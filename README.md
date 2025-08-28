@@ -14,7 +14,21 @@
 
 ## Usage
 
-TODO
+### Creating a cross virtual environment
+
+To create a cross virtual environment:
+
+    $ python3 -m venv venv
+    $ source venv/bin/activate
+    (venv) $ pip install xbuild
+    (venv) $ python -m venv x-venv
+    (venv) $ xvenv --sysconfig path/to/_sysconfig_vars__.json x-venv
+    (venv) $ deactivate
+    $ source x-venv/bin/activate
+    (x-venv) python -c "import sys; print(sys.platform)"
+
+This should now print the platform identifier for the target platform, not your
+build platform.
 
 ## Contributing
 
