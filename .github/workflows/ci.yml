@@ -43,7 +43,8 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5.6.0
       with:
-        python-version: "${{ matrix.python-version}}"
+        python-version: "${{ matrix.python-version }}"
+        allow-prereleases: true
 
     # # This step is only needed if you're trying to diagnose test failures that
     # # only occur in CI, and can't be reproduced locally. When it runs, it will
