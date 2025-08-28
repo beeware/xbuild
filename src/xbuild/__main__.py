@@ -6,7 +6,6 @@ import sys
 from collections.abc import Sequence
 from functools import partial
 
-import xbuild
 from build import ProjectBuilder
 from build import env as _env
 from build.__main__ import (
@@ -19,6 +18,8 @@ from build.__main__ import (
 )
 from build._types import ConfigSettings, Distribution, StrPath
 from build.env import DefaultIsolatedEnv
+
+import xbuild
 
 
 def _build_in_isolated_env(

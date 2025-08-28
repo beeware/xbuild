@@ -5,11 +5,12 @@ from argparse import ArgumentParser
 from collections.abc import Sequence
 from pathlib import Path
 
-import xvenv
 from build.__main__ import (
     _cprint,
     _error,
 )
+
+import xvenv
 from xvenv.convert import convert_venv
 
 
