@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 dynamic = ["version"]
 name = "xbuild"
-description = "A PEP517 build backend for cross-compiling wheels."
+description = "A PEP517 build frontend for cross-compiling wheels."
 readme = "README.md"
 requires-python = ">= 3.13"
 license = "BSD-3-Clause"

@@ -6,7 +6,7 @@
 [![BSD License](https://img.shields.io/pypi/l/xbuild.svg)](https://github.com/beeware/xbuild/blob/master/LICENSE)
 [![Discord server](https://img.shields.io/discord/836455665257021440?label=Discord%20Chat&logo=discord&style=plastic)](https://beeware.org/bee/chat/)
 
-`xbuild` is PEP517 build backend that has additions and extensions to support cross-compiling wheels for platforms where compilation cannot be performed natively - most notably:
+`xbuild` is PEP517 build frontend that has additions and extensions to support cross-compiling wheels for platforms where compilation cannot be performed natively - most notably:
 
 * Android
 * Emscripten (WASM)
