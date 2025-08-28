@@ -1,0 +1,26 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Distribution / packaging
+build/lib/
+dist/
+*.egg-info/
+.eggs
+
+# Testing and coverage
+.cache
+.tox/
+.mypy_cache/
+.pytest_cache
+htmlcov/
+.coverage
+coverage.xml
+tests/integration/
+.integration-sources
+.tox
+Dockerfile
+
+# In-repo spaces for local testing
+local/
+temp/
