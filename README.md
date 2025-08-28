@@ -16,19 +16,39 @@
 
 ### Creating a cross virtual environment
 
-To create a cross virtual environment:
+To create a cross virtual environment, you will need a distribution of Python that has
+been compiled for Android, Emscripten or iOS. Create a virtual environment for your
+build platform (i.e., the platform where you will be compiling), then use the `xvenv`
+script to convert that virtual environment in to a cross environment.
 
     $ python3 -m venv venv
     $ source venv/bin/activate
     (venv) $ pip install xbuild
     (venv) $ python -m venv x-venv
-    (venv) $ xvenv --sysconfig path/to/_sysconfig_vars__.json x-venv
-    (venv) $ deactivate
+    (venv) $ xvenv --sysconfig path/to/_sysconfig_vars__...json x-venv
+
+You can then activate the cross virtual environment. For example, if `x-venv`
+was constructed using an iOS simulator sysconfig vars file
+(`_sysconfig_vars__ios_arm64-iphonesimulator.json`), you would see output like:
+
     $ source x-venv/bin/activate
-    (x-venv) python -c "import sys; print(sys.platform)"
+    (x-venv) $ python -c "import sys; print(sys.platform)"
+    ios
+    (x-venv) $ python -c "import sys; print(sys.implementation._multiarch)"
+    arm64-iphonesimulator
 
 This should now print the platform identifier for the target platform, not your
 build platform.
+
+If you are in the cross environment, and you need to temporarily convert
+it back to the build platform, you can do so with the `XBUILD_ENV` environment
+variable. For example, if `x-venv` is an iOS cross environment:
+
+    $ source x-venv/bin/activate
+    (x-venv) $ python -c "import sys; print(sys.platform)"
+    ios
+    (x-venv) $ XBUILD_ENV=off python -c "import sys; print(sys.platform)"
+    darwin
 
 ## Contributing
 
