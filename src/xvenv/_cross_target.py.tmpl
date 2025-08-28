@@ -1,10 +1,21 @@
 # A site package that turns a virtual environment
 # into a {os} {multiarch} cross-platform virtual environment
+import functools
+import os
 import platform
 import subprocess
 import sys
 import sysconfig
-import os
+
+
+def monkeypatch(module):
+    """A decorator for patching a function in a module."""
+    def _dec(fn):
+        orig_fn = getattr(module, fn.__name__, None)
+        setattr(module, fn.__name__, fn)
+        functools.wraps(orig_fn)(fn)
+
+    return _dec
 
 
 def patch_cross_env():
@@ -22,7 +33,8 @@ def patch_cross_env():
     ###########################################################################
     # os module patches
     ###########################################################################
-    def cross_os_uname():
+    @monkeypatch(os)
+    def uname():
         return os.uname_result(
             (
                 "{os_sysname}",
@@ -33,15 +45,14 @@ def patch_cross_env():
             )
         )
 
-    os.uname = cross_os_uname
-
     ###########################################################################
     # platform module patches
     ###########################################################################
-    def cross_uname():
+    @monkeypatch(platform)
+    def uname():
         return platform.uname_result(
             system="{os}",
-            node="build",
+            node="{os_nodename}",
             release="{release}",
             version="{os_version}",
             machine="{arch}",
@@ -58,14 +69,13 @@ def patch_cross_env():
     # sysconfig module patches
     ###########################################################################
 
-    def cross_get_platform():
-        return "{platform}-{release}-{multiarch}"
+    @monkeypatch(sysconfig)
+    def get_platform():
+        return "{platform}-{platform_version}-{multiarch}"
 
-    def cross_get_sysconfigdata_name():
+    @monkeypatch(sysconfig)
+    def get_sysconfigdata_name():
         return "_sysconfigdata__{platform}_{multiarch}"
-
-    sysconfig.get_platform = cross_get_platform
-    sysconfig._get_sysconfigdata_name = cross_get_sysconfigdata_name
 
     # Ensure module-level values cached at time of import are updated.
     sysconfig._BASE_PREFIX = sys.base_prefix

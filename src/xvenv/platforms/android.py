@@ -29,7 +29,9 @@ def extend_context(context, sysconfig):
         raise ValueError("xbuild doesn't support API levels lower than 20")
 
     ######################################################################
+    context["os"] = "Android"
     context["release"] = release
+    context["platform_version"] = api_level
 
     # The Linux kernel version and release are unlikely to be
     # significant, but return realistic values anyway (from an
@@ -40,10 +42,12 @@ def extend_context(context, sysconfig):
     context["os_version"] = "#1 SMP PREEMPT Tue Jan 9 20:35:43 UTC 2018"
 
     context["platform_extra"] = f"""
-    def cross_getandroidapilevel() -> int:
+    @monkeypatch(platform)
+    def getandroidapilevel() -> int:
         return {api_level}
 
-    def cross_android_ver(
+    @monkeypatch(platform)
+    def android_ver(
         release="",
         api_level=0,
         manufacturer="",
@@ -54,7 +58,7 @@ def extend_context(context, sysconfig):
         if release == "":
             release = "{release}"
         if api_level == "":
-            release = "{api_level}"
+            api_level = "{api_level}"
         if manufacturer == "":
             manufacturer = "Google"
         if model == "":
@@ -66,6 +70,4 @@ def extend_context(context, sysconfig):
             release, api_level, manufacturer, model, device, True
         )
 
-    platform.getandroidapilevel = cross_getandroidapilevel
-    platform.android_ver = cross_android_ver
 """

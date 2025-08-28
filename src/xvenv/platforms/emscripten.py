@@ -1,14 +1,15 @@
 def extend_context(context, sysconfig):
-    context["release"] = "4.0.12"
+    emscripten_version = "4.0.12"
+    context["release"] = emscripten_version
+    context["platform_version"] = emscripten_version
 
     context["os_sysname"] = "Emscripten"
     context["os_nodename"] = "emscripten"
-    context["os_release"] = "4.0.12"
+    context["os_release"] = emscripten_version
     context["os_version"] = "#1"
 
-    context["platform_extra"] = """
-    def cross_libc_ver() -> int:
-        return ("emscripten", "4.0.12")
-
-    platform.libc_ver = cross_libc_ver
+    context["platform_extra"] = f"""
+    @monkeypatch(platform)
+    def libc_ver() -> int:
+        return ("emscripten", {emscripten_version})
 """

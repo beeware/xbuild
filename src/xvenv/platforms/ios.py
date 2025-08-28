@@ -5,6 +5,7 @@ def extend_context(context, sysconfig):
     ######################################################################
     context["os"] = "iOS"
     context["release"] = release
+    context["platform_version"] = release
 
     # The Darwin kernel version and release are unlikely to be
     # significant, but return realistic values anyway (from an
@@ -18,7 +19,8 @@ def extend_context(context, sysconfig):
     )
 
     context["platform_extra"] = f"""
-    def cross_ios_ver(system="", release="", model="", is_simulator=False):
+    @monkeypatch(platform)
+    def ios_ver(system="", release="", model="", is_simulator=False):
         if system == "":
             system = "iOS"
         if release == "":
@@ -27,6 +29,4 @@ def extend_context(context, sysconfig):
             model = "{context["sdk"]}"
 
         return platform.IOSVersionInfo(system, release, model, {is_simulator})
-
-    platform.ios_ver = cross_ios_ver
 """
