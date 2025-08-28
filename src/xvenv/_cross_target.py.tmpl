@@ -1,0 +1,81 @@
+# A site package that turns a virtual environment
+# into a {os} {multiarch} cross-platform virtual environment
+import platform
+import subprocess
+import sys
+import sysconfig
+import os
+
+
+def patch_cross_env():
+    ###########################################################################
+    # sys module patches
+    ###########################################################################
+    sys.cross_compiling = True
+    sys.platform = "{platform}"
+    sys.implementation._multiarch = "{multiarch}"
+    sys.abiflags = "{abiflags}"
+
+    sys.base_prefix = sysconfig._get_sysconfigdata()["prefix"]
+    sys.base_exec_prefix = sysconfig._get_sysconfigdata()["prefix"]
+
+    ###########################################################################
+    # os module patches
+    ###########################################################################
+    def cross_os_uname():
+        return os.uname_result(
+            (
+                "{os_sysname}",
+                "{os_nodename}",
+                "{os_release}",
+                "{os_version}",
+                "{arch}",
+            )
+        )
+
+    os.uname = cross_os_uname
+
+    ###########################################################################
+    # platform module patches
+    ###########################################################################
+    def cross_uname():
+        return platform.uname_result(
+            system="{os}",
+            node="build",
+            release="{release}",
+            version="{os_version}",
+            machine="{arch}",
+        )
+
+    # -------------------------------------------------------------------------
+{platform_extra}
+    ###########################################################################
+    # subprocess module patches
+    ###########################################################################
+    subprocess._can_fork_exec = True
+
+    ###########################################################################
+    # sysconfig module patches
+    ###########################################################################
+
+    def cross_get_platform():
+        return "{platform}-{release}-{multiarch}"
+
+    def cross_get_sysconfigdata_name():
+        return "_sysconfigdata__{platform}_{multiarch}"
+
+    sysconfig.get_platform = cross_get_platform
+    sysconfig._get_sysconfigdata_name = cross_get_sysconfigdata_name
+
+    # Ensure module-level values cached at time of import are updated.
+    sysconfig._BASE_PREFIX = sys.base_prefix
+    sysconfig._BASE_EXEC_PREFIX = sys.base_exec_prefix
+
+    # Force sysconfig data to be loaded (and cached).
+    sysconfig._init_config_vars()
+
+
+# if XBUILD_ENV=off is in the environment, don't apply any environment shims.
+# This reverts the environment to a native build environment.
+if os.environ.get("XBUILD_ENV", "on").lower() in {{"1", "on"}}:
+    patch_cross_env()

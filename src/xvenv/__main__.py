@@ -10,6 +10,7 @@ from build.__main__ import (
     _cprint,
     _error,
 )
+from xvenv.convert import convert_venv
 
 
 def main_parser():
@@ -35,8 +36,9 @@ def main_parser():
         help="increase verbosity",
     )
     parser.add_argument(
-        "--target",
-        help="The path to an unpacked binary distribution for the target platform",
+        "-s",
+        "--sysconfig",
+        help="The path to a sysconfig_vars JSON file",
     )
     parser.add_argument(
         "venv",
@@ -57,12 +59,21 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     args = parser.parse_args(cli_args)
 
     venv_path = Path(args.venv).resolve()
-    support_path = Path(args.target).resolve()
+    sysconfig_path = Path(args.sysconfig).resolve()
 
     if not venv_path.exists():
         _error(f"Native virtual environment {venv_path} does not exist.")
     else:
-        _cprint("{bold}{green}Convert {} using {}{reset}", venv_path, support_path)
+        try:
+            description = convert_venv(venv_path, sysconfig_path)
+        except Exception as e:
+            _error(e)
+            sys.exit(1)
+        else:
+            _cprint(
+                "{bold}{green}{}{reset}",
+                f"{args.venv} is now an {description} cross venv.",
+            )
 
 
 def entrypoint() -> None:
