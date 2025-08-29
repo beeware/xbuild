@@ -27,8 +27,12 @@ def patch_cross_env():
     sys.implementation._multiarch = "{multiarch}"
     sys.abiflags = "{abiflags}"
 
-    sys.base_prefix = sysconfig._get_sysconfigdata()["prefix"]
-    sys.base_exec_prefix = sysconfig._get_sysconfigdata()["prefix"]
+    if sys.version_info < (3, 14):
+        sys.base_prefix = sysconfig.get_config_var("prefix")
+        sys.base_exec_prefix = sysconfig.get_config_var("prefix")
+    else:
+        sys.base_prefix = sysconfig._get_sysconfigdata()["prefix"]
+        sys.base_exec_prefix = sysconfig._get_sysconfigdata()["prefix"]
 
     ###########################################################################
     # os module patches

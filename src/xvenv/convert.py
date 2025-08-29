@@ -1,5 +1,6 @@
 import json
 import pprint
+import sys
 from importlib import import_module
 from importlib import util as importlib_util
 from pathlib import Path
@@ -56,6 +57,8 @@ def localize_sysconfigdata(sysconfigdata_path, venv_site_packages):
             compact=True,
         )
 
+    return sysconfigdata.build_time_vars
+
 
 def localize_sysconfig_vars(sysconfig_vars_path, venv_site_packages):
     """Localize a sysconfig_vars.json file.
@@ -78,12 +81,12 @@ def localize_sysconfig_vars(sysconfig_vars_path, venv_site_packages):
     return sysconfig_vars
 
 
-def convert_venv(venv_path: Path, sysconfig_vars_path: Path):
+def convert_venv(venv_path: Path, sysconfig_path: Path):
     """Convert a virtual environment into a cross-platform environment.
 
     :param venv_path: The path to the root of the venv.
-    :param sysconfig_vars_path: The path to the sysconfig_vars JSON file for the target
-        platform.
+    :param sysconfig_path: The path to the sysconfig_vars JSON or sysconfigdata Python
+        file for the target platform.
     """
     if not venv_path.exists():
         raise ValueError(f"Virtual environment {venv_path} does not exist.")
@@ -99,8 +102,31 @@ def convert_venv(venv_path: Path, sysconfig_vars_path: Path):
 
     venv_site_packages_path = platlibs[0]
 
-    if not sysconfig_vars_path.is_file():
-        raise ValueError(f"Could not find sysconfig file {sysconfig_vars_path}")
+    if not sysconfig_path.is_file():
+        raise ValueError(f"Could not find sysconfig file {sysconfig_path}")
+
+    match sysconfig_path.suffix:
+        case ".json":
+            sysconfig_vars_path = sysconfig_path
+            _, _, _, abiflags, platform, multiarch = sysconfig_vars_path.stem.split("_")
+
+            sysconfigdata_path = (
+                sysconfig_vars_path.parent
+                / f"_sysconfigdata_{abiflags}_{platform}_{multiarch}.py"
+            )
+        case ".py":
+            sysconfigdata_path = sysconfig_path
+            _, _, abiflags, platform, multiarch = sysconfigdata_path.stem.split("_")
+
+            sysconfig_vars_path = (
+                sysconfigdata_path.parent
+                / f"_sysconfig_vars_{abiflags}_{platform}_{multiarch}.py"
+            )
+        case _:
+            raise ValueError(
+                "Don't know how to process sysconfig data "
+                f"of type {sysconfig_path.suffix}"
+            )
 
     if sysconfig_vars_path.parts[-2] != venv_site_packages_path.parts[-2]:
         raise ValueError(
@@ -108,19 +134,14 @@ def convert_venv(venv_path: Path, sysconfig_vars_path: Path):
             f"sysconfig file is for {sysconfig_vars_path.parts[-2]}"
         )
 
-    # Extract some basic properties from the name of the sysconfig_vars filename.
-    _, _, _, abiflags, platform, multiarch = sysconfig_vars_path.stem.split("_")
-    arch, sdk = multiarch.split("-", 1)
-
-    # Localize the sysconfig data.
-    sysconfig = localize_sysconfig_vars(sysconfig_vars_path, venv_site_packages_path)
-    sysconfigdata_path = (
-        sysconfig_vars_path.parent
-        / f"_sysconfigdata_{abiflags}_{platform}_{multiarch}.py"
-    )
-    localize_sysconfigdata(sysconfigdata_path, venv_site_packages_path)
+    # Localize the sysconfig data. sysconfigdata *must* exist; sysconfig_vars
+    # will only exist on Python 3.14 or newer.
+    sysconfig = localize_sysconfigdata(sysconfigdata_path, venv_site_packages_path)
+    if sys.version_info[:2] >= (3, 14):
+        localize_sysconfig_vars(sysconfig_vars_path, venv_site_packages_path)
 
     # Generate the context for the templated cross-target file
+    arch, sdk = multiarch.split("-", 1)
     context = {
         "platform": platform,
         "os": platform,  # some platforms use different capitalization here

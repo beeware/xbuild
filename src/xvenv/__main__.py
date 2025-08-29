@@ -39,7 +39,7 @@ def main_parser():
     parser.add_argument(
         "-s",
         "--sysconfig",
-        help="The path to a sysconfig_vars JSON file",
+        help="The path to a sysconfig_vars JSON file or sysconfigdata Python file",
     )
     parser.add_argument(
         "venv",
