@@ -40,6 +40,11 @@ was constructed using an iOS simulator sysconfig vars file
 This should now print the platform identifier for the target platform, not your
 build platform.
 
+You can also configure xvenv with a `_sysconfigdata` Python file (e.g.,
+(`_sysconfigdata__ios_arm64-iphonesimulator.py`), instead of the
+`_sysconfig_var` JSON file. You'll have to use `_sysconfigdata` if you're on
+Python 3.13 (as the JSON format was only introduced in Python 3.14)
+
 If you are in the cross environment, and you need to temporarily convert
 it back to the build platform, you can do so with the `XBUILD_ENV` environment
 variable. For example, if `x-venv` is an iOS cross environment:
