@@ -12,5 +12,5 @@ def extend_context(context, sysconfig):
     context["platform_extra"] = f"""
     @monkeypatch(platform)
     def libc_ver() -> int:
-        return ("emscripten", {emscripten_version})
+        return ("emscripten", "{emscripten_version}")
 """

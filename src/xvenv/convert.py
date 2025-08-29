@@ -128,17 +128,17 @@ def convert_venv(venv_path: Path, sysconfig_path: Path):
                 f"of type {sysconfig_path.suffix}"
             )
 
-    if sysconfig_vars_path.parts[-2] != venv_site_packages_path.parts[-2]:
-        raise ValueError(
-            f"venv is {venv_site_packages_path.parts[-2]}; "
-            f"sysconfig file is for {sysconfig_vars_path.parts[-2]}"
-        )
-
     # Localize the sysconfig data. sysconfigdata *must* exist; sysconfig_vars
     # will only exist on Python 3.14 or newer.
     sysconfig = localize_sysconfigdata(sysconfigdata_path, venv_site_packages_path)
     if sys.version_info[:2] >= (3, 14):
         localize_sysconfig_vars(sysconfig_vars_path, venv_site_packages_path)
+
+    if sysconfig["VERSION"] != venv_site_packages_path.parts[-2][6:]:
+        raise ValueError(
+            f"target venv is Python {venv_site_packages_path.parts[-2][6:]}; "
+            f"sysconfig file is for Python {sysconfig['VERSION']}"
+        )
 
     # Generate the context for the templated cross-target file
     arch, sdk = multiarch.split("-", 1)
