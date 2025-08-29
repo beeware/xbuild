@@ -2,6 +2,7 @@ def extend_context(context, sysconfig):
     emscripten_version = "4.0.12"
     context["release"] = emscripten_version
     context["platform_version"] = emscripten_version
+    context["machine"] = context["arch"]
 
     context["os_sysname"] = "Emscripten"
     context["os_nodename"] = "emscripten"

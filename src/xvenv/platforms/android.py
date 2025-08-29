@@ -32,6 +32,12 @@ def extend_context(context, sysconfig):
     context["os"] = "Android"
     context["release"] = release
     context["platform_version"] = api_level
+    context["machine"] = {
+        "x86_64": "x86_64",
+        "i686": "x86",
+        "aarch64": "arm64_v8a",
+        "armv7l": "armeabi_v7a",
+    }[context["arch"]]
 
     # The Linux kernel version and release are unlikely to be
     # significant, but return realistic values anyway (from an
@@ -57,8 +63,8 @@ def extend_context(context, sysconfig):
     ):
         if release == "":
             release = "{release}"
-        if api_level == "":
-            api_level = "{api_level}"
+        if api_level == 0:
+            api_level = {api_level}
         if manufacturer == "":
             manufacturer = "Google"
         if model == "":

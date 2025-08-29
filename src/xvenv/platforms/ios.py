@@ -6,6 +6,7 @@ def extend_context(context, sysconfig):
     context["os"] = "iOS"
     context["release"] = release
     context["platform_version"] = release
+    context["machine"] = context["multiarch"]
 
     # The Darwin kernel version and release are unlikely to be
     # significant, but return realistic values anyway (from an

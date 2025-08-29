@@ -75,7 +75,7 @@ def patch_cross_env():
 
     @monkeypatch(sysconfig)
     def get_platform():
-        return "{platform}-{platform_version}-{multiarch}"
+        return "{platform}-{platform_version}-{machine}"
 
     @monkeypatch(sysconfig)
     def get_sysconfigdata_name():
