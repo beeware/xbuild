@@ -60,7 +60,7 @@ test = [
 ]
 ci = [
     "setuptools_scm == 9.2.0",
-    "tox == 4.29.0",
+    "tox-uv == 1.28.0",
 ]
 dev = [
     {include-group = "pre-commit"},
@@ -90,4 +90,19 @@ extend-select = [
     # They may be worth occasionally turning on just to see if something could actually
     # use improvement.
     # "SIM",    # flake8-simplify
+]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "xbuild",
+    "xvenv",
+]
+known-third-party = [
+    "build",
+]
+
+[tool.check-wheel-contents]
+toplevel = [
+    "xbuild",
+    "xvenv",
 ]
