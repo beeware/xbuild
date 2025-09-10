@@ -82,7 +82,7 @@ def entrypoint() -> None:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main(sys.argv[1:], "python -m build")
+    main(sys.argv[1:], "python -m xvenv")
 
 __all__ = [
     "main",
