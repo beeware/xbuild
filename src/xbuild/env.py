@@ -12,6 +12,8 @@ from build import _ctx
 from build import env as build_env
 from build.env import DefaultIsolatedEnv, _PipBackend
 
+from xvenv.convert import convert_venv
+
 
 ###########################################################################
 # Patch `build.env._PipBackend` to disable the cross-build environment
@@ -50,40 +52,57 @@ build_env._PipBackend = _XPipBackend
 
 
 ###########################################################################
-# Add an XBuild isolated environment that can handle cross-platform
-# installs, and passes
+# An isolated environment manager that creates cross-plaform installs,
+# and can handle both build and target dependency installs.
 ###########################################################################
 class XBuildIsolatedEnv(DefaultIsolatedEnv):
-    def __init__(self, *, installer):
+    def __init__(self, *, installer, sysconfig_path):
         if installer == "uv":
             raise RuntimeError("Can't support uv (for now)")
 
         super().__init__()
+        self.sysconfig_path = sysconfig_path
 
     def __enter__(self) -> XBuildIsolatedEnv:
         super().__enter__()
 
-        # Copy any _cross_*.pth or _cross_*.py file, plus the cross-platform
-        # sysconfig data to the new environment.
-        data_name = sysconfig._get_sysconfigdata_name()
-        if sys.version_info < (3, 14):
-            vars_files = []
-        else:
-            vars_files = [sysconfig._get_json_data_name()]
+        # If we're not in a cross-compiling environment, the isolated environment
+        # that we create must become a cross-compiling environment. Otherwise,
+        # transfer the currently active cross-compilation environment to the
+        # isolated environment.
+        if not getattr(sys, "cross_compiling", False):
+            # We're in a local environment.
+            # Make the isolated environment a cross environment.
+            if self.sysconfig_path is None:
+                raise RuntimeError(
+                    "Must specify the location of target platform sysconfig data "
+                    "with --sysconfig"
+                )
 
-        multiarch = sys.implementation._multiarch.replace("-", "_")
-        SRC_SITE_PACKAGES = Path(sysconfig.get_path("platlib"))
-        for filename in [
-            "_cross_venv.pth",
-            f"_cross_{sys.platform}_{multiarch}.py",
-            f"{data_name}.py",
-        ] + vars_files:
-            src = SRC_SITE_PACKAGES / filename
-            target = Path(self._path) / src.relative_to(
-                SRC_SITE_PACKAGES.parent.parent.parent
-            )
-            if not target.exists():
-                shutil.copy(src, target)
+            convert_venv(Path(self._path), self.sysconfig_path)
+        else:
+            # We're already in a cross environment.
+            # Copy any _cross_*.pth or _cross_*.py file, plus the cross-platform
+            # sysconfig data to the new environment.
+            data_name = sysconfig._get_sysconfigdata_name()
+            if sys.version_info < (3, 14):
+                vars_files = []
+            else:
+                vars_files = [sysconfig._get_json_data_name()]
+
+            multiarch = sys.implementation._multiarch.replace("-", "_")
+            SRC_SITE_PACKAGES = Path(sysconfig.get_path("platlib"))
+            for filename in [
+                "_cross_venv.pth",
+                f"_cross_{sys.platform}_{multiarch}.py",
+                f"{data_name}.py",
+            ] + vars_files:
+                src = SRC_SITE_PACKAGES / filename
+                target = Path(self._path) / src.relative_to(
+                    SRC_SITE_PACKAGES.parent.parent.parent
+                )
+                if not target.exists():
+                    shutil.copy(src, target)
 
         return self
 

@@ -6,6 +6,7 @@ import os
 import sys
 from collections.abc import Sequence
 from functools import partial
+from pathlib import Path
 
 from build import env as _env
 from build.__main__ import (
@@ -30,8 +31,12 @@ def _build_in_isolated_env(
     distribution: Distribution,
     config_settings: ConfigSettings | None,
     installer: _env.Installer,
+    sysconfig_path: Path | None,
 ) -> str:
-    with XBuildIsolatedEnv(installer=installer) as env:
+    with XBuildIsolatedEnv(
+        installer=installer,
+        sysconfig_path=sysconfig_path,
+    ) as env:
         builder = ProjectXBuilder.from_isolated_env(env, srcdir)
 
         # First install the dependencies for the build
@@ -139,6 +144,16 @@ def main_parser() -> argparse.ArgumentParser:
     #     choices=_env.INSTALLERS,
     #     help="Python package installer to use (defaults to pip)",
     # )
+
+    # This is only a required argument if the current environment isn't cross-compiling.
+    # If/when this project is merged into `build`, the existence of `--sysconfig` as
+    # an argument will be the trigger for "this is a cross platform build".
+    parser.add_argument(
+        "--sysconfig",
+        help="The path to a sysconfig_vars JSON file or sysconfigdata Python file",
+        required=not getattr(sys, "cross_compiling", False),
+    )
+
     config_group = parser.add_mutually_exclusive_group()
     config_group.add_argument(
         "--config-setting",
@@ -210,6 +225,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     outdir = os.path.join(args.srcdir, "dist") if args.outdir is None else args.outdir
 
     with _handle_build_error():
+        sysconfig_path = Path(args.sysconfig) if args.sysconfig else None
         built = [
             _build_in_isolated_env(
                 args.srcdir,
@@ -217,6 +233,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
                 "wheel",
                 config_settings,
                 "pip",
+                sysconfig_path=sysconfig_path,
             )
         ]
         artifact_list = _natural_language_list(
@@ -233,7 +250,7 @@ def entrypoint() -> None:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main(sys.argv[1:], "python -m build")
+    main(sys.argv[1:], "python -m xbuild")
 
 __all__ = [
     "main",
