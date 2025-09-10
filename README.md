@@ -100,7 +100,7 @@ If you are in the cross-platform environment, and you need to temporarily conver
     (x-venv) $ XBUILD_ENV=off python -c "import sys; print(sys.platform)"
     darwin
 
-If you have an active cross-platform virtual environment, you can run `xbuild` without providing the `--sysconfig` variable. The configuration of your existing cross virtual environment will copied into the isolated environment for the build.
+If you have an active cross-platform virtual environment, you can run `xbuild` without providing the `--sysconfig` variable. The configuration of your existing cross virtual environment will copied into the isolated environment for the build. Alternatively, you can also use the `--no-isolation` flag to disable the creation of a isolated cross-platform build environment. This will use your existing cross-platform environment as the build environment.
 
 ## How this works
 

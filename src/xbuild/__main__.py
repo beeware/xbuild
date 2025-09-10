@@ -12,6 +12,7 @@ from build import env as _env
 from build.__main__ import (
     _cprint,
     _error,
+    _format_dep_chain,
     _handle_build_error,
     _max_terminal_width,
     _natural_language_list,
@@ -23,6 +24,35 @@ from build._types import ConfigSettings, Distribution, StrPath
 import xbuild
 from xbuild._builder import ProjectXBuilder
 from xbuild.env import XBuildIsolatedEnv
+
+
+def _build(
+    isolation: bool,
+    srcdir: StrPath,
+    outdir: StrPath,
+    distribution: Distribution,
+    config_settings: ConfigSettings | None,
+    skip_dependency_check: bool,
+    installer: _env.Installer,
+    sysconfig_path: Path | None,
+) -> str:
+    if isolation:
+        return _build_in_isolated_env(
+            srcdir,
+            outdir,
+            distribution,
+            config_settings,
+            installer,
+            sysconfig_path=sysconfig_path,
+        )
+    else:
+        return _build_in_current_env(
+            srcdir,
+            outdir,
+            distribution,
+            config_settings,
+            skip_dependency_check,
+        )
 
 
 def _build_in_isolated_env(
@@ -58,6 +88,41 @@ def _build_in_isolated_env(
 
         # Now run the build
         return builder.build(distribution, outdir, config_settings or {})
+
+
+def _build_in_current_env(
+    srcdir: StrPath,
+    outdir: StrPath,
+    distribution: Distribution,
+    config_settings: ConfigSettings | None,
+    skip_dependency_check: bool = False,
+) -> str:
+    builder = ProjectXBuilder(srcdir)
+
+    if not skip_dependency_check:
+        missing = builder.check_dependencies(distribution, config_settings or {})
+        if missing:
+            dependencies = "".join(
+                "\n\t" + dep
+                for deps in missing
+                for dep in (deps[0], _format_dep_chain(deps[1:]))
+                if dep
+            )
+            _cprint()
+            _error(f"Missing build dependencies:{dependencies}")
+
+        missing = builder.check_target_dependencies(distribution, config_settings or {})
+        if missing:
+            dependencies = "".join(
+                "\n\t" + dep
+                for deps in missing
+                for dep in (deps[0], _format_dep_chain(deps[1:]))
+                if dep
+            )
+            _cprint()
+            _error(f"Missing target build dependencies:{dependencies}")
+
+    return builder.build(distribution, outdir, config_settings or {})
 
 
 def main_parser() -> argparse.ArgumentParser:
@@ -125,25 +190,25 @@ def main_parser() -> argparse.ArgumentParser:
         help=f"output directory (defaults to {{srcdir}}{os.sep}dist)",
         metavar="PATH",
     )
-    # parser.add_argument(
-    #     "--skip-dependency-check",
-    #     "-x",
-    #     action="store_true",
-    #     help="do not check that build dependencies are installed",
-    # )
-    # env_group = parser.add_mutually_exclusive_group()
-    # env_group.add_argument(
-    #     "--no-isolation",
-    #     "-n",
-    #     action="store_true",
-    #     help="disable building the project in an isolated virtual environment. "
-    #     "Build dependencies must be installed separately when this option is used",
-    # )
-    # env_group.add_argument(
-    #     "--installer",
-    #     choices=_env.INSTALLERS,
-    #     help="Python package installer to use (defaults to pip)",
-    # )
+    parser.add_argument(
+        "--skip-dependency-check",
+        "-x",
+        action="store_true",
+        help="do not check that build dependencies are installed",
+    )
+    env_group = parser.add_mutually_exclusive_group()
+    env_group.add_argument(
+        "--no-isolation",
+        "-n",
+        action="store_true",
+        help="disable building the project in an isolated virtual environment. "
+        "Build dependencies must be installed separately when this option is used",
+    )
+    env_group.add_argument(
+        "--installer",
+        choices=_env.INSTALLERS,
+        help="Python package installer to use (defaults to pip)",
+    )
 
     # This is only a required argument if the current environment isn't cross-compiling.
     # If/when this project is merged into `build`, the existence of `--sysconfig` as
@@ -226,13 +291,16 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
 
     with _handle_build_error():
         sysconfig_path = Path(args.sysconfig) if args.sysconfig else None
+
         built = [
-            _build_in_isolated_env(
+            _build(
+                not args.no_isolation,
                 args.srcdir,
                 outdir,
                 "wheel",
                 config_settings,
-                "pip",
+                args.skip_dependency_check,
+                args.installer,
                 sysconfig_path=sysconfig_path,
             )
         ]

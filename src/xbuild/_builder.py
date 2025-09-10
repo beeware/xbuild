@@ -6,6 +6,7 @@ from typing import Any
 from build import _builder, _ctx
 from build._builder import ProjectBuilder, _parse_build_system_table
 from build._types import ConfigSettings, Distribution
+from build._util import check_dependency
 
 
 ###########################################################################
@@ -58,4 +59,23 @@ class ProjectXBuilder(ProjectBuilder):
         except AttributeError:
             # For now, most build backends won't implement
             # get_target_requires_for_build_wheel
-            pass
+            return set()
+
+    def check_target_dependencies(
+        self,
+        distribution: Distribution,
+        config_settings: ConfigSettings | None = None,
+    ) -> set[tuple[str, ...]]:
+        """
+        Return the dependencies which are not satisfied from the combined set of
+        :attr:`build_system_target_requires` and
+        :meth:`get_target_requires_for_build` for a given distribution.
+
+        :param distribution: Distribution to check (``sdist`` or ``wheel``)
+        :param config_settings: Config settings for the build backend
+        :returns: Set of variable-length unmet dependency tuples
+        """
+        dependencies = self.get_target_requires_for_build(distribution, config_settings)
+        dependencies |= self.build_system_target_requires
+
+        return {u for d in dependencies for u in check_dependency(d)}
