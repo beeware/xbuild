@@ -36,11 +36,23 @@ def main_parser():
         default=0,
         help="increase verbosity",
     )
-    parser.add_argument(
-        "-s",
-        "--sysconfig",
-        help="The path to a sysconfig_vars JSON file or sysconfigdata Python file",
+
+    # Create mutually exclusive group for --build-details and --sysconfig
+    # One of these arguments must be provided
+    config_group = parser.add_mutually_exclusive_group(required=True)
+    config_group.add_argument(
+        "--build-details",
+        dest="build_details_path",
+        type=Path,
+        help=("The path to a build-details.json file.",),
     )
+    config_group.add_argument(
+        "--sysconfig",
+        dest="sysconfigdata_path",
+        type=Path,
+        help=("The path to a sysconfigdata python file.",),
+    )
+
     parser.add_argument(
         "venv",
         help="The location of a native virtual environment",
@@ -60,13 +72,22 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     args = parser.parse_args(cli_args)
 
     venv_path = Path(args.venv).resolve()
-    sysconfig_path = Path(args.sysconfig).resolve()
+    build_details_path = (
+        Path(args.build_details_path).resolve() if args.build_details_path else None
+    )
+    sysconfigdata_path = (
+        Path(args.sysconfigdata_path).resolve() if args.sysconfigdata_path else None
+    )
 
     if not venv_path.exists():
         _error(f"Native virtual environment {venv_path} does not exist.")
     else:
         try:
-            description = convert_venv(venv_path, sysconfig_path)
+            description = convert_venv(
+                venv_path,
+                build_details_path=build_details_path,
+                sysconfigdata_path=sysconfigdata_path,
+            )
         except Exception as e:
             _error(e)
             sys.exit(1)

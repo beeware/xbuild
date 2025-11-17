@@ -1,6 +1,16 @@
-def extend_context(context, sysconfig):
+def build_details_from_sysconfigdata(sysconfigdata):
+    # Reconstruct a build_details-alike structure from sysconfigdata.
+    arch, _, platform = sysconfigdata["MULTIARCH"].split("-")
+    min_api_level = sysconfigdata["ANDROID_API_LEVEL"]
+    build_details = {
+        "platform": f"{platform}-{min_api_level}-{arch}",
+    }
+    return build_details
+
+
+def extend_context(context, build_details):
     # Convert the API level into a release number
-    api_level = int(sysconfig["ANDROID_API_LEVEL"])
+    api_level = int(build_details["platform"].split("-")[1])
     if api_level >= 33:
         release = f"{api_level - 20}"
     elif api_level == 32:

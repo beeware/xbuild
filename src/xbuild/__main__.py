@@ -34,7 +34,8 @@ def _build(
     config_settings: ConfigSettings | None,
     skip_dependency_check: bool,
     installer: _env.Installer,
-    sysconfig_path: Path | None,
+    build_details_path: Path | None,
+    sysconfigdata_path: Path | None,
 ) -> str:
     if isolation:
         return _build_in_isolated_env(
@@ -43,7 +44,8 @@ def _build(
             distribution,
             config_settings,
             installer,
-            sysconfig_path=sysconfig_path,
+            build_details_path=build_details_path,
+            sysconfigdata_path=sysconfigdata_path,
         )
     else:
         return _build_in_current_env(
@@ -61,11 +63,13 @@ def _build_in_isolated_env(
     distribution: Distribution,
     config_settings: ConfigSettings | None,
     installer: _env.Installer,
-    sysconfig_path: Path | None,
+    build_details_path: Path | None,
+    sysconfigdata_path: Path | None,
 ) -> str:
     with XBuildIsolatedEnv(
         installer=installer,
-        sysconfig_path=sysconfig_path,
+        build_details_path=build_details_path,
+        sysconfigdata_path=sysconfigdata_path,
     ) as env:
         builder = ProjectXBuilder.from_isolated_env(env, srcdir)
 
@@ -210,15 +214,24 @@ def main_parser() -> argparse.ArgumentParser:
         help="Python package installer to use (defaults to pip)",
     )
 
-    # This is only a required argument if the current environment isn't cross-compiling.
-    # If/when this project is merged into `build`, the existence of `--sysconfig` as
-    # an argument will be the trigger for "this is a cross platform build".
-    parser.add_argument(
-        "--sysconfig",
-        help="The path to a sysconfig_vars JSON file or sysconfigdata Python file",
-        required=not getattr(sys, "cross_compiling", False),
+    # This is only a required argument if the current environment isn't
+    # cross-compiling. If/when this project is merged into `build`, the
+    # existence of `--build-details/--sysconfig` as an argument will be the
+    # trigger for "this is a cross platform build". The two arguments are
+    # mutually exclusive.
+    config_group = parser.add_mutually_exclusive_group(required=True)
+    config_group.add_argument(
+        "--build-details",
+        dest="build_details_path",
+        type=Path,
+        help=("The path to a build-details.json file.",),
     )
-
+    config_group.add_argument(
+        "--sysconfig",
+        dest="sysconfigdata_path",
+        type=Path,
+        help=("The path to a sysconfigdata python file.",),
+    )
     config_group = parser.add_mutually_exclusive_group()
     config_group.add_argument(
         "--config-setting",
@@ -290,8 +303,6 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     outdir = os.path.join(args.srcdir, "dist") if args.outdir is None else args.outdir
 
     with _handle_build_error():
-        sysconfig_path = Path(args.sysconfig) if args.sysconfig else None
-
         built = [
             _build(
                 not args.no_isolation,
@@ -301,7 +312,8 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
                 config_settings,
                 args.skip_dependency_check,
                 args.installer,
-                sysconfig_path=sysconfig_path,
+                build_details_path=args.build_details_path,
+                sysconfigdata_path=args.sysconfigdata_path,
             )
         ]
         artifact_list = _natural_language_list(
