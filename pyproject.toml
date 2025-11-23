@@ -53,7 +53,7 @@ Source = "https://github.com/beeware/xbuild"
 # Extras used by developers *of* briefcase are pinned to specific versions to
 # ensure environment consistency.
 pre-commit = [
-    "pre-commit == 4.4.0",
+    "pre-commit == 4.5.0",
 ]
 test = [
     "pytest == 9.0.1",
