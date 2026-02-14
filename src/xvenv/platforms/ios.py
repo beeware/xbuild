@@ -1,5 +1,16 @@
-def extend_context(context, sysconfig):
-    release = sysconfig["IPHONEOS_DEPLOYMENT_TARGET"]
+def build_details_from_sysconfigdata(sysconfigdata):
+    # Reconstruct a build_details-alike structure from sysconfigdata.
+    platform = sysconfigdata["MACHDEP"]
+    multiarch = sysconfigdata["MULTIARCH"]
+    ios_target = sysconfigdata["IPHONEOS_DEPLOYMENT_TARGET"]
+    build_details = {
+        "platform": f"{platform}-{ios_target}-{multiarch}",
+    }
+    return build_details
+
+
+def extend_context(context, build_details):
+    release = build_details["platform"].split("-")[1]
     is_simulator = context["sdk"] == "iphonesimulator"
 
     ######################################################################

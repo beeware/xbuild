@@ -1,4 +1,12 @@
-def extend_context(context, sysconfig):
+def build_details_from_sysconfigdata(sysconfigdata):
+    # Reconstruct a build_details-alike structure from sysconfigdata.
+    build_details = {
+        "platform": "emscripten-4.0.12-wasm32",
+    }
+    return build_details
+
+
+def extend_context(context, build_details):
     emscripten_version = "4.0.12"
     context["release"] = emscripten_version
     context["platform_version"] = emscripten_version

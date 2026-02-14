@@ -56,12 +56,13 @@ build_env._PipBackend = _XPipBackend
 # and can handle both build and target dependency installs.
 ###########################################################################
 class XBuildIsolatedEnv(DefaultIsolatedEnv):
-    def __init__(self, *, installer, sysconfig_path):
+    def __init__(self, *, installer, build_details_path, sysconfigdata_path):
         if installer == "uv":
             raise RuntimeError("Can't support uv (for now)")
 
         super().__init__()
-        self.sysconfig_path = sysconfig_path
+        self.build_details_path = build_details_path
+        self.sysconfigdata_path = sysconfigdata_path
 
     def __enter__(self) -> XBuildIsolatedEnv:
         super().__enter__()
@@ -73,13 +74,17 @@ class XBuildIsolatedEnv(DefaultIsolatedEnv):
         if not getattr(sys, "cross_compiling", False):
             # We're in a local environment.
             # Make the isolated environment a cross environment.
-            if self.sysconfig_path is None:
+            if self.build_details_path is None and self.sysconfigdata_path is None:
                 raise RuntimeError(
-                    "Must specify the location of target platform sysconfig data "
-                    "with --sysconfig"
+                    "Must specify the location of target platform build_details.json "
+                    "with --build-details, or sysconfigdata with --sysconfig"
                 )
 
-            convert_venv(Path(self._path), self.sysconfig_path)
+            convert_venv(
+                Path(self._path),
+                build_details_path=self.build_details_path,
+                sysconfigdata_path=self.sysconfigdata_path,
+            )
         else:
             # We're already in a cross environment.
             # Copy any _cross_*.pth or _cross_*.py file, plus the cross-platform
