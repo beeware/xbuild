@@ -44,13 +44,13 @@ def main_parser():
         "--build-details",
         dest="build_details_path",
         type=Path,
-        help=("The path to a build-details.json file.",),
+        help="The path to a build-details.json file.",
     )
     config_group.add_argument(
         "--sysconfig",
         dest="sysconfigdata_path",
         type=Path,
-        help=("The path to a sysconfigdata python file.",),
+        help="The path to a sysconfigdata python file.",
     )
 
     parser.add_argument(

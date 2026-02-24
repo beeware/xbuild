@@ -205,8 +205,10 @@ def main_parser() -> argparse.ArgumentParser:
         "--no-isolation",
         "-n",
         action="store_true",
-        help="disable building the project in an isolated virtual environment. "
-        "Build dependencies must be installed separately when this option is used",
+        help=(
+            "disable building the project in an isolated virtual environment. "
+            "Build dependencies must be installed separately when this option is used"
+        ),
     )
     env_group.add_argument(
         "--installer",
@@ -224,13 +226,13 @@ def main_parser() -> argparse.ArgumentParser:
         "--build-details",
         dest="build_details_path",
         type=Path,
-        help=("The path to a build-details.json file.",),
+        help="The path to a build-details.json file.",
     )
     config_group.add_argument(
         "--sysconfig",
         dest="sysconfigdata_path",
         type=Path,
-        help=("The path to a sysconfigdata python file.",),
+        help="The path to a sysconfigdata python file.",
     )
     config_group = parser.add_mutually_exclusive_group()
     config_group.add_argument(
