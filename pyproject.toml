@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools==80.10.2",
+    "setuptools==82.0.0",
     "setuptools_scm==9.2.2",
 ]
 build-backend = "setuptools.build_meta"
@@ -60,7 +60,7 @@ test = [
 ]
 ci = [
     "setuptools_scm == 9.2.2",
-    "tox-uv == 1.29.0",
+    "tox-uv == 1.33.0",
 ]
 dev = [
     {include-group = "pre-commit"},
