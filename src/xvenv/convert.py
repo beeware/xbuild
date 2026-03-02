@@ -1,6 +1,5 @@
 import json
 import pprint
-import sys
 from importlib import import_module
 from importlib import util as importlib_util
 from pathlib import Path
@@ -81,12 +80,18 @@ def localize_sysconfig_vars(sysconfig_vars_path, venv_site_packages):
     return sysconfig_vars
 
 
-def convert_venv(venv_path: Path, sysconfig_path: Path):
+def convert_venv(
+    venv_path: Path,
+    build_details_path: Path | None,
+    sysconfigdata_path: Path | None,
+):
     """Convert a virtual environment into a cross-platform environment.
 
     :param venv_path: The path to the root of the venv.
-    :param sysconfig_path: The path to the sysconfig_vars JSON or sysconfigdata Python
-        file for the target platform.
+    :param build_details_path: The path to build-details.json file for the
+        target platform.
+    :param sysconfigdata_path: The path to the sysconfigdata python file
+        for the target platform.
     """
     if not venv_path.exists():
         raise ValueError(f"Virtual environment {venv_path} does not exist.")
@@ -102,42 +107,61 @@ def convert_venv(venv_path: Path, sysconfig_path: Path):
 
     venv_site_packages_path = platlibs[0]
 
-    if not sysconfig_path.is_file():
-        raise ValueError(f"Could not find sysconfig file {sysconfig_path}")
+    if build_details_path:
+        if not build_details_path.is_file():
+            raise ValueError(f"Could not find {build_details_path}")
 
-    match sysconfig_path.suffix:
-        case ".json":
-            sysconfig_vars_path = sysconfig_path
-            _, _, _, abiflags, platform, multiarch = sysconfig_vars_path.stem.split("_")
+        # If build_details.json exists, then so does sysconfig_vars.
+        with open(build_details_path) as fp:
+            build_details = json.load(fp)
 
-            sysconfigdata_path = (
-                sysconfig_vars_path.parent
+        # build_details platform is the full platform-min_version-multiarch
+        # format. We only need the platform part.
+        platform = build_details["platform"].split("-")[0]
+        version = build_details["language"]["version"]
+        abiflags = "".join(build_details["abi"]["flags"])
+        multiarch = build_details["implementation"]["_multiarch"]
+
+        localize_sysconfigdata(
+            (
+                build_details_path.parent
                 / f"_sysconfigdata_{abiflags}_{platform}_{multiarch}.py"
-            )
-        case ".py":
-            sysconfigdata_path = sysconfig_path
-            _, _, abiflags, platform, multiarch = sysconfigdata_path.stem.split("_")
+            ),
+            venv_site_packages_path,
+        )
+        localize_sysconfig_vars(
+            (
+                build_details_path.parent
+                / f"_sysconfig_vars_{abiflags}_{platform}_{multiarch}.json"
+            ),
+            venv_site_packages_path,
+        )
+    elif sysconfigdata_path:
+        if not sysconfigdata_path.is_file():
+            raise ValueError(f"Could not find {sysconfigdata_path}")
 
-            sysconfig_vars_path = (
-                sysconfigdata_path.parent
-                / f"_sysconfig_vars_{abiflags}_{platform}_{multiarch}.py"
-            )
-        case _:
-            raise ValueError(
-                "Don't know how to process sysconfig data "
-                f"of type {sysconfig_path.suffix}"
-            )
+        # If we've been given a sysconfigdata file, re
+        _, _, abiflags, platform, multiarch = sysconfigdata_path.stem.split("_", 4)
 
-    # Localize the sysconfig data. sysconfigdata *must* exist; sysconfig_vars
-    # will only exist on Python 3.14 or newer.
-    sysconfig = localize_sysconfigdata(sysconfigdata_path, venv_site_packages_path)
-    if sys.version_info[:2] >= (3, 14):
-        localize_sysconfig_vars(sysconfig_vars_path, venv_site_packages_path)
+        # Localize the sysconfig data.
+        sysconfigdata = localize_sysconfigdata(
+            sysconfigdata_path,
+            venv_site_packages_path,
+        )
+        version = sysconfigdata["VERSION"]
 
-    if sysconfig["VERSION"] != venv_site_packages_path.parts[-2][6:]:
+        # We'll need to reconstruct build_details-like data once we have
+        # a platform module, as the keys in sysconfig data vary by platform.
+        build_details = None
+    else:
+        raise ValueError(
+            "Must provide path to either build_details.json or sysconfigdata"
+        )
+
+    if version != venv_site_packages_path.parts[-2][6:]:
         raise ValueError(
             f"target venv is Python {venv_site_packages_path.parts[-2][6:]}; "
-            f"sysconfig file is for Python {sysconfig['VERSION']}"
+            f"build details file is for Python {version}"
         )
 
     # Generate the context for the templated cross-target file
@@ -153,7 +177,12 @@ def convert_venv(venv_path: Path, sysconfig_path: Path):
 
     try:
         platform_module = import_module(f"xvenv.platforms.{platform}")
-        platform_module.extend_context(context, sysconfig)
+        if build_details is None:
+            build_details = platform_module.build_details_from_sysconfigdata(
+                sysconfigdata
+            )
+
+        platform_module.extend_context(context, build_details)
     except ImportError:
         raise ValueError(
             f"Don't know how to build a cross-venv file for {platform}"
