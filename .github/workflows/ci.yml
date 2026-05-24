@@ -5,6 +5,15 @@ on:
     branches:
       - main
   workflow_call:
+    inputs:
+      attest-package:
+        description: "Create GitHub provenance attestation for the package."
+        default: "false"
+        type: string
+    outputs:
+      artifact-basename:
+        description: "Base name of the uploaded artifacts; use for artifact retrieval."
+        value: ${{ jobs.package.outputs.artifact-basename }}
 
 # Cancel active CI runs for a PR before starting another run
 concurrency:
@@ -26,22 +35,14 @@ jobs:
       pre-commit-source: "--group pre-commit"
 
   package:
-    name: Build Package
-    needs: [ pre-commit ]
-    runs-on: "ubuntu-24.04"
+    name: Package xbuild
     permissions:
       id-token: write
       attestations: write
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v6.0.2
-      with:
-        fetch-depth: 0
-
-    - name: Build and inspect package
-      uses: hynek/build-and-inspect-python-package@v2.17.0
-      with:
-        attest-build-provenance-github: 'true'
+      contents: read
+    uses: beeware/.github/.github/workflows/python-package-create.yml@main
+    with:
+      attest: ${{ inputs.attest-package }}
 
   unit-tests:
     name: Unit tests
