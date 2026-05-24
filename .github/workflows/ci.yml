@@ -36,6 +36,7 @@ jobs:
 
   package:
     name: Package xbuild
+    needs: [ pre-commit ]
     permissions:
       id-token: write
       attestations: write
