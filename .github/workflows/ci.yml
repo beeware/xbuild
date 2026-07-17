@@ -20,6 +20,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 defaults:
   run:
     shell: bash  # https://github.com/beeware/briefcase/pull/912
@@ -30,7 +33,7 @@ env:
 jobs:
   pre-commit:
     name: Pre-commit checks
-    uses: beeware/.github/.github/workflows/pre-commit-run.yml@main
+    uses: beeware/.github/.github/workflows/pre-commit-run.yml@741cc5a311012ee0ee195938889a337449d01eeb  # main
     with:
       pre-commit-source: "--group pre-commit"
 
@@ -41,7 +44,7 @@ jobs:
       id-token: write
       attestations: write
       contents: read
-    uses: beeware/.github/.github/workflows/python-package-create.yml@main
+    uses: beeware/.github/.github/workflows/python-package-create.yml@741cc5a311012ee0ee195938889a337449d01eeb  # main
     with:
       attest: ${{ inputs.attest-package }}
 
@@ -56,12 +59,15 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v7.0.0
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       with:
         fetch-depth: 0
+        # Nothing in this job pushes, so the token doesn't need to be
+        # persisted in .git/config.
+        persist-credentials: false
 
     - name: Set up Python
-      uses: actions/setup-python@v6.3.0
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
       with:
         python-version: "${{ matrix.python-version }}"
         allow-prereleases: true
