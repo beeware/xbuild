@@ -46,8 +46,6 @@ jobs:
           path: dist
 
       - name: Create release
-        # gh is provided by the runner, so a third-party release action isn't
-        # needed; gh fails the step if any artifact upload fails.
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
