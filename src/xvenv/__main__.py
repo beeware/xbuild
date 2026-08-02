@@ -88,7 +88,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
                 build_details_path=build_details_path,
                 sysconfigdata_path=sysconfigdata_path,
             )
-        except Exception as e:
+        except ValueError as e:
             _error(e)
             sys.exit(1)
         else:
