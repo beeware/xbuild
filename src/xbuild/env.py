@@ -7,6 +7,7 @@ import sysconfig
 from collections.abc import Collection
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Self
 
 from build import _ctx
 from build import env as build_env
@@ -64,7 +65,7 @@ class XBuildIsolatedEnv(DefaultIsolatedEnv):
         self.build_details_path = build_details_path
         self.sysconfigdata_path = sysconfigdata_path
 
-    def __enter__(self) -> XBuildIsolatedEnv:
+    def __enter__(self) -> Self:
         super().__enter__()
 
         # If we're not in a cross-compiling environment, the isolated environment
