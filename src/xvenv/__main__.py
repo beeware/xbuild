@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import venv
 from argparse import ArgumentParser
 from collections.abc import Sequence
 from pathlib import Path
@@ -80,22 +81,22 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     )
 
     if not venv_path.exists():
-        _error(f"Native virtual environment {venv_path} does not exist.")
+        venv.create(venv_path, with_pip=True)
+
+    try:
+        description = convert_venv(
+            venv_path,
+            build_details_path=build_details_path,
+            sysconfigdata_path=sysconfigdata_path,
+        )
+    except ValueError as e:
+        _error(e)
+        sys.exit(1)
     else:
-        try:
-            description = convert_venv(
-                venv_path,
-                build_details_path=build_details_path,
-                sysconfigdata_path=sysconfigdata_path,
-            )
-        except ValueError as e:
-            _error(e)
-            sys.exit(1)
-        else:
-            _cprint(
-                "{bold}{green}{}{reset}",
-                f"{args.venv} is now an {description} cross venv.",
-            )
+        _cprint(
+            "{bold}{green}{}{reset}",
+            f"{args.venv} is now an {description} cross venv.",
+        )
 
 
 def entrypoint() -> None:

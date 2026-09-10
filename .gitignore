@@ -18,9 +18,13 @@ htmlcov/
 coverage.xml
 tests/integration/
 .integration-sources
-.tox
 Dockerfile
 
 # In-repo spaces for local testing
 local/
 temp/
+
+# Agent tooling
+.opencode
+.kilo
+docs/superpowers/

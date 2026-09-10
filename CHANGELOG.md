@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+`xvenv` will now create the target virtual environment if it doesn't already exist, equivalent to running `python -m venv <location>` before conversion. Previously, `xvenv` required the target directory to already exist as a valid virtual environment.
+
 ## 0.0.1 (5 Sep 2025)
 
 Initial release.

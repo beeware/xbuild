@@ -18,7 +18,6 @@ To use xbuild, you need:
 * an install of Python for the platform where you will be performing the build (e.g., macOS, Linux or Windows)
 * a distribution of Python that has been compiled for your target platform (e.g., Android, Emscripten or iOS)
 
-
 ### Build a package
 
 Create a virtual environment for your build platform (i.e., the platform where you will be compiling), and install `xbuild`:
@@ -38,9 +37,9 @@ If, for some reason, you require the *iOS* version of a build requirement to be 
     [build-system]
     requires = ["setuptools"]
     target-requires = ["target-tool"]
-    build_backenmd = "setuptools.build_meta"
+    build-backend = "setuptools.build_meta"
 
-In order for a cross-build to succeed, your environment must be configured appropriately for the platform you're targeting.
+In order for a cross-build to succeed, your environment must be configured appropriately for the platform you're targeting. This means setting `PATH` and other environment variables appropriately.
 
 #### Android
 
@@ -56,7 +55,9 @@ To build an Android wheel, you must:
 You must have Xcode installed, with the iOS SDK added.
 
 It is also strongly advised that you:
+
 * Add the path to the iOS binary shims to your path. These are provided in the `Python.xcframework/ios-arm64/bin` and `Python.xcframework/ios-arm64_x86_64-simulator/bin` folder for the iOS support package that you have downloaded.
+
 * Clear your path of any other dependencies. It is very easy for macOS ARM64 binaries from Homebrew and other sources to leak into iOS builds if they are present on the path; the safest approach is to set your path so it only contains:
   - The path for the Python binary (ideally, your virtual environment's `bin` directory)
   - `/usr/bin`
@@ -71,13 +72,14 @@ TODO
 
 ### Creating a cross virtual environment
 
-To explicitly create a cross-platform virtual environment, start by creating a virtual environment for your build platform (i.e., the platform where you will be compiling), then use the `xvenv` script to convert that virtual environment in to a cross environment.
+To explicitly create a cross-platform virtual environment, start by creating a virtual environment for your build platform (i.e., the platform where you will be compiling), then use the `xvenv` script to convert a virtual environment in to a cross environment.
 
     $ python3 -m venv venv
     $ source venv/bin/activate
     (venv) $ python -m pip install xbuild
-    (venv) $ python -m venv x-venv
     (venv) $ python -m xvenv --sysconfig path/to/_sysconfig_vars__...json x-venv
+
+If `x-venv` doesn't already exist, `xvenv` will create it first (equivalent to running `python -m venv x-venv`), then convert it into a cross environment. If `x-venv` already exists, it will be converted into a cross-platform environment of type specified by `--sysconfig`.
 
 You can then deactivate the environment that was used to create the cross-platform environment, and activate the cross-platform virtual environment. For example, if `x-venv` was constructed using an iOS simulator sysconfig vars file (`_sysconfig_vars__ios_arm64-iphonesimulator.json`), you would see output like:
 
