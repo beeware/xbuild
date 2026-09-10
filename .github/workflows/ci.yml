@@ -116,7 +116,7 @@ jobs:
     - name: Install test requirements
       run: |
         python -m pip install -U pip
-        python -m pip install --group ci
+        python -m pip install --group tox
 
     - name: Test
       run: |
