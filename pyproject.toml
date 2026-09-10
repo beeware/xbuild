@@ -55,24 +55,32 @@ Source = "https://github.com/beeware/xbuild"
 pre-commit = [
     "pre-commit == 4.6.2",
 ]
+towncrier = [
+    "towncrier==25.8.0",
+]
+tox = [
+    "tox-uv == 1.35.2",
+]
 test = [
     "pytest == 9.1.1",
-]
-ci = [
-    "setuptools_scm == 10.2.1",
-    "tox-uv == 1.36.0",
 ]
 dev = [
     {include-group = "pre-commit"},
     {include-group = "test"},
-    {include-group = "ci"},
+    {include-group = "tox"},
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+# Docs are always built on a specific Python version; see RTD and tox config files.
+# beeware-docs-tools is not published to PyPI; install from the base repo.
+docs = [
+    "beeware-docs-tools @ git+https://github.com/beeware/beeware-docs-tools@main",
+]
 
-[tool.setuptools_scm]
-# An empty table is needed to enable setuptools_scm
+[tool.check-wheel-contents]
+toplevel = [
+    "xbuild",
+    "xvenv",
+]
 
 [tool.ruff.lint]
 # In addition to the default rules, these additional rules will be used:
@@ -104,7 +112,7 @@ known-third-party = [
 [tool.rumdl]
 flavor = "mkdocs"
 include = ["**/*.md"]
-exclude = ["comment.md", "CODE_OF_CONDUCT.md"]
+exclude = ["docs/en/SUMMARY.md", "CODE_OF_CONDUCT.md", "changes/template.md"]
 respect-gitignore = true
 
 # Disable rules:
@@ -112,10 +120,11 @@ respect-gitignore = true
 disable = ["MD014"]
 
 [tool.rumdl.per-file-ignores]
-# MD002: First heading should be level 1, found level 2; title will be included in the target page
-# MD034: URL without angle brackets or link formatting; triggers on URLs with Jinja variable included
 # MD041: First line in file should be level 1 heading; title will be included in the target page
-"src/beeware_docs_tools/shared_content/en/*.md" = ["MD002", "MD034", "MD041",]
+"docs/en/how-to/contribute/**/*.md" = ["MD041"]
+"docs/en/how-to/contribute/*.md" = ["MD041"]
+# MD041: Change note fragments are prose snippets, not standalone documents
+"changes/*.md" = ["MD041"]
 
 [tool.rumdl.MD013]  # Line length
 line_length = 999999  # Force reflow to paragraph content to remove linebreaks
@@ -131,8 +140,24 @@ allowed_elements = ["nospell",]  # pyspelling inline disable tag
 [tool.rumdl.MD061]
 terms = ["TODO"]
 
-[tool.check-wheel-contents]
-toplevel = [
-    "xbuild",
-    "xvenv",
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
+# An empty table is needed to enable setuptools_scm
+
+[tool.towncrier]
+directory = "changes"
+package = "xbuild"
+package_dir = "src"
+filename = "docs/en/about/releases.md"
+title_format = false
+template = "changes/template.md"
+start_string = "<!-- towncrier release notes start -->"
+type = [
+    { directory = "feature", name = "Features", showcontent = true },
+    { directory = "bugfix", name = "Bugfixes", showcontent = true },
+    { directory = "removal", name = "Backward Incompatible Changes", showcontent = true },
+    { directory = "doc", name = "Documentation", showcontent = true },
+    { directory = "misc", name = "Misc", showcontent = false },
 ]
