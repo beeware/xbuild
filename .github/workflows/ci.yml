@@ -37,6 +37,15 @@ jobs:
     with:
       pre-commit-source: "--group pre-commit"
 
+  towncrier:
+    name: Check towncrier
+    uses: beeware/.github/.github/workflows/towncrier-run.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      tox-source: "--group tox"
+
   package:
     name: Package xbuild
     needs: [ pre-commit ]
@@ -48,6 +57,40 @@ jobs:
     with:
       attest: ${{ inputs.attest-package }}
 
+  docs-lint:
+    name: Documentation linting
+    needs: [ pre-commit ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.X"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            .pre-commit-config.yaml
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get install aspell aspell-en
+
+      - name: Update pip
+        run: python -m pip install -U pip
+
+      - name: Install Tox
+        run: python -m pip install --group 'tox-uv'
+
+      - name: Perform lint checks
+        run: python -m tox -e docs-lint
+
   unit-tests:
     name: Unit tests
     needs: [ package ]
@@ -55,7 +98,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ "3.13", "3.14" ]
+        python-version: [ "3.13", "3.14", "3.15" ]
 
     steps:
     - name: Checkout

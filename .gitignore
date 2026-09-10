@@ -24,6 +24,9 @@ Dockerfile
 local/
 temp/
 
+# Docs
+_build
+
 # Agent tooling
 .opencode
 .kilo
