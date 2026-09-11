@@ -86,6 +86,23 @@ $ source venv/bin/activate
 
 If `x-venv` doesn't already exist, `xvenv` will create it first (equivalent to running `python -m venv x-venv`), then convert it into a cross environment. If `x-venv` already exists, it will be converted into a cross-platform environment of type specified by `--sysconfig`.
 
+#### Downloading a Python build automatically
+
+Instead of providing `--sysconfig` or `--build-details` yourself, you can ask `xvenv` to download (or reuse a cached copy of) a matching Python build for a target platform, using the same Python version you're currently running `xvenv` with:
+
+```console
+(venv) $ python -m xvenv --platform ios --arch arm64_iphonesimulator x-venv
+(venv) $ python -m xvenv --platform android --arch aarch64 x-venv
+```
+
+`--arch` is optional; if omitted, a useful default is chosen based on your host machine's architecture (e.g. the iOS simulator, or the Android emulator's aarch64 architecture on Apple Silicon).
+
+`--platform`, `--sysconfig` and `--build-details` are mutually exclusive — provide exactly one of them.
+
+Downloaded builds are cached so repeated runs don't re-download. By default, the cache lives in a platform-appropriate user cache directory; you can override this with the `--cache` option or the `XBUILD_CACHE` environment variable (`--cache` takes priority if both are set).
+
+Note: downloading Python builds for iOS and Android via `--platform` is currently only supported for Python 3.14 and later, since that's when python.org started publishing these builds.
+
 You can then deactivate the environment that was used to create the cross-platform environment, and activate the cross-platform virtual environment. For example, if `x-venv` was constructed using an iOS simulator sysconfig vars file (`_sysconfig_vars__ios_arm64-iphonesimulator.json`), you would see output like:
 
 ```console

@@ -4,6 +4,7 @@
 
 * `xvenv` will now create the target virtual environment if it doesn't already exist, equivalent to running `python -m venv <location>` before conversion. Previously, `xvenv` required the target directory to already exist as a valid virtual environment.
 * `xvenv` and `xbuild` can now be configured using a `build-details.json` file, as an alternative to a `sysconfig_vars` JSON file or `sysconfigdata` Python file.
+* `xvenv` can now download and cache a matching Python build for a target platform automatically, using the new `--platform {ios,android,emscripten}` option (with optional `--arch` and `--cache`), instead of requiring a manually-provided `--sysconfig`/`--build-details` file. This is currently only supported for Python 3.14+ on iOS and Android; emscripten download support is not yet implemented.
 
 ## 0.2.0 (10 Sep 2025)
 
