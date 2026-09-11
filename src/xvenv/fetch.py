@@ -142,6 +142,10 @@ def fetch_python(
     version_info = _current_version_info()
     version = python_version_string(version_info)
 
+    # NOTE: if you're adding real emscripten download support, this branch's
+    # call shape doesn't match emscripten.download_url()'s (version, arch)
+    # signature -- you'll need to special-case it here too, similar to the
+    # android branch above.
     if platform_name == "android":
         url = platform_module.download_url(version, arch, version_info)
     else:
@@ -160,6 +164,10 @@ def fetch_python(
             urllib.request.urlretrieve(url, archive_path)
         except OSError as e:
             raise ValueError(f"Failed to download {url}: {e}") from e
+        # NOTE: if extraction fails partway (disk full, corrupt archive),
+        # extracted_dir already exists and will be treated as a valid cache
+        # hit on retry. No rollback/cleanup on partial failure -- delete the
+        # cache directory manually to retry a failed download.
         extracted_dir.mkdir()
         with tarfile.open(archive_path) as tar:
             tar.extractall(extracted_dir, filter="data")
