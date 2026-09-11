@@ -1,3 +1,57 @@
+import sys
+from pathlib import Path
+
+VALID_ARCHES = ["arm64_iphonesimulator", "x86_64_iphonesimulator", "arm64_iphoneos"]
+
+
+def download_url(version: str, version_info=sys.version_info) -> str:
+    """Compute the python.org download URL for the iOS XCframework build.
+
+    :param version: The python.org version string (e.g. ``"3.15.0rc2"``).
+    :param version_info: The ``sys.version_info``-shaped value the version
+        string was derived from, used to select pre-3.14 vs. 3.14+ URL
+        conventions.
+    :returns: The download URL.
+    """
+    if version_info[:2] < (3, 14):
+        # TODO: real URL pattern for pre-3.14 iOS builds (different source,
+        # different filename/layout convention). Placeholder only.
+        return f"https://TODO.example/placeholder/iOS/{version}.tar.gz"
+    return (
+        f"https://www.python.org/ftp/python/{version}/"
+        f"python-{version}-iOS-XCframework.tar.gz"
+    )
+
+
+def config_path(extracted_dir: Path, version_info, arch: str) -> Path:
+    """Locate the sysconfig/build-details file inside an extracted iOS
+    XCframework archive.
+
+    :param extracted_dir: The root of the extracted archive.
+    :param version_info: A ``sys.version_info``-shaped value for the Python
+        version the archive contains.
+    :param arch: One of the values in ``VALID_ARCHES``, e.g.
+        ``"arm64_iphonesimulator"``.
+    :returns: The path to ``build-details.json`` (Python 3.14+) or the
+        legacy ``_sysconfigdata__ios_*.py`` module (Python <3.14).
+    """
+    cpu, sdk = arch.rsplit("_", 1)
+    if sdk == "iphonesimulator":
+        slice_dir = "ios-arm64_x86_64-simulator"
+    else:
+        slice_dir = "ios-arm64"
+    py_dir = (
+        extracted_dir
+        / "Python.xcframework"
+        / slice_dir
+        / f"lib-{cpu}"
+        / f"python{version_info.major}.{version_info.minor}"
+    )
+    if version_info[:2] >= (3, 14):
+        return py_dir / "build-details.json"
+    return py_dir / f"_sysconfigdata__ios_{cpu}-{sdk}.py"
+
+
 def build_details_from_sysconfigdata(sysconfigdata):
     # Reconstruct a build_details-alike structure from sysconfigdata.
     platform = sysconfigdata["MACHDEP"]
