@@ -22,3 +22,18 @@ def extend_context(context, build_details):
     def libc_ver() -> int:
         return ("emscripten", "{emscripten_version}")
 """
+
+
+VALID_ARCHES = []
+
+_NOT_IMPLEMENTED_MESSAGE = (
+    "xvenv does not yet know how to download a Python build for emscripten."
+)
+
+
+def download_url(version: str, arch: str) -> str:
+    raise NotImplementedError(_NOT_IMPLEMENTED_MESSAGE)
+
+
+def config_path(extracted_dir, version_info, arch: str):
+    raise NotImplementedError(_NOT_IMPLEMENTED_MESSAGE)
