@@ -20,6 +20,10 @@ tests/integration/
 .integration-sources
 Dockerfile
 
+# Documentation
+_build/
+comment.md
+
 # In-repo spaces for local testing
 local/
 temp/
