@@ -1,6 +1,9 @@
-import platformdirs
+import sys
 
-from xvenv.fetch import resolve_cache_dir
+import platformdirs
+import pytest
+
+from xvenv.fetch import python_version_string, resolve_cache_dir
 
 
 def test_resolve_cache_dir_explicit_arg_wins(tmp_path, monkeypatch):
@@ -42,3 +45,36 @@ def test_resolve_cache_dir_creates_missing_directory(tmp_path, monkeypatch):
 
     assert result == target
     assert target.is_dir()
+
+
+@pytest.mark.parametrize(
+    "version_info,expected",
+    [
+        (
+            sys.version_info.__replace__(
+                major=3, minor=14, micro=7, releaselevel="final", serial=0
+            ),
+            "3.14.7",
+        ),
+        (
+            sys.version_info.__replace__(
+                major=3, minor=15, micro=0, releaselevel="candidate", serial=2
+            ),
+            "3.15.0rc2",
+        ),
+        (
+            sys.version_info.__replace__(
+                major=3, minor=15, micro=0, releaselevel="alpha", serial=1
+            ),
+            "3.15.0a1",
+        ),
+        (
+            sys.version_info.__replace__(
+                major=3, minor=15, micro=0, releaselevel="beta", serial=3
+            ),
+            "3.15.0b3",
+        ),
+    ],
+)
+def test_python_version_string(version_info, expected):
+    assert python_version_string(version_info) == expected
