@@ -13,6 +13,7 @@ from build.__main__ import (
 
 import xvenv
 from xvenv.convert import convert_venv
+from xvenv.fetch import fetch_python, resolve_cache_dir
 
 
 def main_parser():
@@ -38,8 +39,8 @@ def main_parser():
         help="increase verbosity",
     )
 
-    # Create mutually exclusive group for --build-details and --sysconfig
-    # One of these arguments must be provided
+    # Create mutually exclusive group for --build-details, --sysconfig and
+    # --platform. Exactly one of these arguments must be provided.
     config_group = parser.add_mutually_exclusive_group(required=True)
     config_group.add_argument(
         "--build-details",
@@ -52,6 +53,36 @@ def main_parser():
         dest="sysconfigdata_path",
         type=Path,
         help="The path to a sysconfigdata python file.",
+    )
+    config_group.add_argument(
+        "--platform",
+        dest="platform",
+        choices=["ios", "android", "emscripten"],
+        help=(
+            "Download (or reuse a cached copy of) a Python build for this "
+            "target platform, matching the Python version currently "
+            "running xvenv."
+        ),
+    )
+
+    parser.add_argument(
+        "--arch",
+        dest="arch",
+        help=(
+            "The target architecture to use with --platform. Defaults to a "
+            "useful value based on the host machine's architecture."
+        ),
+    )
+    parser.add_argument(
+        "--cache",
+        dest="cache",
+        type=Path,
+        help=(
+            "The directory to use for caching downloaded Python builds, "
+            "for use with --platform. Defaults to the XBUILD_CACHE "
+            "environment variable, or a platform-appropriate cache "
+            "directory."
+        ),
     )
 
     parser.add_argument(
@@ -72,6 +103,11 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         parser.prog = prog
     args = parser.parse_args(cli_args)
 
+    if args.arch is not None and args.platform is None:
+        parser.error("--arch requires --platform")
+    if args.cache is not None and args.platform is None:
+        parser.error("--cache requires --platform")
+
     venv_path = Path(args.venv).resolve()
     build_details_path = (
         Path(args.build_details_path).resolve() if args.build_details_path else None
@@ -84,12 +120,22 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         venv.create(venv_path, with_pip=True)
 
     try:
+        if args.platform is not None:
+            cache_dir = resolve_cache_dir(args.cache)
+            config_path, is_build_details = fetch_python(
+                args.platform, args.arch, cache_dir
+            )
+            if is_build_details:
+                build_details_path = config_path
+            else:
+                sysconfigdata_path = config_path
+
         description = convert_venv(
             venv_path,
             build_details_path=build_details_path,
             sysconfigdata_path=sysconfigdata_path,
         )
-    except ValueError as e:
+    except (ValueError, NotImplementedError) as e:
         _error(e)
         sys.exit(1)
     else:

@@ -156,7 +156,10 @@ def fetch_python(
 
     if not extracted_dir.is_dir():
         archive_path = cache_dir / archive_name
-        urllib.request.urlretrieve(url, archive_path)
+        try:
+            urllib.request.urlretrieve(url, archive_path)
+        except OSError as e:
+            raise ValueError(f"Failed to download {url}: {e}") from e
         extracted_dir.mkdir()
         with tarfile.open(archive_path) as tar:
             tar.extractall(extracted_dir, filter="data")

@@ -37,6 +37,7 @@ classifiers = [
 ]
 dependencies = [
     "build == 1.6.0",
+    "platformdirs",
 ]
 
 [project.scripts]
