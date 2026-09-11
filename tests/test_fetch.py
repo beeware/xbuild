@@ -3,7 +3,7 @@ import sys
 import platformdirs
 import pytest
 
-from xvenv.fetch import python_version_string, resolve_cache_dir
+from xvenv.fetch import default_arch, python_version_string, resolve_cache_dir
 
 
 def test_resolve_cache_dir_explicit_arg_wins(tmp_path, monkeypatch):
@@ -78,3 +78,36 @@ def test_resolve_cache_dir_creates_missing_directory(tmp_path, monkeypatch):
 )
 def test_python_version_string(version_info, expected):
     assert python_version_string(version_info) == expected
+
+
+@pytest.mark.parametrize(
+    "platform_name,host_machine,expected",
+    [
+        ("ios", "arm64", "arm64_iphonesimulator"),
+        ("ios", "aarch64", "arm64_iphonesimulator"),
+        ("ios", "x86_64", "x86_64_iphonesimulator"),
+        ("ios", "AMD64", "x86_64_iphonesimulator"),
+        ("android", "arm64", "aarch64"),
+        ("android", "aarch64", "aarch64"),
+        ("android", "x86_64", "x86_64"),
+        ("android", "AMD64", "x86_64"),
+    ],
+)
+def test_default_arch(platform_name, host_machine, expected, monkeypatch):
+    monkeypatch.setattr("platform.machine", lambda: host_machine)
+
+    assert default_arch(platform_name) == expected
+
+
+def test_default_arch_unknown_host_machine_raises(monkeypatch):
+    monkeypatch.setattr("platform.machine", lambda: "sparc64")
+
+    with pytest.raises(ValueError, match="sparc64"):
+        default_arch("ios")
+
+
+def test_default_arch_emscripten_raises_not_implemented(monkeypatch):
+    monkeypatch.setattr("platform.machine", lambda: "arm64")
+
+    with pytest.raises(NotImplementedError):
+        default_arch("emscripten")

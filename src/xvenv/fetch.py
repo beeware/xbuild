@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import sys
 from pathlib import Path
 
@@ -53,3 +54,50 @@ def python_version_string(version_info=sys.version_info) -> str:
     if suffix:
         return f"{base}{suffix}{version_info.serial}"
     return base
+
+
+_HOST_ARCH_FAMILY = {
+    "arm64": "arm64",
+    "aarch64": "arm64",
+    "x86_64": "x86_64",
+    "AMD64": "x86_64",
+}
+
+_DEFAULT_ARCH = {
+    "ios": {
+        "arm64": "arm64_iphonesimulator",
+        "x86_64": "x86_64_iphonesimulator",
+    },
+    "android": {
+        "arm64": "aarch64",
+        "x86_64": "x86_64",
+    },
+}
+
+
+def default_arch(platform_name: str) -> str:
+    """Compute a "useful default" --arch for a platform, based on the host
+    machine's architecture.
+
+    :param platform_name: One of ``"ios"``, ``"android"``, ``"emscripten"``.
+    :returns: The default arch string for that platform.
+    :raises NotImplementedError: for ``"emscripten"`` (no sensible default
+        known yet).
+    :raises ValueError: if the host machine architecture is not recognized.
+    """
+    if platform_name == "emscripten":
+        raise NotImplementedError(
+            "xvenv does not yet know how to choose a default --arch for emscripten."
+        )
+
+    host_machine = platform.machine()
+    try:
+        arch_family = _HOST_ARCH_FAMILY[host_machine]
+    except KeyError:
+        raise ValueError(
+            f"Don't know a default --arch for {platform_name} on host "
+            f"machine architecture {host_machine!r}. Specify --arch "
+            "explicitly."
+        ) from None
+
+    return _DEFAULT_ARCH[platform_name][arch_family]
