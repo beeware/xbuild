@@ -29,6 +29,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Software Development :: Libraries",
     "Topic :: System :: Software Distribution",
@@ -36,7 +37,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
-    "build == 1.6.0",
+    "build == 1.6.1",
     "platformdirs",
 ]
 

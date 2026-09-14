@@ -1,41 +1,58 @@
-import sys
 from pathlib import Path
 
-VALID_ARCHES = ["arm64_iphonesimulator", "x86_64_iphonesimulator", "arm64_iphoneos"]
+from xvenv import versions
+
+VALID_ARCHES = ["arm64-iphonesimulator", "x86_64-iphonesimulator", "arm64-iphoneos"]
+DEFAULT_ARCH = {
+    "arm64": "arm64-iphonesimulator",
+    "x86_64": "x86_64-iphonesimulator",
+}
 
 
-def download_url(version: str, version_info=sys.version_info) -> str:
+def download_url(version_info: tuple, arch: str) -> str:
     """Compute the python.org download URL for the iOS XCframework build.
 
-    :param version: The python.org version string (e.g. ``"3.15.0rc2"``).
-    :param version_info: The ``sys.version_info``-shaped value the version
-        string was derived from, used to select pre-3.14 vs. 3.14+ URL
-        conventions.
+    :param version: The `sys.version_info` tuple for the version being
+        requested.
+    :param arch: The architecture build built. Ignored; the single XCframework
+        download includes all architectures.
     :returns: The download URL.
     """
-    if version_info[:2] < (3, 14):
-        # TODO: real URL pattern for pre-3.14 iOS builds (different source,
-        # different filename/layout convention). Placeholder only.
-        return f"https://TODO.example/placeholder/iOS/{version}.tar.gz"
+    version = versions.version(version_info)
+    release = versions.release(version_info)
+    series = versions.series(version_info)
+    if version_info[:2] < (3, 11):
+        raise ValueError(f"xbuild doesn't support Python {series} on iOS")
+    elif version_info[:2] < (3, 15):
+        build = {
+            "3.11": "b10",
+            "3.12": "b10",
+            "3.13": "b15",
+            "3.14": "b11",
+        }[series]
+        return (
+            "https://github.com/beeware/Python-Apple-support/releases/download/"
+            f"{series}-{build}/Python-{series}-iOS-support.{build}.tar.gz"
+        )
     return (
-        f"https://www.python.org/ftp/python/{version}/"
+        f"https://www.python.org/ftp/python/{release}/"
         f"python-{version}-iOS-XCframework.tar.gz"
     )
 
 
-def config_path(extracted_dir: Path, version_info, arch: str) -> Path:
+def config_path(extracted_dir: Path, version_info: tuple, arch: str) -> Path:
     """Locate the sysconfig/build-details file inside an extracted iOS
     XCframework archive.
 
     :param extracted_dir: The root of the extracted archive.
-    :param version_info: A ``sys.version_info``-shaped value for the Python
+    :param version_info: A `sys.version_info`-shaped value for the Python
         version the archive contains.
-    :param arch: One of the values in ``VALID_ARCHES``, e.g.
-        ``"arm64_iphonesimulator"``.
-    :returns: The path to ``build-details.json`` (Python 3.14+) or the
-        legacy ``_sysconfigdata__ios_*.py`` module (Python <3.14).
+    :param arch: One of the values in `VALID_ARCHES`, e.g.
+        `"arm64_iphonesimulator"`.
+    :returns: The path to `build-details.json` (Python 3.14+) or the
+        legacy `_sysconfigdata__ios_*.py` module (Python <3.14).
     """
-    cpu, sdk = arch.rsplit("_", 1)
+    cpu, sdk = arch.rsplit("-", 1)
     if sdk == "iphonesimulator":
         slice_dir = "ios-arm64_x86_64-simulator"
     else:

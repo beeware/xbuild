@@ -13,7 +13,7 @@ from build.__main__ import (
 
 import xvenv
 from xvenv.convert import convert_venv
-from xvenv.fetch import fetch_python, resolve_cache_dir
+from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_dir
 
 
 def main_parser():
@@ -122,9 +122,9 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     try:
         if args.platform is not None:
             cache_dir = resolve_cache_dir(args.cache)
-            config_path, is_build_details = fetch_python(
-                args.platform, args.arch, cache_dir
-            )
+            arch = resolve_arch(args.platform, args.arch)
+
+            config_path, is_build_details = fetch_python(args.platform, arch, cache_dir)
             if is_build_details:
                 build_details_path = config_path
             else:

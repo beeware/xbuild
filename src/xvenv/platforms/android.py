@@ -1,26 +1,43 @@
-import sys
 from pathlib import Path
 
+from xvenv import versions
+
 VALID_ARCHES = ["aarch64", "x86_64"]
+DEFAULT_ARCH = {
+    # Linux architectures
+    "aarch64": "aarch64",
+    "x86_64": "x86_64",
+    # macOS spelling of ARM64
+    "arm64": "aarch64",
+    # Windows architectures
+    "ARM64": "aarch64",
+    "AMD64": "x86_64",
+}
 
 
-def download_url(version: str, arch: str, version_info=sys.version_info) -> str:
-    """Compute the python.org download URL for an Android build.
+def download_url(version_info: tuple, arch: str) -> str:
+    """Compute the python.org download URL for the iOS XCframework build.
 
-    :param version: The python.org version string (e.g. ``"3.14.7"``).
-    :param arch: One of the values in ``VALID_ARCHES``.
-    :param version_info: The ``sys.version_info``-shaped value the version
-        string was derived from, used to select pre-3.14 vs. 3.14+ URL
-        conventions.
+    :param version: The `sys.version_info` tuple for the version being
+        requested.
+    :param arch: The architecture build built.
     :returns: The download URL.
     """
-    if version_info[:2] < (3, 14):
-        # TODO: real URL pattern for pre-3.14 Android builds. Placeholder only.
-        return f"https://TODO.example/placeholder/android/{version}-{arch}.tar.gz"
-    return (
-        f"https://www.python.org/ftp/python/{version}/"
-        f"python-{version}-{arch}-linux-android.tar.gz"
-    )
+    series = versions.series(version_info)
+    if version_info[:2] < (3, 13):
+        raise ValueError(f"xbuild doesn't support Python {series} on Android")
+    elif series == "3.13":
+        return (
+            "https://repo.maven.apache.org/maven2/com/chaquo/python/python/"
+            f"3.13.15/python-3.13.15-{arch}-linux-android.tar.gz"
+        )
+    else:
+        version = versions.version(version_info)
+        release = versions.release(version_info)
+        return (
+            f"https://www.python.org/ftp/python/{release}/"
+            f"python-{version}-{arch}-linux-android.tar.gz"
+        )
 
 
 def config_path(extracted_dir: Path, version_info, arch: str) -> Path:
@@ -28,11 +45,11 @@ def config_path(extracted_dir: Path, version_info, arch: str) -> Path:
     archive.
 
     :param extracted_dir: The root of the extracted archive.
-    :param version_info: A ``sys.version_info``-shaped value for the Python
+    :param version_info: A `sys.version_info`-shaped value for the Python
         version the archive contains.
-    :param arch: One of the values in ``VALID_ARCHES``, e.g. ``"aarch64"``.
-    :returns: The path to ``build-details.json`` (Python 3.14+) or the
-        legacy ``_sysconfigdata__android_*.py`` module (Python <3.14).
+    :param arch: One of the values in `VALID_ARCHES`, e.g. `"aarch64"`.
+    :returns: The path to `build-details.json` (Python 3.14+) or the
+        legacy `_sysconfigdata__android_*.py` module (Python <3.14).
     """
     py_dir = (
         extracted_dir
