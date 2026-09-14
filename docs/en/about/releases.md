@@ -1,16 +1,12 @@
-# Changelog
+# Release History
 
-## Unreleased
+<!-- towncrier release notes start -->
 
-* `xvenv` will now create the target virtual environment if it doesn't already exist, equivalent to running `python -m venv <location>` before conversion. Previously, `xvenv` required the target directory to already exist as a valid virtual environment.
-* `xvenv` and `xbuild` can now be configured using a `build-details.json` file, as an alternative to a `sysconfig_vars` JSON file or `sysconfigdata` Python file.
-* `xvenv` can now download and cache a matching Python build for a target platform automatically, using the new `--platform {ios,android,emscripten}` option (with optional `--arch` and `--cache`), instead of requiring a manually-provided `--sysconfig`/`--build-details` file. This is currently only supported for Python 3.14+ on iOS and Android; emscripten download support is not yet implemented.
-
-## 0.2.0 (10 Sep 2025)
+## 0.2.0 (2025-09-10)
 
 * Added `xbuild`, a PEP 517 build frontend that triggers cross-platform builds using a cross-platform virtual environment created by `xvenv`. Build requirements are installed for the build platform by default, unless listed in a new `target-requires` key in `build-system`, in which case they're installed for the target platform.
 
-## 0.0.1 (5 Sep 2025)
+## 0.0.1 (2025-09-05)
 
 Initial release.
 

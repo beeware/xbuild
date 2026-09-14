@@ -1,6 +1,6 @@
-# xvenv version is the same as xbuild
-from xbuild import __version__
+from importlib.metadata import version
 
-__all__ = [
-    "__version__",
-]
+# The version number for xvenv is the same as the underlying package
+__version__ = version("xbuild")
+
+__all__ = ["__version__"]
