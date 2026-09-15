@@ -1,8 +1,8 @@
-import sys
-
 import pytest
 
 from xvenv.platforms.emscripten import config_path, download_url
+
+from ...utils import VersionInfo
 
 
 @pytest.mark.parametrize(
@@ -32,7 +32,7 @@ from xvenv.platforms.emscripten import config_path, download_url
 )
 def test_download_url(version_details, url):
     """The download URL can be constructed from the version and architecture."""
-    version_info = sys.version_info.__replace__(**version_details)
+    version_info = VersionInfo(**version_details)
 
     with pytest.raises(NotImplementedError):
         actual_url = download_url(version_info, "wasm32")  # noqa: F841
@@ -67,7 +67,7 @@ def test_download_url(version_details, url):
 )
 def test_config_path(tmp_path, version_details, path):
     """The location of the Emscripten configuration path can be determined."""
-    version_info = sys.version_info.__replace__(**version_details)
+    version_info = VersionInfo(**version_details)
 
     with pytest.raises(NotImplementedError):
         actual_config_path = config_path(tmp_path, version_info, "wasm32")  # noqa: F841

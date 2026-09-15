@@ -62,6 +62,18 @@ def patch_cross_env():
             machine="{arch}",
         )
 
+    if sys.version_info < (3, 13):
+        import collections
+
+        @monkeypatch(platform)
+        def system():
+            return "{os}"
+
+        platform.IOSVersionInfo = collections.namedtuple(
+            "IOSVersionInfo",
+            ["system", "release", "model", "is_simulator"]
+        )
+
     # -------------------------------------------------------------------------
 {platform_extra}
     ###########################################################################
@@ -86,7 +98,11 @@ def patch_cross_env():
     sysconfig._BASE_EXEC_PREFIX = sys.base_exec_prefix
 
     # Force sysconfig data to be loaded (and cached).
-    sysconfig._init_config_vars()
+    if sys.version_info < (3, 12):
+        sysconfig._CONFIG_VARS = None
+        sysconfig.get_config_vars()
+    else:
+        sysconfig._init_config_vars()
 
 
 # if XBUILD_ENV=off is in the environment, don't apply any environment shims.

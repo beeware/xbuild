@@ -1,0 +1,21 @@
+[android.aarch64]
+sysconfig_platform = "android-21-arm64_v8a"
+android_release = "5.0"
+android_api_level = 21
+
+[android.x86_64]
+sysconfig_platform = "android-21-x86_64"
+android_release = "5.0"
+android_api_level = 21
+
+[ios."arm64-iphonesimulator"]
+sysconfig_platform = "ios-13.0-arm64-iphonesimulator"
+ios_release = "13.0"
+
+[ios."x86_64-iphonesimulator"]
+sysconfig_platform = "ios-13.0-x86_64-iphonesimulator"
+ios_release = "13.0"
+
+[ios."arm64-iphoneos"]
+sysconfig_platform = "ios-13.0-arm64-iphoneos"
+ios_release = "13.0"

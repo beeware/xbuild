@@ -1,8 +1,8 @@
-import sys
-
 import pytest
 
 from xvenv.versions import release, series, version
+
+from ..utils import VersionInfo
 
 
 @pytest.mark.parametrize(
@@ -71,7 +71,7 @@ from xvenv.versions import release, series, version
     ],
 )
 def test_versions(version_details, version_str, release_str, series_str):
-    v = sys.version_info.__replace__(**version_details)
+    v = VersionInfo(**version_details)
     assert version(v) == version_str
     assert release(v) == release_str
     assert series(v) == series_str

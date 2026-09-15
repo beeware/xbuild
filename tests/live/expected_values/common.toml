@@ -1,0 +1,48 @@
+[android.aarch64]
+sys_platform = "android"
+multiarch = "aarch64-linux-android"
+abiflags = ""
+platform_system = "Android"
+uname_machine = "aarch64"
+android_manufacturer = "Google"
+android_model = "sdk_gphone64"
+android_device = "emu64"
+android_is_emulator = true
+
+[android.x86_64]
+sys_platform = "android"
+multiarch = "x86_64-linux-android"
+abiflags = ""
+platform_system = "Android"
+uname_machine = "x86_64"
+android_manufacturer = "Google"
+android_model = "sdk_gphone64"
+android_device = "emu64"
+android_is_emulator = true
+
+[ios."arm64-iphonesimulator"]
+sys_platform = "ios"
+multiarch = "arm64-iphonesimulator"
+abiflags = ""
+platform_system = "iOS"
+uname_machine = "arm64"
+ios_is_simulator = true
+ios_model = "iphonesimulator"
+
+[ios."x86_64-iphonesimulator"]
+sys_platform = "ios"
+multiarch = "x86_64-iphonesimulator"
+abiflags = ""
+platform_system = "iOS"
+uname_machine = "x86_64"
+ios_is_simulator = true
+ios_model = "iphonesimulator"
+
+[ios."arm64-iphoneos"]
+sys_platform = "ios"
+multiarch = "arm64-iphoneos"
+abiflags = ""
+platform_system = "iOS"
+uname_machine = "arm64"
+ios_is_simulator = false
+ios_model = "iphoneos"

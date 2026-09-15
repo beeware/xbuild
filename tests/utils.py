@@ -1,4 +1,9 @@
 import tarfile
+from collections import namedtuple
+
+VersionInfo = namedtuple(
+    "_VersionInfo", ["major", "minor", "micro", "releaselevel", "serial"]
+)
 
 
 def _make_archive(tmp_path, name, files):
