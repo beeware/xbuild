@@ -2,6 +2,13 @@
 __pycache__/
 *.py[cod]
 
+# IDEs
+.vscode/
+.idea/
+
+# Environments
+venv/
+
 # Distribution / packaging
 build/lib/
 dist/
@@ -19,6 +26,10 @@ coverage.xml
 tests/integration/
 .integration-sources
 Dockerfile
+
+# Documentation
+_build/
+comment.md
 
 # In-repo spaces for local testing
 local/

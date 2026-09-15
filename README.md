@@ -25,13 +25,13 @@ This will do the equivalent of `python -m build`, but in an cross-platform envir
 
 ### xvenv
 
-To explicitly create a cross-platform virtual environment, start by creating a virtual environment for your build platform (i.e., the platform where you will be compiling), then install and use the `xvenv` script to create cross-platform virtual environment.
+To explicitly create a cross-platform virtual environment, start by creating a virtual environment for your build platform (i.e., the platform where you will be compiling), then install and use the `xvenv` script to create cross-platform virtual environment, specifying the platform and architecture you want to target.
 
 ```console
 $ python3 -m venv venv
 $ source venv/bin/activate
 (venv) $ python -m pip install xbuild
-(venv) $ python -m xvenv --sysconfig path/to/_sysconfig_vars__...json x-venv
+(venv) $ python -m xvenv --platform ios --arch arm64-iphonesimulator x-venv
 ```
 
 You can then activate and deactivate the `x-venv` environment as you would any other virtual environment.

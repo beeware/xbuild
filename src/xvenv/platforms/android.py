@@ -1,3 +1,67 @@
+from pathlib import Path
+
+from xvenv import versions
+
+VALID_ARCHES = ["aarch64", "x86_64"]
+DEFAULT_ARCH = {
+    # Linux architectures
+    "aarch64": "aarch64",
+    "x86_64": "x86_64",
+    # macOS spelling of ARM64
+    "arm64": "aarch64",
+    # Windows architectures
+    "ARM64": "aarch64",
+    "AMD64": "x86_64",
+}
+
+
+def download_url(version_info: tuple, arch: str) -> str:
+    """Compute the python.org download URL for the iOS XCframework build.
+
+    :param version: The `sys.version_info` tuple for the version being
+        requested.
+    :param arch: The architecture build built.
+    :returns: The download URL.
+    """
+    series = versions.series(version_info)
+    if version_info[:2] < (3, 13):
+        raise ValueError(f"xbuild doesn't support Python {series} on Android")
+    elif series == "3.13":
+        return (
+            "https://repo.maven.apache.org/maven2/com/chaquo/python/python/"
+            f"3.13.15/python-3.13.15-{arch}-linux-android.tar.gz"
+        )
+    else:
+        version = versions.version(version_info)
+        release = versions.release(version_info)
+        return (
+            f"https://www.python.org/ftp/python/{release}/"
+            f"python-{version}-{arch}-linux-android.tar.gz"
+        )
+
+
+def config_path(extracted_dir: Path, version_info, arch: str) -> Path:
+    """Locate the sysconfig/build-details file inside an extracted Android
+    archive.
+
+    :param extracted_dir: The root of the extracted archive.
+    :param version_info: A `sys.version_info`-shaped value for the Python
+        version the archive contains.
+    :param arch: One of the values in `VALID_ARCHES`, e.g. `"aarch64"`.
+    :returns: The path to `build-details.json` (Python 3.14+) or the
+        legacy `_sysconfigdata__android_*.py` module (Python <3.14).
+    """
+    py_dir = (
+        extracted_dir
+        / "prefix"
+        / "lib"
+        / f"python{version_info.major}.{version_info.minor}"
+    )
+    if version_info[:2] >= (3, 14):
+        return py_dir / "build-details.json"
+    return py_dir / f"_sysconfigdata__android_{arch}-linux-android.py"
+
+
 def build_details_from_sysconfigdata(sysconfigdata):
     # Reconstruct a build_details-alike structure from sysconfigdata.
     arch, _, platform = sysconfigdata["MULTIARCH"].split("-")
