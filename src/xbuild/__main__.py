@@ -24,6 +24,7 @@ from build._types import ConfigSettings, Distribution, StrPath
 import xbuild
 from xbuild._builder import ProjectXBuilder
 from xbuild.env import XBuildIsolatedEnv
+from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_dir
 
 
 def _build(
@@ -221,19 +222,30 @@ def main_parser() -> argparse.ArgumentParser:
     # existence of `--build-details/--sysconfig` as an argument will be the
     # trigger for "this is a cross platform build". The two arguments are
     # mutually exclusive.
-    config_group = parser.add_mutually_exclusive_group(required=True)
-    config_group.add_argument(
+    pyconfig_group = parser.add_mutually_exclusive_group(required=True)
+    pyconfig_group.add_argument(
         "--build-details",
         dest="build_details_path",
         type=Path,
         help="The path to a build-details.json file.",
     )
-    config_group.add_argument(
+    pyconfig_group.add_argument(
         "--sysconfig",
         dest="sysconfigdata_path",
         type=Path,
         help="The path to a sysconfigdata python file.",
     )
+    pyconfig_group.add_argument(
+        "--platform",
+        dest="platform",
+        choices=["ios", "android", "emscripten"],
+        help=(
+            "Download (or reuse a cached copy of) a Python build for this "
+            "target platform, matching the Python version currently "
+            "running xvenv."
+        ),
+    )
+
     config_group = parser.add_mutually_exclusive_group()
     config_group.add_argument(
         "--config-setting",
@@ -259,6 +271,26 @@ def main_parser() -> argparse.ArgumentParser:
         metavar="JSON_STRING",
     )
 
+    parser.add_argument(
+        "--arch",
+        dest="arch",
+        help=(
+            "The target architecture to use with --platform. Defaults to a "
+            "useful value based on the host machine's architecture."
+        ),
+    )
+    parser.add_argument(
+        "--cache",
+        dest="cache",
+        type=Path,
+        help=(
+            "The directory to use for caching downloaded Python builds, "
+            "for use with --platform. Defaults to the XBUILD_CACHE "
+            "environment variable, or a platform-appropriate cache "
+            "directory."
+        ),
+    )
+
     return parser
 
 
@@ -273,9 +305,31 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         parser.prog = prog
     args = parser.parse_args(cli_args)
 
+    if args.arch is not None and args.platform is None:
+        parser.error("--arch requires --platform")
+    if args.cache is not None and args.platform is None:
+        parser.error("--cache requires --platform")
+
     _setup_cli(verbosity=args.verbosity)
 
     config_settings = {}
+
+    try:
+        if args.platform is not None:
+            cache_dir = resolve_cache_dir(args.cache)
+            arch = resolve_arch(args.platform, args.arch)
+
+            config_path, is_build_details = fetch_python(args.platform, arch, cache_dir)
+            if is_build_details:
+                build_details_path = config_path
+            else:
+                sysconfigdata_path = config_path
+        else:
+            build_details_path = args.build_details_path
+            sysconfigdata_path = args.sysconfigdata_path
+    except (ValueError, NotImplementedError) as e:
+        _error(e)
+        sys.exit(1)
 
     # Handle --config-json
     if args.config_json:
@@ -314,8 +368,8 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
                 config_settings,
                 args.skip_dependency_check,
                 args.installer,
-                build_details_path=args.build_details_path,
-                sysconfigdata_path=args.sysconfigdata_path,
+                build_details_path=build_details_path,
+                sysconfigdata_path=sysconfigdata_path,
             )
         ]
         artifact_list = _natural_language_list(
