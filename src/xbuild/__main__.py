@@ -219,9 +219,9 @@ def main_parser() -> argparse.ArgumentParser:
 
     # This is only a required argument if the current environment isn't
     # cross-compiling. If/when this project is merged into `build`, the
-    # existence of `--build-details/--sysconfig` as an argument will be the
-    # trigger for "this is a cross platform build". The two arguments are
-    # mutually exclusive.
+    # existence of `--platform/--build-details/--sysconfig` as an argument will
+    # be the trigger for "this is a cross platform build". These arguments are
+    # all mutually exclusive.
     pyconfig_group = parser.add_mutually_exclusive_group(required=True)
     pyconfig_group.add_argument(
         "--build-details",

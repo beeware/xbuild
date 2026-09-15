@@ -15,10 +15,10 @@ $ source venv/bin/activate
 (venv) $ python -m pip install xbuild
 ```
 
-You can then run `xbuild` from the root directory of the project you want to build. You *must* pass in the `--sysconfig` argument, providing the path to the `sysconfig_vars` JSON file for the target platform, or the equivalent `sysconfigdata` python configuration.
+You can then run `xbuild` from the root directory of the project you want to build, providing the platform and architecture that you want to target:
 
 ```console
-(venv) $ python -m xbuild --sysconfig path/to/_sysconfig_vars__...json
+(venv) $ python -m xbuild --platform ios --arch arm64-iphonesimulator
 ```
 
 This will create an isolated cross-platform virtual environment, and trigger a PEP 517 build in that environment. Any build `requires` will be installed *for the build platform*. For example, if you're running on macOS, building for an ARM64 iPhone simulator, and your project lists `ninja` as a requirement, the *macOS* version of ninja will be installed. This ensures that the binary will be executable during the build.
@@ -33,6 +33,8 @@ build-backend = "setuptools.build_meta"
 ```
 
 In order for a cross-build to succeed, your environment must be configured appropriately for the platform you're targeting. This means setting `PATH` and other environment variables appropriately.
+
+As part of creating the cross-platform virtual environment, `xbuild` will download and cache a version of Python for the selected target platform. This will be stored in your user cache folder; you can specify an alternate cache folder using the `--cache` option, or by setting the XBUILD_CACHE environment variable. Alternatively, if you have a pre-existing Python download that you want to use, you can specify `--build-details` argument to point a the `build-details.json` configuration file for the Python install (For Python 3.13 or earlier, use `--sysconfig` to point at the `_sysconfigdata_....py` file for the platform)
 
 ### Android
 
@@ -65,16 +67,16 @@ Coming soon...
 
 ## Creating a cross virtual environment
 
-To explicitly create a cross-platform virtual environment, start by creating a virtual environment for your build platform (i.e., the platform where you will be compiling), then install and use the `xvenv` script to create cross-platform virtual environment.
+To explicitly create a cross-platform virtual environment, start by creating a virtual environment for your build platform (i.e., the platform where you will be compiling), then install and use the `xvenv` script to create cross-platform virtual environment, specifying the platform and architecture you want to target.
 
 ```console
 $ python3 -m venv venv
 $ source venv/bin/activate
 (venv) $ python -m pip install xbuild
-(venv) $ python -m xvenv --sysconfig path/to/_sysconfig_vars__...json x-venv
+(venv) $ python -m xvenv --platform ios --arch arm64-iphonesimulator x-venv
 ```
 
-If `x-venv` doesn't already exist, `xvenv` will create it first (equivalent to running `python -m venv x-venv`), then convert it into a cross environment. If `x-venv` already exists, it will be converted into a cross-platform environment of type specified by `--sysconfig`.
+If `x-venv` doesn't already exist, `xvenv` will create it first (equivalent to running `python -m venv x-venv`), then convert it into a cross environment. If `x-venv` already exists, it will be converted into a cross-platform environment of type specified by the `--platform` argument. As with `xbuild`, this will download and cache a Python install for your chosen platform and architecture.
 
 You can then deactivate the environment that was used to create the cross-platform environment, and activate the cross-platform virtual environment. For example, if `x-venv` was constructed using an iOS simulator `_sysconfig_vars` file (`_sysconfig_vars__ios_arm64-iphonesimulator.json`), you would see output like:
 
