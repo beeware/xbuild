@@ -87,8 +87,8 @@ def _verify_patched(
         INNER_PATCHED_DIR,
         {
             "_XBUILD_EXPECTED_VALUES_PATH": str(expected_path),
-            "_XBUILD_CROSS_PLATFORM": platform_name,
-            "_XBUILD_CROSS_MULTIARCH": arch,
+            "_XBUILD_PLATFORM": platform_name,
+            "_XBUILD_ARCH": arch,
         },
     )
 
