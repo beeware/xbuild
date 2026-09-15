@@ -23,11 +23,17 @@ INNER_PATCHED_DIR = _HERE / "_inner" / "patched"
 INNER_DISABLED_DIR = _HERE / "_inner" / "disabled"
 EXPECTED_VALUES_DIR = _HERE / "expected_values"
 
-CASES = [
-    pytest.param("ios", "arm64-iphonesimulator", id="ios-arm64-simulator"),
-    pytest.param("ios", "x86_64-iphonesimulator", id="ios-x86_64-simulator"),
-    pytest.param("ios", "arm64-iphoneos", id="ios-arm64-device"),
-]
+CASES = []
+if sys.platform == "darwin":
+    # iOS tests can only run on macOS
+    CASES.extend(
+        [
+            pytest.param("ios", "arm64-iphonesimulator", id="ios-arm64-simulator"),
+            pytest.param("ios", "x86_64-iphonesimulator", id="ios-x86_64-simulator"),
+            pytest.param("ios", "arm64-iphoneos", id="ios-arm64-device"),
+        ]
+    )
+
 if sys.version_info >= (3, 13, 0):
     # Android is only supported from 3.13 onwards
     CASES.extend(
