@@ -1,5 +1,7 @@
 import json
 import pprint
+import re
+import sys
 from importlib import import_module
 from importlib import util as importlib_util
 from pathlib import Path
@@ -95,18 +97,24 @@ def convert_venv(
     """
     if not venv_path.exists():
         raise ValueError(f"Virtual environment {venv_path} does not exist.")
-    if not (venv_path / "bin/python3").exists():
+
+    if sys.platform == "win32":
+        bin_path = "Scripts/python.exe"
+        lib_glob = "Lib/site-packages"
+    else:
+        bin_path = "bin/python3"
+        lib_glob = "lib/*/site-packages"
+    if not (venv_path / bin_path).exists():
         raise ValueError(f"{venv_path} does not appear to be a virtual environment.")
 
     # Update path references in the sysconfigdata to reflect local conditions.
-    platlibs = list(venv_path.glob("lib/*/site-packages"))
+    platlibs = list(venv_path.glob(lib_glob))
     if len(platlibs) == 0:
         raise ValueError(f"Couldn't find site packages in {venv_path}")
     elif len(platlibs) > 1:
         raise ValueError(f"Found more than one site packages in {venv_path}")
 
     venv_site_packages_path = platlibs[0]
-
     if build_details_path:
         if not build_details_path.is_file():
             raise ValueError(f"Could not find {build_details_path}")
@@ -158,11 +166,19 @@ def convert_venv(
             "Must provide path to either build_details.json or sysconfigdata"
         )
 
-    if version != venv_site_packages_path.parts[-2][6:]:
-        raise ValueError(
-            f"target venv is Python {venv_site_packages_path.parts[-2][6:]}; "
-            f"build details file is for Python {version}"
-        )
+    # Check the venv version matches the configuration file that has been provided
+    venv_config = (venv_path / "pyvenv.cfg").read_text()
+
+    match = re.search("version = (.*)", venv_config)
+    if match:
+        venv_version = match.groups()[0]
+        if not venv_version.startswith(f"{version}."):
+            raise ValueError(
+                f"target venv is Python {venv_version}; "
+                f"build details file is for Python {version}"
+            )
+    else:
+        raise ValueError("Could not determine Python version from target venv.")
 
     # Generate the context for the templated cross-target file
     arch, sdk = multiarch.split("-", 1)

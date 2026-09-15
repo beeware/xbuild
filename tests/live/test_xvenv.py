@@ -74,13 +74,22 @@ def _run_inner_suite(venv_python: Path, inner_dir: Path, extra_env: dict) -> Non
     assert result.returncode == 0, "inner test suite failed"
 
 
+def venv_python_exe(venv_path: Path) -> Path:
+    """Determine the executable name for Python in the venv."""
+    if sys.platform == "win32":
+        venv_python = venv_path / "Scripts" / "python"
+    else:
+        venv_python = venv_path / "bin" / "python"
+    return venv_python
+
+
 def _verify_patched(
     venv_path: Path,
     expected_path: Path,
     platform_name: str,
     arch: str,
 ) -> None:
-    venv_python = venv_path / "bin" / "python"
+    venv_python = venv_python_exe(venv_path)
     _install_pytest(venv_python)
     _run_inner_suite(
         venv_python,
@@ -93,6 +102,10 @@ def _verify_patched(
     )
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 13),
+    reason="Android tests only run on Python 3.13+",
+)
 def test_convert_existing_venv(tmp_path):
     """xvenv converts an already-existing native venv in place."""
     expected_path = _expected_values_path()
@@ -106,20 +119,15 @@ def test_convert_existing_venv(tmp_path):
             "-m",
             "xvenv",
             "--platform",
-            "ios",
+            "android",
             "--arch",
-            "arm64-iphonesimulator",
+            "aarch64",
             str(venv_path),
         ],
         check=True,
     )
 
-    _verify_patched(
-        venv_path,
-        expected_path,
-        platform_name="ios",
-        arch="arm64-iphonesimulator",
-    )
+    _verify_patched(venv_path, expected_path, platform_name="android", arch="aarch64")
 
 
 @pytest.mark.parametrize(("platform_name", "arch"), CASES)
@@ -148,7 +156,7 @@ def test_create_xvenv(tmp_path, platform_name, arch):
     # a third one, since disabled-mode behavior doesn't depend on how the
     # venv was originally created.
     _run_inner_suite(
-        venv_path / "bin" / "python",
+        venv_python_exe(venv_path),
         INNER_DISABLED_DIR,
         {"XBUILD_ENV": "off"},
     )
