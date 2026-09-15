@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 from unittest import mock
 
@@ -11,7 +10,7 @@ from xvenv.fetch import (
     resolve_cache_dir,
 )
 
-from ..utils import _make_archive
+from ..utils import VersionInfo, _make_archive
 
 
 def test_resolve_cache_dir_explicit_arg_wins(tmp_path, monkeypatch):
@@ -143,7 +142,7 @@ def test_skip_download_when_cached(tmp_path, monkeypatch):
     # Pre-populate the cache with an already-"extracted" directory matching
     # what android.config_path() expects for the current interpreter version.
     extracted_dir = tmp_path / "python-3.14.7-aarch64-linux-android"
-    version_info = sys.version_info.__replace__(
+    version_info = VersionInfo(
         major=3, minor=14, micro=7, releaselevel="final", serial=0
     )
     config_file = extracted_dir / "prefix" / "lib" / "python3.14" / "build-details.json"
@@ -173,7 +172,7 @@ def test_skip_download_when_cached_not_unpacked(tmp_path, monkeypatch):
     )
 
     extracted_dir = tmp_path / "python-3.14.7-aarch64-linux-android"
-    version_info = sys.version_info.__replace__(
+    version_info = VersionInfo(
         major=3, minor=14, micro=7, releaselevel="final", serial=0
     )
     config_file = extracted_dir / "prefix" / "lib" / "python3.14" / "build-details.json"
@@ -192,7 +191,7 @@ def test_skip_download_when_cached_not_unpacked(tmp_path, monkeypatch):
 def test_fetch_python(tmp_path, monkeypatch):
     """If the required file doesn't exist, it is downloaded."""
     monkeypatch.setattr("platform.machine", lambda: "arm64")
-    version_info = sys.version_info.__replace__(
+    version_info = VersionInfo(
         major=3, minor=14, micro=7, releaselevel="final", serial=0
     )
 

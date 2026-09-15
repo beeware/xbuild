@@ -1,8 +1,8 @@
-import sys
-
 import pytest
 
 from xvenv.platforms.ios import config_path, download_url
+
+from ...utils import VersionInfo
 
 
 @pytest.mark.parametrize(
@@ -132,7 +132,7 @@ from xvenv.platforms.ios import config_path, download_url
 )
 def test_download_url(version_details, arch, url):
     """The download URL can be constructed from the version and architecture."""
-    version_info = sys.version_info.__replace__(**version_details)
+    version_info = VersionInfo(**version_details)
 
     actual_url = download_url(version_info, arch)
 
@@ -293,7 +293,7 @@ def test_download_url(version_details, arch, url):
 )
 def test_config_path(tmp_path, version_details, arch, path):
     """The location of the iOS configuration path can be determined."""
-    version_info = sys.version_info.__replace__(**version_details)
+    version_info = VersionInfo(**version_details)
 
     actual_config_path = config_path(tmp_path, version_info, arch)
 
