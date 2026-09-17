@@ -41,6 +41,7 @@ classifiers = [
 dependencies = [
     "build >= 1.6.0",
     "platformdirs",
+    "filelock",
 ]
 
 [project.scripts]

@@ -32,6 +32,7 @@ _build/
 comment.md
 
 # In-repo spaces for local testing
+.envrc
 local/
 temp/
 
