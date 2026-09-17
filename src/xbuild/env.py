@@ -40,13 +40,16 @@ def install_environment(os, for_target):
 
 
 class _XPipBackend(_PipBackend):
-    def install_requirements(
+    def install_dependencies(
         self,
         requirements: Collection[str],
+        constraints: Collection[str] = (),
+        *,
         for_target: bool = True,
+        _fresh: bool = False,
     ) -> None:
         with install_environment(os, for_target=for_target):
-            super().install_requirements(requirements)
+            super().install_dependencies(requirements, constraints, _fresh=_fresh)
 
 
 build_env._PipBackend = _XPipBackend
@@ -126,6 +129,7 @@ class XBuildIsolatedEnv(DefaultIsolatedEnv):
         for_loc = "target platform" if for_target else "build platform"
         _ctx.log(
             f"Installing packages for {for_loc} in isolated environment:\n"
-            + "\n".join(f"- {r}" for r in sorted(requirements))
+            + "\n".join(f"- {r}" for r in sorted(requirements)),
+            kind=("step",),
         )
-        self._env_backend.install_requirements(requirements, for_target=for_target)
+        self._env_backend.install_dependencies(requirements, for_target=for_target)
