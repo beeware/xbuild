@@ -49,7 +49,9 @@ class ProjectXBuilder(ProjectBuilder):
             (``sdist`` or ``wheel``)
         :param config_settings: Config settings for the build backend
         """
-        _ctx.log(f"Getting target build dependencies for {distribution}...")
+        _ctx.log(
+            f"Getting target build dependencies for {distribution}...", kind=("step",)
+        )
         hook_name = f"get_target_requires_for_build_{distribution}"
         try:
             get_requires = getattr(self._hook, hook_name)

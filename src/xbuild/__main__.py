@@ -12,14 +12,13 @@ from build import env as _env
 from build.__main__ import (
     _cprint,
     _error,
-    _format_dep_chain,
     _handle_build_error,
-    _max_terminal_width,
     _natural_language_list,
     _setup_cli,
     _styles,
 )
 from build._types import ConfigSettings, Distribution, StrPath
+from build._util import _format_dep_chain
 
 import xbuild
 from xbuild._builder import ProjectXBuilder
@@ -132,22 +131,13 @@ def _build_in_current_env(
 
 def main_parser() -> argparse.ArgumentParser:
     """Construct the main parser."""
-    formatter_class = partial(
-        argparse.RawDescriptionHelpFormatter, width=min(_max_terminal_width, 127)
-    )
-    # Workaround for 3.14.0 beta 1, can remove once beta 2 is out
-    if sys.version_info >= (3, 14):
-        formatter_class = partial(formatter_class, color=True)
-
     make_parser = partial(
         argparse.ArgumentParser,
         description="A cross-platform build backend for Python",
-        # Prevent argparse from taking up the entire width of the terminal window
-        # which impedes readability. Also keep the description formatted.
-        formatter_class=formatter_class,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     if sys.version_info >= (3, 14):
-        make_parser = partial(make_parser, suggest_on_error=True, color=True)
+        make_parser = partial(make_parser, suggest_on_error=True)
 
     parser = make_parser()
     parser.add_argument(
@@ -358,7 +348,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     # outdir is relative to srcdir only if omitted.
     outdir = os.path.join(args.srcdir, "dist") if args.outdir is None else args.outdir
 
-    with _handle_build_error():
+    with _handle_build_error(env_dir=None, sdist_extract_dir=None):
         built = [
             _build(
                 not args.no_isolation,
@@ -374,7 +364,9 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         ]
         artifact_list = _natural_language_list(
             [
-                "{underline}{}{reset}{bold}{green}".format(artifact, **_styles.get())
+                "{underline}{}{reset}{bold}{green}".format(
+                    artifact, **_styles.get()["stdout"]
+                )
                 for artifact in built
             ]
         )

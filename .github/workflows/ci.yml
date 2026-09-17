@@ -98,7 +98,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ "3.13", "3.14" ]
+        python-version: [ "3.13", "3.14", "3.15" ]
         runs-on: ["macos-26", "macos-26-intel", "windows-2025", "ubuntu-24.04"]
         include:
           # iOS support goes back to 3.11, but can't be meaningfully run on
