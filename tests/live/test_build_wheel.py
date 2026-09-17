@@ -142,9 +142,14 @@ def _build_env_android(config_path, arch):
     prefix_dir = config_path.parents[2]
     extracted_dir = config_path.parents[3]
 
-    sysconfigdata_path = next(
+    sysconfigdata_matches = list(
         prefix_dir.glob("lib/python*/_sysconfigdata__android_*.py")
     )
+    if not sysconfigdata_matches:
+        pytest.fail(
+            f"Could not find a _sysconfigdata__android_*.py file under {prefix_dir}"
+        )
+    sysconfigdata_path = sysconfigdata_matches[0]
     api_level = runpy.run_path(str(sysconfigdata_path))["build_time_vars"][
         "ANDROID_API_LEVEL"
     ]
@@ -166,8 +171,8 @@ def _build_env_android(config_path, arch):
         )
 
     bash_command = (
-        f"set -eu; HOST={host}; PREFIX={prefix_dir}; "
-        f"ANDROID_API_LEVEL={api_level}; . {env_script}; export"
+        f'set -eu; HOST="{host}"; PREFIX="{prefix_dir}"; '
+        f'ANDROID_API_LEVEL="{api_level}"; . "{env_script}"; export'
     )
     result = subprocess.run(
         [
