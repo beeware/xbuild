@@ -25,6 +25,8 @@ silently.
 """
 
 import os
+import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -40,11 +42,23 @@ CASES = []
 if sys.platform == "darwin":
     # iOS builds can only be performed on macOS.
     CASES.append(pytest.param("ios", id="ios"))
+if sys.version_info >= (3, 13):
+    # Android support starts at Python 3.13.
+    CASES.append(pytest.param("android", id="android"))
+
+_ANDROID_HOST_TRIPLETS = {
+    "aarch64": "aarch64-linux-android",
+    "x86_64": "x86_64-linux-android",
+}
+_NDK_VERSION_RE = re.compile(r"^ndk_version=(\S+)", re.MULTILINE)
+_EXPORT_LINE_RE = re.compile(r"^(?:declare -x |export )?(\w+)=['\"]?(.*?)['\"]?$")
 
 
 def _check_preconditions(platform_name):
     if platform_name == "ios":
         _check_preconditions_ios()
+    elif platform_name == "android":
+        _check_preconditions_android()
     else:
         raise AssertionError(f"no precondition check for {platform_name!r}")
 
@@ -59,9 +73,24 @@ def _check_preconditions_ios():
         )
 
 
+def _check_preconditions_android():
+    if "ANDROID_HOME" not in os.environ:
+        pytest.fail(
+            "ANDROID_HOME environment variable is not set. It must point "
+            "at an installed Android SDK."
+        )
+    if "JAVA_HOME" not in os.environ:
+        pytest.fail(
+            "JAVA_HOME environment variable is not set. It must point at "
+            "an installed JDK."
+        )
+
+
 def _build_env(platform_name, config_path, arch):
     if platform_name == "ios":
         return _build_env_ios(config_path)
+    elif platform_name == "android":
+        return _build_env_android(config_path, arch)
     else:
         raise AssertionError(f"no environment builder for {platform_name!r}")
 
@@ -92,6 +121,75 @@ def _build_env_ios(config_path):
             ]
         ),
     }
+
+
+def _build_env_android(config_path, arch):
+    # config_path is e.g.
+    # <cache_dir>/python-3.13.15-aarch64-linux-android/prefix/lib/
+    #     python3.13/_sysconfigdata__android_aarch64-linux-android.py
+    # or, for Python >= 3.14:
+    # <cache_dir>/python-3.14.7-aarch64-linux-android/prefix/lib/
+    #     python3.14/build-details.json
+    # In both cases:
+    #   prefix_dir      = config_path.parents[2]   (".../prefix")
+    #   extracted_dir   = config_path.parents[3]
+    #                     (".../python-3.13.15-aarch64-linux-android")
+    try:
+        host = _ANDROID_HOST_TRIPLETS[arch]
+    except KeyError:
+        raise AssertionError(f"unknown Android arch: {arch!r}") from None
+
+    prefix_dir = config_path.parents[2]
+    extracted_dir = config_path.parents[3]
+
+    sysconfigdata_path = next(
+        prefix_dir.glob("lib/python*/_sysconfigdata__android_*.py")
+    )
+    api_level = runpy.run_path(str(sysconfigdata_path))["build_time_vars"][
+        "ANDROID_API_LEVEL"
+    ]
+
+    env_script = extracted_dir / "android-env.sh"
+    ndk_match = _NDK_VERSION_RE.search(env_script.read_text())
+    if not ndk_match:
+        pytest.fail(f"Could not find ndk_version= in {env_script}")
+    ndk_version = ndk_match[1]
+
+    ndk_dir = Path(os.environ["ANDROID_HOME"]) / "ndk" / ndk_version
+    if not ndk_dir.is_dir():
+        pytest.fail(
+            f"Android NDK {ndk_version} is required (as specified by "
+            f"{env_script}), but was not found at {ndk_dir}. Install it "
+            f'with `sdkmanager "ndk;{ndk_version}"`, or use '
+            "`ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager` to list "
+            "available versions."
+        )
+
+    bash_command = (
+        f"set -eu; HOST={host}; PREFIX={prefix_dir}; "
+        f"ANDROID_API_LEVEL={api_level}; . {env_script}; export"
+    )
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            bash_command,
+        ],
+        env=os.environ,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    sourced = {}
+    for line in result.stdout.splitlines():
+        match = _EXPORT_LINE_RE.search(line)
+        if match:
+            key, value = match[1], match[2]
+            if os.environ.get(key) != value:
+                sourced[key] = value
+
+    return {**os.environ, **sourced}
 
 
 @pytest.mark.parametrize("platform_name", CASES)
