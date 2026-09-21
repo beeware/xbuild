@@ -23,25 +23,26 @@ INNER_PATCHED_DIR = _HERE / "_inner" / "patched"
 INNER_DISABLED_DIR = _HERE / "_inner" / "disabled"
 EXPECTED_VALUES_DIR = _HERE / "expected_values"
 
-CASES = []
-if sys.platform == "darwin":
-    # iOS tests can only run on macOS
-    CASES.extend(
-        [
-            pytest.param("ios", "arm64-iphonesimulator", id="ios-arm64-simulator"),
-            pytest.param("ios", "x86_64-iphonesimulator", id="ios-x86_64-simulator"),
-            pytest.param("ios", "arm64-iphoneos", id="ios-arm64-device"),
-        ]
-    )
+IOS_SKIPS = [
+    pytest.mark.skipif(
+        sys.platform != "darwin",
+        reason="iOS tests can only be run on macOS",
+    ),
+]
+ANDROID_SKIPS = [
+    pytest.mark.skipif(
+        sys.version_info < (3, 13),
+        reason="Android tests require Python 3.13+",
+    ),
+]
 
-if sys.version_info >= (3, 13, 0):
-    # Android is only supported from 3.13 onwards
-    CASES.extend(
-        [
-            pytest.param("android", "aarch64", id="android-aarch64"),
-            pytest.param("android", "x86_64", id="android-x86_64"),
-        ]
-    )
+CASES = [
+    pytest.param("ios", "arm64-iphonesimulator", id="ios-arm64-sim", marks=IOS_SKIPS),
+    pytest.param("ios", "x86_64-iphonesimulator", id="ios-x86_64-sim", marks=IOS_SKIPS),
+    pytest.param("ios", "arm64-iphoneos", id="ios-arm64-device", marks=IOS_SKIPS),
+    pytest.param("android", "aarch64", id="android-aarch64", marks=ANDROID_SKIPS),
+    pytest.param("android", "x86_64", id="android-x86_64", marks=ANDROID_SKIPS),
+]
 
 
 def _expected_values_path() -> Path:
@@ -104,7 +105,7 @@ def _verify_patched(
 
 @pytest.mark.skipif(
     sys.version_info < (3, 13),
-    reason="Android tests only run on Python 3.13+",
+    reason="Android tests require Python 3.13+",
 )
 def test_convert_existing_venv(tmp_path):
     """xvenv converts an already-existing native venv in place."""

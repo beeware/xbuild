@@ -38,13 +38,32 @@ from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_dir
 
 SAMPLE_PROJECT = Path(__file__).parents[1] / "samples" / "test1"
 
-CASES = []
-if sys.platform == "darwin":
-    # iOS builds can only be performed on macOS.
-    CASES.append(pytest.param("ios", id="ios"))
-if sys.version_info >= (3, 13):
-    # Android support starts at Python 3.13.
-    CASES.append(pytest.param("android", id="android"))
+CASES = [
+    pytest.param(
+        "ios",
+        id="ios",
+        marks=[
+            pytest.mark.skipif(
+                sys.platform != "darwin",
+                reason="iOS tests can only be run on macOS",
+            ),
+        ],
+    ),
+    pytest.param(
+        "android",
+        id="android",
+        marks=[
+            pytest.mark.skipif(
+                sys.platform == "win32",
+                reason="Android xbuild tests cannot be run on Windows",
+            ),
+            pytest.mark.skipif(
+                sys.version_info < (3, 13),
+                reason="Android tests require Python 3.13+",
+            ),
+        ],
+    ),
+]
 
 _ANDROID_HOST_TRIPLETS = {
     "aarch64": "aarch64-linux-android",
