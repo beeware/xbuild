@@ -44,6 +44,18 @@ dependencies = [
     "filelock",
 ]
 
+[project.optional-dependencies]
+# These mirror the optional dependencies of the build package.
+uv = [
+  "build[uv]",
+]
+keyring = [
+  "build[keyring]",
+]
+virtualenv = [
+  "build[virtualenv]",
+]
+
 [project.scripts]
 xbuild = "xbuild.__main__:entrypoint"
 xvenv = "xvenv.__main__:entrypoint"
