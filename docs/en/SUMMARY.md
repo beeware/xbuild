@@ -52,6 +52,7 @@ search:
         - [Release process](how-to/internal/release.md)
 - Topic guides
     - [Topic guides](topics/index.md)
+    - [How it works](topics/how-it-works.md)
 - Reference
     - [Reference](reference/index.md)
     - Command reference
