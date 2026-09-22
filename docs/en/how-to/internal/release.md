@@ -1,8 +1,8 @@
-# How to cut a xbuild release
+# How to cut a `xbuild` release
 
-The release infrastructure for xbuild is semi-automated, using GitHub Actions to formally publish releases.
+The release infrastructure for `xbuild` is semi-automated, using GitHub Actions to formally publish releases.
 
-This guide assumes that you have an `upstream` remote configured on your local clone of the xbuild repository, pointing at the official repository. If all you have is a checkout of a personal fork of the xbuild repository, you can configure that checkout by running:
+This guide assumes that you have an `upstream` remote configured on your local clone of the `xbuild` repository, pointing at the official repository. If all you have is a checkout of a personal fork of the `xbuild` repository, you can configure that checkout by running:
 
 ```bash
 git remote add upstream https://github.com/beeware/xbuild.git

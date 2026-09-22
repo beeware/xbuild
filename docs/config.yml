@@ -14,8 +14,8 @@ extra:
   package_name: xbuild
   formal_name: "XBuild"
   website: false
-  min_python_version: "3.13"
-  min_python_version_tag: "313"
+  min_python_version: "3.11"
+  min_python_version_tag: "311"
   recent_python_version: "3.15"
   docs_python_version: "3.13"
   translated: false
