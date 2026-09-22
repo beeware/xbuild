@@ -304,6 +304,9 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
 
     config_settings = {}
 
+    build_details_path = args.build_details_path
+    sysconfigdata_path = args.sysconfigdata_path
+
     try:
         if args.platform is not None:
             cache_dir = resolve_cache_dir(args.cache)
@@ -314,9 +317,6 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
                 build_details_path = config_path
             else:
                 sysconfigdata_path = config_path
-        else:
-            build_details_path = args.build_details_path
-            sysconfigdata_path = args.sysconfigdata_path
     except (ValueError, NotImplementedError) as e:
         _error(e)
         sys.exit(1)

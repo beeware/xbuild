@@ -9,6 +9,7 @@ from importlib import import_module
 from pathlib import Path
 
 import platformdirs
+from filelock import FileLock
 
 
 def resolve_cache_dir(cache_arg: Path | None) -> Path:
@@ -104,15 +105,17 @@ def fetch_python(platform_name: str, arch: str, cache_dir: Path) -> tuple[Path, 
 
     if not extracted_dir.is_dir():
         archive_path = cache_dir / archive_name
-        if archive_path.is_file():
-            print(f"Cached {archive_name} exists.")
-        else:
-            print(f"Downloading {archive_name}...", end="", flush=True)
-            try:
-                urllib.request.urlretrieve(url, archive_path)
-                print(" done.")
-            except OSError as e:
-                raise ValueError(f"Failed to download {url}: {e}") from e
+        with FileLock(str(archive_path) + ".lock"):
+            if archive_path.is_file():
+                print(f"Cached {archive_name} exists.")
+            else:
+                print(f"Downloading {archive_name}...", end="", flush=True)
+                try:
+                    urllib.request.urlretrieve(url, archive_path)
+                    print(" done.")
+                except OSError as e:
+                    archive_path.unlink(missing_ok=True)
+                    raise ValueError(f"Failed to download {url}: {e}") from e
 
         # NOTE: if extraction fails partway (disk full, corrupt archive),
         # extracted_dir already exists and will be treated as a valid cache

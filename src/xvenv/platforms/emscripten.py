@@ -30,6 +30,8 @@ def extend_context(context, build_details):
     context["os_release"] = emscripten_version
     context["os_version"] = "#1"
 
+    context["sys_extra"] = ""
+    context["os_extra"] = ""
     context["platform_extra"] = f"""
     @monkeypatch(platform)
     def libc_ver() -> int:

@@ -41,6 +41,19 @@ classifiers = [
 dependencies = [
     "build >= 1.6.0",
     "platformdirs",
+    "filelock",
+]
+
+[project.optional-dependencies]
+# These mirror the optional dependencies of the build package.
+uv = [
+  "build[uv]",
+]
+keyring = [
+  "build[keyring]",
+]
+virtualenv = [
+  "build[virtualenv]",
 ]
 
 [project.scripts]

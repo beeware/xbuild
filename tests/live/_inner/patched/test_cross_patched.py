@@ -94,7 +94,7 @@ def test_sysconfig_get_paths_venv_local(name):
 
 
 @pytest.mark.skipif(sys.platform != "ios", reason="iOS-specific check")
-def test_platform_ios_ver():
+def test_platform_ios():
     """iOS platform properties are as expected"""
     ios_ver = platform.ios_ver()
     assert ios_ver.release == EXPECTED["ios_release"]
@@ -103,8 +103,8 @@ def test_platform_ios_ver():
 
 
 @pytest.mark.skipif(sys.platform != "android", reason="Android-specific check")
-def test_platform_android_ver():
-    """Android platform properties are as expected"""
+def test_platform_android():
+    """Android platform properties are as expected."""
     android_ver = platform.android_ver()
     assert android_ver.release == EXPECTED["android_release"]
     assert android_ver.api_level == EXPECTED["android_api_level"]
@@ -112,3 +112,9 @@ def test_platform_android_ver():
     assert android_ver.model == EXPECTED["android_model"]
     assert android_ver.device == EXPECTED["android_device"]
     assert android_ver.is_emulator == EXPECTED["android_is_emulator"]
+
+
+@pytest.mark.skipif(sys.platform != "android", reason="Android-specific check")
+def test_sys_android():
+    """Android sys properties are as expected."""
+    assert sys.getandroidapilevel() == EXPECTED["android_api_level"]

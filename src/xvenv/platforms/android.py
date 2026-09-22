@@ -121,10 +121,14 @@ def extend_context(context, build_details):
     context["os_release"] = "3.18.91+"
     context["os_version"] = "#1 SMP PREEMPT Tue Jan 9 20:35:43 UTC 2018"
 
-    context["platform_extra"] = f"""
-    @monkeypatch(platform)
+    context["sys_extra"] = f"""
+
+    @monkeypatch(sys)
     def getandroidapilevel() -> int:
         return {api_level}
+"""
+    context["os_extra"] = ""
+    context["platform_extra"] = f"""
 
     @monkeypatch(platform)
     def android_ver(

@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=84"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "test1"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.setuptools]
+ext-modules = [
+    {name = "test1._native", sources=["src/test1/_native.c"]}
+]

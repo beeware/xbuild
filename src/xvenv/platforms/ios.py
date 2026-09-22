@@ -101,6 +101,8 @@ def extend_context(context, build_details):
         "root:xnu-11417.101.15~117/RELEASE_ARM64_T6000"
     )
 
+    context["sys_extra"] = ""
+    context["os_extra"] = ""
     context["platform_extra"] = f"""
     @monkeypatch(platform)
     def ios_ver(system="", release="", model="", is_simulator=False):
