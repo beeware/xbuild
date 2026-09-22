@@ -46,6 +46,10 @@ search:
     - [Topic guides](topics/index.md)
 - Reference
     - [Reference](reference/index.md)
+    - Command reference
+        - [Command reference](reference/commands/index.md)
+        - [xbuild](reference/commands/xbuild.md)
+        - [xvenv](reference/commands/xvenv.md)
 - About xbuild
     - [About xbuild](about/index.md)
     - [FAQ](about/faq.md)
