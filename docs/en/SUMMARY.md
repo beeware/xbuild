@@ -50,6 +50,8 @@ search:
         - [Command reference](reference/commands/index.md)
         - [xbuild](reference/commands/xbuild.md)
         - [xvenv](reference/commands/xvenv.md)
+    - [Project configuration](reference/project-configuration.md)
+    - [Environment variables](reference/environment-variables.md)
 - About xbuild
     - [About xbuild](about/index.md)
     - [FAQ](about/faq.md)
