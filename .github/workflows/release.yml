@@ -5,21 +5,28 @@ on:
     tags:
       - 'v*'
 
-permissions:
-  contents: read
-
 jobs:
   ci:
     name: CI
-    # The called workflow's package job needs id-token/attestations to
-    # create the provenance attestation.
     permissions:
-      contents: read
       id-token: write
+      contents: read
       attestations: write
+      pull-requests: write
     uses: $/.github/workflows/ci.yml
     with:
       attest-package: "true"
+
+  docs:
+    permissions:
+      contents: read
+    name: Verify Docs Build
+    uses: beeware/.github/.github/workflows/docs-build-verify.yml@main
+    secrets:
+      RTD_API_TOKEN: ${{ secrets.RTD_API_TOKEN }}
+    with:
+      project-name: "xbuild"
+      project-version: ${{ github.ref_name }}
 
   release:
     name: Create Release
@@ -52,13 +59,24 @@ jobs:
           pattern: Packages
           path: dist
 
+      - name: Install packages
+        run: pip install dist/*.whl
+
+      - name: Check version number
+        # Check that the setuptools_scm-generated version number is still the same when
+        # installed from a wheel with setuptools_scm not present.
+        run: |
+          set -x
+          test $(xvenv --version) = $VERSION
+          test $(xbuild --version) = $VERSION
+
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           gh release create "${GITHUB_REF_NAME}" \
-            --title "${VERSION}" \
+            --title "$VERSION" \
             --draft \
             --verify-tag \
             dist/*
