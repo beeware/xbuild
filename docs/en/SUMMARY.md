@@ -7,6 +7,12 @@ search:
     - [Tutorial](tutorial/index.md)
 - How-to guides
     - [How-to guides](how-to/index.md)
+    - Using xbuild
+        - Platform setup
+            - [Platform setup](how-to/platform-setup/index.md)
+            - [Android](how-to/platform-setup/android.md)
+            - [iOS](how-to/platform-setup/ios.md)
+            - [Emscripten](how-to/platform-setup/emscripten.md)
     - Contribute
         - [Contributing](how-to/contribute/index.md)
         - [First-time contributors](how-to/contribute/first-time-contributors.md)
