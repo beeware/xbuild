@@ -14,6 +14,7 @@ search:
             - [iOS](how-to/platform-setup/ios.md)
             - [Emscripten](how-to/platform-setup/emscripten.md)
         - [Create a cross-platform venv](how-to/create-cross-venv.md)
+        - [Run a build](how-to/run-a-build.md)
     - Contribute
         - [Contributing](how-to/contribute/index.md)
         - [First-time contributors](how-to/contribute/first-time-contributors.md)
