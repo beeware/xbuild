@@ -2,6 +2,30 @@
 
 <!-- towncrier release notes start -->
 
+## 0.3.0 (2026-09-22)
+
+### Features
+
+* `xvenv` and `xbuild` can now be configured using a `build-details.json` file, as an alternative to a `sysconfig_vars` JSON file or `sysconfigdata` Python file. (#30)
+* `xvenv` will now create the target virtual environment if it doesn't already exist, equivalent to running `python -m venv <location>` before conversion. Previously, `xvenv` required the target directory to already exist as a valid virtual environment. (#79)
+* `xbuild` and `xvenv` can now download and cache a matching Python build for a target platform automatically, using the `--platform {ios,android,emscripten}` option (with optional `--arch` and `--cache`), instead of requiring a pre-existing Python install and manually-providing the `--sysconfig`/`--build-details` option. (#81)
+* Support for cross-building iOS on Python 3.11 and 3.12 was added. (#82)
+* Support for Python 3.15 was added. (#83)
+* `xbuild` now exposes optional extras (like `virtualenv` and `uv`) that mirror the underlying `build` extras. (#84)
+* `xvenv` now supports `--without-pip`, matching `python -m venv`'s own flag, to skip installing pip when `xvenv` creates the target virtual environment. (#86)
+
+### Backward Incompatible Changes
+
+* `xbuild` now requires `build` 1.6.0 or higher. (#83)
+
+### Documentation
+
+* Added full documentation coverage for the `xbuild` and `xvenv` commands, including a command reference, platform-specific tutorials, how-to guides, and a topic guide explaining the cross-compilation mechanism. (#85)
+
+### Misc
+
+* #82, #84
+
 ## 0.2.0 (2025-09-10)
 
 * Added `xbuild`, a PEP 517 build frontend that triggers cross-platform builds using a cross-platform virtual environment created by `xvenv`. Build requirements are installed for the build platform by default, unless listed in a new `target-requires` key in `build-system`, in which case they're installed for the target platform.
