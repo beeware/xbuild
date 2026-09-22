@@ -16,4 +16,4 @@ See the [Common options](./index.md#common-options) page for options shared with
 
 ### `--without-pip`
 
-Skip installing `pip` when `xvenv` creates the target cross-platform virtual environment. Only relevant if the environment doesn't already exist; if you're converting a venv that's already been created, the argument is ignored. Matches `python -m venv`'s own `--without-pip` flag.
+Skip installing `pip` when `xvenv` creates the target cross-platform virtual environment. Only relevant if the environment doesn't already exist; if you're converting a virtual environment that's already been created, the argument is ignored. Matches `python -m venv`'s own `--without-pip` flag.
