@@ -4,8 +4,11 @@ Bugfixes
 Emscripten
 frontend
 Homebrew
+JDK
 JSON
 macOS
+monkeypatch
+monkeypatching
 natively
 pre
 PyPI
@@ -14,6 +17,4 @@ SDK
 toga
 towncrier
 WASM
-xbuild
-xvenv
 Xcode

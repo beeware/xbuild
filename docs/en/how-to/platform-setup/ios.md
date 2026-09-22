@@ -1,6 +1,6 @@
 # Set up your environment for iOS
 
-You must have Xcode installed, with the iOS SDK added.
+You must have a machine running macOS, with Xcode installed, and the iOS SDK added.
 
 It is also strongly advised that you:
 

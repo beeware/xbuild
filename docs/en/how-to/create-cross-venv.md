@@ -1,10 +1,10 @@
 # How to create a cross-platform virtual environment
 
-[`xvenv`](../reference/commands/xvenv.md) converts a virtual environment so that it pretends to be running on a target platform, rather than the platform it's physically running on. This is useful when you want to explore a target environment interactively, or when you want to reuse the same cross-venv across multiple `xbuild` invocations (see [How to run a build](run-a-build.md#reusing-an-active-cross-venv)).
+[`xvenv`](../reference/commands/xvenv.md) converts a virtual environment so that it pretends to be running on a target platform, rather than the platform it's physically running on. This is required when a platform requires building an application on one platform, for deployment on a second platform (e.g., building a mobile application on a desktop machine that will be run on a mobile phone.
 
 Before you start, make sure your build-platform machine is set up for your chosen target platform - see [Platform setup](platform-setup/index.md).
 
-## Creating the venv
+## Creating the environment
 
 Start by creating (or reusing) a virtual environment for your **build** platform, and install `xbuild`:
 
@@ -14,17 +14,17 @@ $ source venv/bin/activate
 (venv) $ python -m pip install xbuild
 ```
 
-Then run `xvenv`, specifying the platform and architecture you want to target, and the path where the cross-venv should be created:
+Then run `xvenv`, specifying the platform and architecture you want to target, and the path where the cross-environment should be created:
 
 ```console
 (venv) $ xvenv --platform ios --arch arm64-iphonesimulator x-venv
 ```
 
-If `x-venv` doesn't already exist, `xvenv` creates it first (equivalent to running `python -m venv x-venv`), then converts it into a cross environment. If `x-venv` already exists, it is converted in place.
+If the `x-venv` directory doesn't already exist, `xvenv` creates it first (equivalent to running `python -m venv x-venv`), then converts it into a cross environment. If `x-venv` already exists, it is converted in place.
 
-## Activating the cross-venv
+## Activating the cross-environment
 
-Deactivate the build-platform venv you used to create the cross-venv, then activate the cross-venv itself:
+Deactivate the build-platform virtual environment you used to create the cross-environment, then activate the cross-environment itself:
 
 ```console
 (venv) $ deactivate

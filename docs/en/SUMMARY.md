@@ -9,16 +9,15 @@ search:
     - [Android](tutorial/android.md)
 - How-to guides
     - [How-to guides](how-to/index.md)
-    - Using xbuild
-        - Platform setup
-            - [Platform setup](how-to/platform-setup/index.md)
-            - [Android](how-to/platform-setup/android.md)
-            - [iOS](how-to/platform-setup/ios.md)
-            - [Emscripten](how-to/platform-setup/emscripten.md)
-        - [Create a cross-platform venv](how-to/create-cross-venv.md)
-        - [Run a build](how-to/run-a-build.md)
-    - Contribute
-        - [Contributing](how-to/contribute/index.md)
+    - [Using `xbuild`](how-to/index.md)
+    - Platform setup
+        - [Platform setup](how-to/platform-setup/index.md)
+        - [Android](how-to/platform-setup/android.md)
+        - [iOS](how-to/platform-setup/ios.md)
+        - [Emscripten](how-to/platform-setup/emscripten.md)
+    - [Create a cross-platform virtual environment](how-to/create-cross-venv.md)
+    - [Run a build](how-to/run-a-build.md)
+    - [Contributing to `xbuild`](how-to/contribute/index.md)
         - [First-time contributors](how-to/contribute/first-time-contributors.md)
         - What can I do?
             - [Fix an issue](how-to/contribute/what/fix-issue.md)
@@ -49,7 +48,7 @@ search:
         - Style guides
             - [Code style guide](how-to/contribute/style/code-style-guide.md)
             - [Documentation style guide](how-to/contribute/style/docs-style-guide.md)
-    - Internal
+    - Internal guides
         - [Internal How-to guides](how-to/internal/index.md)
         - [Release process](how-to/internal/release.md)
 - Topic guides
@@ -59,12 +58,11 @@ search:
     - [Reference](reference/index.md)
     - Command reference
         - [Command reference](reference/commands/index.md)
-        - [xbuild](reference/commands/xbuild.md)
-        - [xvenv](reference/commands/xvenv.md)
+        - [`xbuild`](reference/commands/xbuild.md)
+        - [`xvenv`](reference/commands/xvenv.md)
     - [Project configuration](reference/project-configuration.md)
     - [Environment variables](reference/environment-variables.md)
-- About xbuild
-    - [About xbuild](about/index.md)
+- [About `xbuild`](about/index.md)
     - [FAQ](about/faq.md)
     - [Community](about/community.md)
     - [Release History](about/releases.md)

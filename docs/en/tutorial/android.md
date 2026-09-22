@@ -1,6 +1,6 @@
 # Tutorial: building for Android
 
-This tutorial walks through the two most common xbuild tasks - creating a cross-platform virtual environment, and building a wheel - targeting Android.
+This tutorial walks through the two most common `xbuild` tasks - creating a cross-platform virtual environment, and building a wheel - targeting Android.
 
 /// note | Before you start
 
@@ -32,7 +32,7 @@ C:\...> venv\Scripts\activate
 
 ///
 
-## Create a cross-platform venv
+## Create a cross-platform virtual environment
 
 Use `xvenv` to create a cross-platform virtual environment targeting Android (using the `aarch64` architecture, typical for both physical devices and Apple Silicon-hosted emulators):
 
@@ -40,7 +40,7 @@ Use `xvenv` to create a cross-platform virtual environment targeting Android (us
 (venv) $ xvenv --platform android --arch aarch64 x-venv
 ```
 
-The first time you run this, xbuild downloads and caches a copy of Python built for Android. Deactivate your build-platform venv, and activate the new cross-platform one, to confirm it's pretending to be Android:
+The first time you run this, `xbuild` downloads and caches a copy of Python built for Android. Deactivate your build-platform virtual environment, and activate the new cross-platform one, to confirm it's pretending to be Android:
 
 /// tab | macOS/Linux
 
@@ -68,7 +68,7 @@ android
 
 ## Build a wheel
 
-Clone or copy the xbuild repository so you have access to the `tests/samples/test1` sample project (a minimal package containing a C extension), then build it for Android:
+If you have a project that contains a PEP 517 build configuration and has binary modules, you can build a binary wheel for Android using:
 
 /// tab | macOS/Linux
 
@@ -81,10 +81,7 @@ $ source venv/bin/activate
 
 /// tab | Windows
 
-```doscon
-C:\...> venv\Scripts\activate
-(venv) C:\...> xbuild tests\samples\test1 --platform android --arch aarch64
-```
+At present, it is not possible to build Android binary wheels on Windows. You'll need
 
 ///
 
@@ -92,6 +89,6 @@ This produces a wheel in `tests/samples/test1/dist/`. Confirm it's a real compil
 
 ## Next steps
 
-- [How to create a cross-platform venv](../how-to/create-cross-venv.md) covers more advanced `xvenv` usage, like bringing your own Python build.
+- [How to create a cross-platform virtual environment](../how-to/create-cross-venv.md) covers more advanced `xvenv` usage, like bringing your own Python build.
 - [How to run a build](../how-to/run-a-build.md) covers more advanced `xbuild` usage, like target-platform build dependencies.
-- [How xbuild works](../topics/how-it-works.md) explains the mechanism behind the cross-platform environment.
+- [How `xbuild` works](../topics/how-it-works.md) explains the mechanism behind the cross-platform environment.

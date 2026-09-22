@@ -1,9 +1,13 @@
 # Frequently Asked Questions
 
-## What version of Python does xbuild support?
+## What version of Python does `xbuild` support?
 
-Python {{ min_python_version }} or higher.
+`xbuild` supports:
 
-## How does xbuild work?
+- Python {{ min_python_version }} or higher for iOS;
+- Python 3.13 or higher for Android.
+- Python 3.14 or higher for Emscripten.
 
-xbuild's cross-compiling environments monkeypatch the Python interpreter at startup so that platform-detection functions return details about the target platform, not the build platform. See [How xbuild works](../topics/how-it-works.md) for the full explanation.
+## How does `xbuild` work?
+
+`xbuild`'s cross-compiling environments monkeypatch the Python interpreter at startup so that platform-detection functions return details about the target platform, not the build platform. See [How `xbuild` works](../topics/how-it-works.md) for the full explanation.

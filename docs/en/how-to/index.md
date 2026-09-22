@@ -1,22 +1,23 @@
 # How-to guides
 
-How-to guides are recipes that take you through the steps involved in addressing key problems and use cases. They are more advanced than tutorials and assume some knowledge of how xbuild works.
+How-to guides are recipes that take you through the steps involved in addressing key problems and use cases. They are more advanced than tutorials and assume some knowledge of how `xbuild` works.
 
-## Using xbuild
+## Using `xbuild` { #using-xbuild }
 
-Common tasks when using xbuild to cross-compile wheels.
+Common tasks when using `xbuild` to cross-compile wheels.
 
-- [Create a cross-platform venv](create-cross-venv.md)
+- [Platform-specific prerequisites and setup](platform-setup/index.md)
+- [Create a cross-platform virtual environment](create-cross-venv.md)
 - [Run a build](run-a-build.md)
 
-## Contributing to xbuild
+## Contributing to `xbuild`
 
-The many ways you can contribute to xbuild, including what you can do and how to do it.
+The many ways you can contribute to `xbuild`, including what you can do and how to do it.
 
-- [Contributing to xbuild](contribute/index.md)
+- [Contributing to `xbuild`](contribute/index.md)
 
 ## Internal guides
 
-Guides for the maintainers of xbuild, documenting internal project procedures.
+Guides for the maintainers of `xbuild`, documenting internal project procedures.
 
-- [How to cut a xbuild release](internal/release.md)
+- [How to cut a `xbuild` release](internal/release.md)

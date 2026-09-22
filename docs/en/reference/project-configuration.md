@@ -1,6 +1,6 @@
 # Project configuration
 
-xbuild extends the standard [PEP 517](https://peps.python.org/0517) `[build-system]` table in `pyproject.toml` with one additional key.
+`xbuild` extends the standard [PEP 517](https://peps.python.org/0517) `[build-system]` table in `pyproject.toml` with one additional key.
 
 ## `target-requires`
 
@@ -17,4 +17,4 @@ build-backend = "setuptools.build_meta"
 
 In this example, the *macOS* version of `setuptools` is installed (needed to run the build backend), while the *iOS* version of `target-tool` is installed into the cross-platform build environment.
 
-`target-requires` is only meaningful for isolated builds (the default; see [`--no-isolation`](./commands/xbuild.md#-no-isolation-n-vs-installer-name)). It is ignored when installing dependencies in an already-active environment.
+`target-requires` is only meaningful for isolated builds (the default; see [`--no-isolation`][xbuild-no-isolation]). It is ignored when installing dependencies in an already-active environment.

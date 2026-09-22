@@ -16,4 +16,4 @@ ios
 darwin
 ```
 
-Unsetting the variable, or setting it (case-insensitively) to `1` or `on`, leaves the cross-platform patches active - this is the default behavior for any activated cross-venv. Any other value - not just `off` - disables the patches, so `off` is the documented way to do so.
+Clearing the variable, or setting it (case-insensitively) to `1` or `on`, leaves the cross-platform patches active.
