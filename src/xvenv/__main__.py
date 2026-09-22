@@ -84,6 +84,17 @@ def main_parser():
             "directory."
         ),
     )
+    parser.add_argument(
+        "--without-pip",
+        dest="with_pip",
+        default=True,
+        action="store_false",
+        help=(
+            "Skip installing pip when creating the virtual environment. "
+            "Only relevant if the target venv doesn't already exist; "
+            "matches python -m venv's --without-pip."
+        ),
+    )
 
     parser.add_argument(
         "venv",
@@ -117,7 +128,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     )
 
     if not venv_path.exists():
-        venv.create(venv_path, with_pip=True)
+        venv.create(venv_path, with_pip=args.with_pip)
 
     try:
         if args.platform is not None:
