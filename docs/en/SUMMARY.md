@@ -6,6 +6,7 @@ search:
 - Tutorial
     - [Tutorial](tutorial/index.md)
     - [iOS](tutorial/ios.md)
+    - [Android](tutorial/android.md)
 - How-to guides
     - [How-to guides](how-to/index.md)
     - Using xbuild
