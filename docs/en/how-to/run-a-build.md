@@ -29,15 +29,13 @@ See [Project configuration](../reference/project-configuration.md#target-require
 
 ## Choosing an installer
 
-By default, dependencies are installed into the isolated build environment with `pip`. Use `--installer` to choose a different one:
+`--installer` selects the package installer used to populate the isolated build environment. By default (and currently, in practice, exclusively), `pip` is used.
 
-```console
-(venv) $ xbuild --platform ios --arch arm64-iphonesimulator --installer uv
-```
+`xbuild` does not currently support `uv` as an installer for isolated (the default) cross-platform builds - passing `--installer uv` raises an error instead of building a wheel. If you need `uv`, use [`--no-isolation`](#reusing-an-active-cross-venv) and manage the build environment yourself.
 
 ## Passing settings to the build backend
 
-Use `--config-setting KEY=VALUE` (repeatable) or `--config-json` to pass settings through to the build backend - see the [xbuild reference](../reference/commands/xbuild.md#-config-setting-keyvalue-c-keyvalue-vs-config-json-json_string) for the full syntax, including how to pass hyphen-prefixed values.
+Use `--config-setting KEY[=VALUE]` (repeatable) or `--config-json` to pass settings through to the build backend - see the [xbuild reference](../reference/commands/xbuild.md#-config-setting-keyvalue-c-keyvalue-vs-config-json-json_string) for the full syntax, including how to pass hyphen-prefixed values.
 
 ## Reusing an active cross-venv
 
