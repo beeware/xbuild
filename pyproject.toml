@@ -40,6 +40,7 @@ classifiers = [
 ]
 dependencies = [
     "build >= 1.6.0",
+    "dependency-groups",
     "platformdirs",
     "filelock",
 ]
