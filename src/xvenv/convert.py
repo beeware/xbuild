@@ -13,6 +13,21 @@ def localized_vars(orig_vars, slice_path):
     # The host's sysconfigdata will include references to build-time variables.
     # Update these to refer to the current known install location.
     orig_prefix = orig_vars["prefix"]
+
+    # The host's sysconfigdata may also include absolute paths to the
+    # build machine's copy of the build toolchain (e.g. the Android NDK).
+    # Identify that toolchain directory from CC, so it can be stripped from
+    # every other variable that references it, leaving just the bare tool
+    # name (to be resolved via PATH on whatever machine actually uses this
+    # environment). If CC has no directory component (e.g. iOS's bare
+    # "arm64-apple-ios-clang") or is missing, there's nothing to strip.
+    tool_dir = None
+    cc = orig_vars.get("CC")
+    if isinstance(cc, str):
+        candidate = str(Path(cc).parent)
+        if candidate != ".":
+            tool_dir = candidate
+
     localized_vars = {}
     for key, value in orig_vars.items():
         final = value
@@ -21,6 +36,10 @@ def localized_vars(orig_vars, slice_path):
             final = final.replace(orig_prefix, str(slice_path))
             # Replace any reference to the build-time Framework location
             final = final.replace("-F .", f"-F {slice_path}")
+            # Replace any reference to the build machine's toolchain
+            # directory.
+            if tool_dir is not None:
+                final = final.replace(f"{tool_dir}/", "")
         localized_vars[key] = final
 
     return localized_vars
