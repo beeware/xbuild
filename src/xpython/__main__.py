@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 import tempfile
 from collections.abc import Sequence
@@ -192,6 +193,9 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
                 exit_code = _run(args)
     except (ValueError, NotImplementedError) as e:
         _error(e)
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        _error(f"Failed to set up the testbed environment: {e}")
         sys.exit(1)
 
     sys.exit(exit_code)

@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -277,3 +278,17 @@ def test_main_reports_create_cross_venv_error(mock_pipeline, capsys):
 
     assert excinfo.value.code == 1
     assert "bad arch" in capsys.readouterr().err
+
+
+def test_main_reports_pip_install_error(mock_pipeline, capsys):
+    """A CalledProcessError from install_requirements() is reported via
+    _error() and exits with code 1, not an unhandled traceback."""
+    mock_pipeline["install_requirements"].side_effect = subprocess.CalledProcessError(
+        1, ["pip", "install"]
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--platform", "ios", "-d", "requests", "-m", "pytest"])
+
+    assert excinfo.value.code == 1
+    assert "testbed" in capsys.readouterr().err.lower()

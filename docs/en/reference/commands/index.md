@@ -8,7 +8,7 @@
 
 ## Common options
 
-The following options are available on both commands.
+The following options are available on all three commands.
 
 ### `-h` / `--help`
 
