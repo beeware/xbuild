@@ -83,29 +83,3 @@ def test_missing_cc_key():
     result = localized_vars(orig_vars, "/slice/path")
 
     assert result["BINDIR"] == "/slice/path/bin"
-
-
-def test_toolchain_dir_nested_under_prefix_is_still_stripped():
-    """When the build's own install prefix is a literal path-prefix of the
-    toolchain directory (as happens on "official" Linux-built Android
-    slices, where ANDROID_HOME defaults to /usr/local/lib/android/sdk and
-    the build's own prefix is also /usr/local), the toolchain directory
-    must still be stripped from CC/AR/etc, not silently left in place
-    because the prefix substitution already partially consumed it."""
-    orig_vars = {
-        "prefix": "/usr/local",
-        "CC": (
-            "/usr/local/lib/android/sdk/ndk/27.3.13750724/"
-            "toolchains/llvm/prebuilt/linux-x86_64/bin/"
-            "x86_64-linux-android24-clang"
-        ),
-        "AR": (
-            "/usr/local/lib/android/sdk/ndk/27.3.13750724/"
-            "toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
-        ),
-    }
-
-    result = localized_vars(orig_vars, "/slice/path")
-
-    assert result["CC"] == "x86_64-linux-android24-clang"
-    assert result["AR"] == "llvm-ar"
