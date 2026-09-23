@@ -11,27 +11,28 @@ from xvenv.convert import localized_vars
                 "/Users/msmith/Library/Android/sdk/ndk/27.3.13750724/"
                 "toolchains/llvm/prebuilt/darwin-x86_64/bin/"
             ),
-            id="explicit-unofficial",
+            id="user-tools",
         ),
         pytest.param(
             (
                 "/usr/local/lib/android/sdk/ndk/27.3.13750724/"
                 "toolchains/llvm/prebuilt/linux-x86_64/bin/"
             ),
-            id="explicit-official",
+            id="system-tools",
         ),
-        pytest.param("", id="empty"),
+        pytest.param("", id="no-tools"),
     ],
 )
-def test_localize_vars(tool_dir):
+@pytest.mark.parametrize("prefix_dir", ["/path/to/build", "/usr/local"])
+def test_localize_vars(tool_dir, prefix_dir):
     """Path definitions in sysconfigdata are cleaned."""
     orig_vars = {
         # The variables that are used as source data
-        "prefix": "/path/to/build",
-        "CC": (f"{tool_dir}aarch64-linux-android21-clang"),
+        "prefix": prefix_dir,
+        "CC": f"{tool_dir}aarch64-linux-android21-clang",
         # Paths that are updated with the prefix.
-        "BINDIR": "/path/to/build/bin",
-        "BINLIBDEST": "/path/to/build/lib/python3.13",
+        "BINDIR": f"{prefix_dir}/bin",
+        "BINLIBDEST": f"{prefix_dir}/lib/python3.13",
         # "-F ." is expanded into the prefix.
         "BLDSHARED": (
             "arm64-apple-ios-simulator-clang -dynamiclib -F . -framework Python"
