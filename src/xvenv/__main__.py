@@ -6,10 +6,7 @@ from argparse import ArgumentParser
 from collections.abc import Sequence
 from pathlib import Path
 
-from build.__main__ import (
-    _cprint,
-    _error,
-)
+from build.__main__ import _error
 
 import xvenv
 from xvenv.convert import convert_venv
@@ -141,7 +138,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
             else:
                 sysconfigdata_path = config_path
 
-        description = convert_venv(
+        convert_venv(
             venv_path,
             build_details_path=build_details_path,
             sysconfigdata_path=sysconfigdata_path,
@@ -149,11 +146,6 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     except (ValueError, NotImplementedError) as e:
         _error(e)
         sys.exit(1)
-    else:
-        _cprint(
-            "{bold}{green}{}{reset}",
-            f"{args.venv} is now an {description} cross venv.",
-        )
 
 
 def entrypoint() -> None:

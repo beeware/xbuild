@@ -215,5 +215,3 @@ def convert_venv(
     (venv_site_packages_path / "_cross_venv.pth").write_text(
         f"import {cross_multiarch}\n"
     )
-
-    return f"{context['os']} {multiarch}"
