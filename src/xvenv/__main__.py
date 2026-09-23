@@ -12,8 +12,8 @@ from build.__main__ import (
 )
 
 import xvenv
+from xvenv.api import create_cross_venv
 from xvenv.convert import convert_venv
-from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_dir
 
 
 def main_parser():
@@ -120,32 +120,35 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         parser.error("--cache requires --platform")
 
     venv_path = Path(args.venv).resolve()
-    build_details_path = (
-        Path(args.build_details_path).resolve() if args.build_details_path else None
-    )
-    sysconfigdata_path = (
-        Path(args.sysconfigdata_path).resolve() if args.sysconfigdata_path else None
-    )
-
-    if not venv_path.exists():
-        venv.create(venv_path, with_pip=args.with_pip)
 
     try:
         if args.platform is not None:
-            cache_dir = resolve_cache_dir(args.cache)
-            arch = resolve_arch(args.platform, args.arch)
-
-            config_path, is_build_details = fetch_python(args.platform, arch, cache_dir)
-            if is_build_details:
-                build_details_path = config_path
-            else:
-                sysconfigdata_path = config_path
-
-        description = convert_venv(
-            venv_path,
-            build_details_path=build_details_path,
-            sysconfigdata_path=sysconfigdata_path,
-        )
+            result = create_cross_venv(
+                venv_path,
+                args.platform,
+                args.arch,
+                args.cache,
+                with_pip=args.with_pip,
+            )
+            description = result.description
+        else:
+            build_details_path = (
+                Path(args.build_details_path).resolve()
+                if args.build_details_path
+                else None
+            )
+            sysconfigdata_path = (
+                Path(args.sysconfigdata_path).resolve()
+                if args.sysconfigdata_path
+                else None
+            )
+            if not venv_path.exists():
+                venv.create(venv_path, with_pip=args.with_pip)
+            description = convert_venv(
+                venv_path,
+                build_details_path=build_details_path,
+                sysconfigdata_path=sysconfigdata_path,
+            )
     except (ValueError, NotImplementedError) as e:
         _error(e)
         sys.exit(1)
