@@ -1,8 +1,10 @@
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
 from xpython.__main__ import main, main_parser
+from xvenv.api import CrossVenvResult
 
 
 @pytest.mark.parametrize(
@@ -140,3 +142,138 @@ def test_repeatable_flags():
     assert args.groups == ["test", "extra"]
     assert args.find_links == ["/tmp/wheels"]
     assert args.src == [Path("tests"), Path("conftest.py")]
+
+
+@pytest.fixture
+def mock_pipeline(monkeypatch, tmp_path):
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir()
+
+    mocks = {
+        "create_cross_venv": Mock(
+            return_value=CrossVenvResult(
+                description="ios arm64-iphonesimulator",
+                archive_dir=archive_dir,
+            )
+        ),
+        "resolve_requirements": Mock(return_value=["requests"]),
+        "install_requirements": Mock(),
+        "ios_stage_and_run": Mock(return_value=0),
+        "android_stage_and_run": Mock(return_value=0),
+    }
+    monkeypatch.setattr(
+        "xpython.__main__.create_cross_venv", mocks["create_cross_venv"]
+    )
+    monkeypatch.setattr(
+        "xpython.__main__.resolve_requirements", mocks["resolve_requirements"]
+    )
+    monkeypatch.setattr(
+        "xpython.__main__.install_requirements", mocks["install_requirements"]
+    )
+    monkeypatch.setattr(
+        "xpython.__main__.ios_stage_and_run", mocks["ios_stage_and_run"]
+    )
+    monkeypatch.setattr(
+        "xpython.__main__.android_stage_and_run", mocks["android_stage_and_run"]
+    )
+    return mocks
+
+
+def test_main_ios_end_to_end_with_temp_dir(mock_pipeline):
+    """main() creates a cross-venv, installs deps, and dispatches to the
+    iOS platform module, using a temp dir that gets cleaned up."""
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--platform", "ios", "-d", "requests", "-m", "pytest", "tests"])
+
+    assert excinfo.value.code == 0
+    mock_pipeline["create_cross_venv"].assert_called_once()
+    create_call_args = mock_pipeline["create_cross_venv"].call_args
+    assert create_call_args.args[1] == "ios"
+
+    mock_pipeline["resolve_requirements"].assert_called_once_with(
+        ["requests"], [], Path("pyproject.toml")
+    )
+    mock_pipeline["install_requirements"].assert_called_once()
+    mock_pipeline["ios_stage_and_run"].assert_called_once()
+    stage_kwargs = mock_pipeline["ios_stage_and_run"].call_args.kwargs
+    assert stage_kwargs["module"] == "pytest"
+    assert stage_kwargs["module_args"] == ["tests"]
+    mock_pipeline["android_stage_and_run"].assert_not_called()
+
+    # The temp dir passed to create_cross_venv should no longer exist
+    # after main() returns (it's cleaned up).
+    venv_path_used = create_call_args.args[0]
+    assert not venv_path_used.parent.exists()
+
+
+def test_main_android_dispatches_to_android_module(mock_pipeline):
+    """--platform android dispatches to android_stage_and_run, not iOS."""
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--platform", "android", "-m", "pytest"])
+
+    assert excinfo.value.code == 0
+    mock_pipeline["android_stage_and_run"].assert_called_once()
+    mock_pipeline["ios_stage_and_run"].assert_not_called()
+    stage_kwargs = mock_pipeline["android_stage_and_run"].call_args.kwargs
+    assert stage_kwargs["managed"] is None
+    assert stage_kwargs["connected"] is None
+
+
+def test_main_propagates_nonzero_exit_code(mock_pipeline):
+    """A nonzero exit code from the platform module propagates verbatim."""
+    mock_pipeline["ios_stage_and_run"].return_value = 3
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--platform", "ios", "-m", "pytest"])
+
+    assert excinfo.value.code == 3
+
+
+def test_main_work_dir_used_and_not_cleaned_up(mock_pipeline, tmp_path):
+    """--work-dir DIR is used instead of a temp dir, and is not deleted."""
+    work_dir = tmp_path / "my-work-dir"
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--platform", "ios", "--work-dir", str(work_dir), "-m", "pytest"])
+
+    assert excinfo.value.code == 0
+    assert work_dir.exists()
+    create_call_args = mock_pipeline["create_cross_venv"].call_args
+    assert create_call_args.args[0] == work_dir / "venv"
+
+
+def test_main_skips_install_when_no_requirements(mock_pipeline):
+    """install_requirements() is not called if resolve_requirements()
+    returns an empty list."""
+    mock_pipeline["resolve_requirements"].return_value = []
+
+    with pytest.raises(SystemExit):
+        main(["--platform", "ios", "-m", "pytest"])
+
+    mock_pipeline["install_requirements"].assert_not_called()
+
+
+def test_main_reports_dependency_resolution_error(mock_pipeline, capsys):
+    """A ValueError from resolve_requirements() is reported via _error()
+    and exits with code 1."""
+    mock_pipeline["resolve_requirements"].side_effect = ValueError(
+        "Dependency group 'missing' not found"
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--platform", "ios", "--group", "missing", "-m", "pytest"])
+
+    assert excinfo.value.code == 1
+    assert "missing" in capsys.readouterr().err
+
+
+def test_main_reports_create_cross_venv_error(mock_pipeline, capsys):
+    """A ValueError from create_cross_venv() is reported via _error() and
+    exits with code 1."""
+    mock_pipeline["create_cross_venv"].side_effect = ValueError("bad arch")
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--platform", "ios", "--arch", "bogus", "-m", "pytest"])
+
+    assert excinfo.value.code == 1
+    assert "bad arch" in capsys.readouterr().err

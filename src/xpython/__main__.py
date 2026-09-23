@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import argparse
 import sys
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
+from build.__main__ import _cprint, _error
+
 import xpython
+from xpython.deps import install_requirements, resolve_requirements
+from xpython.platforms.android import stage_and_run as android_stage_and_run
+from xpython.platforms.ios import stage_and_run as ios_stage_and_run
+from xvenv.api import create_cross_venv
 
 
 def main_parser() -> argparse.ArgumentParser:
@@ -175,8 +182,67 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     args.module = args.module_and_args[0]
     args.module_args = args.module_and_args[1:]
 
-    # Task 6 fills in the rest of main()'s body: create_cross_venv(),
-    # dependency resolution/install, and platform dispatch.
+    try:
+        if args.work_dir is not None:
+            args.work_dir.mkdir(parents=True, exist_ok=True)
+            exit_code = _run(args)
+        else:
+            with tempfile.TemporaryDirectory() as tmp:
+                args.work_dir = Path(tmp)
+                exit_code = _run(args)
+    except (ValueError, NotImplementedError) as e:
+        _error(e)
+        sys.exit(1)
+
+    sys.exit(exit_code)
+
+
+def _run(args: argparse.Namespace) -> int:
+    """Run the full create-venv/install-deps/stage-and-run pipeline for an
+    already-validated, already-parsed set of arguments.
+
+    :param args: The parsed CLI namespace, with `work_dir` resolved to an
+        existing directory (either `--work-dir` or a temp dir).
+    :returns: The exit code to propagate from `main()`.
+    """
+    _cprint("{bold}Creating cross-venv...{reset}")
+    venv_path = args.work_dir / "venv"
+    result = create_cross_venv(venv_path, args.platform, args.arch, args.cache)
+
+    requirements = resolve_requirements(
+        args.dependencies, args.groups, Path("pyproject.toml")
+    )
+
+    packages_dir = args.work_dir / "packages"
+    packages_dir.mkdir(parents=True, exist_ok=True)
+    if requirements:
+        _cprint("{bold}Installing dependencies...{reset}")
+        venv_python = venv_path / "bin" / "python3"
+        install_requirements(venv_python, requirements, packages_dir, args.find_links)
+
+    if args.platform == "ios":
+        return ios_stage_and_run(
+            archive_dir=result.archive_dir,
+            work_dir=args.work_dir,
+            src_paths=args.src,
+            packages_dir=packages_dir,
+            module=args.module,
+            module_args=args.module_args,
+            simulator=args.simulator,
+            verbose=args.verbosity,
+        )
+    else:
+        return android_stage_and_run(
+            archive_dir=result.archive_dir,
+            work_dir=args.work_dir,
+            src_paths=args.src,
+            packages_dir=packages_dir,
+            module=args.module,
+            module_args=args.module_args,
+            managed=args.managed,
+            connected=args.connected,
+            verbose=args.verbosity,
+        )
 
 
 def entrypoint() -> None:
