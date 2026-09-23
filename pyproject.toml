@@ -62,6 +62,7 @@ xvenv = "xvenv.__main__:entrypoint"
 
 [project.urls]
 Project = "https://github.com/beeware/xbuild"
+Documentation = "https://xbuild.beeware.org/"
 Funding = "https://beeware.org/contributing/membership/"
 Tracker = "https://github.com/beeware/xbuild/issues"
 Source = "https://github.com/beeware/xbuild"
