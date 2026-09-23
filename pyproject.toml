@@ -174,9 +174,9 @@ directory = "changes"
 package = "xbuild"
 package_dir = "src"
 filename = "docs/en/about/releases.md"
-title_format = false
+title_format = "## {version} ({project_date})"
+issue_format = "[#{issue}](https://github.com/beeware/xbuild/issues/{issue})"
 template = "changes/template.md"
-start_string = "<!-- towncrier release notes start -->"
 type = [
     { directory = "feature", name = "Features", showcontent = true },
     { directory = "bugfix", name = "Bugfixes", showcontent = true },
