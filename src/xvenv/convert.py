@@ -32,14 +32,16 @@ def localized_vars(orig_vars, slice_path):
     for key, value in orig_vars.items():
         final = value
         if isinstance(value, str):
-            # Replace any reference to the build installation prefix
+            # Replace any reference to the build machine's toolchain directory.
+            # This must run *before* the install-prefix substitution, because
+            # the toolchain *could* (and is, on official Android x86_64 builds)
+            # be installed in the build prefix.
+            if tool_dir is not None:
+                final = final.replace(f"{tool_dir}/", "")
+            # Replace any reference to the build prefix
             final = final.replace(orig_prefix, str(slice_path))
             # Replace any reference to the build-time Framework location
             final = final.replace("-F .", f"-F {slice_path}")
-            # Replace any reference to the build machine's toolchain
-            # directory.
-            if tool_dir is not None:
-                final = final.replace(f"{tool_dir}/", "")
         localized_vars[key] = final
 
     return localized_vars
