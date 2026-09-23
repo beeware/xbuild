@@ -1,9 +1,10 @@
 # Command reference
 
-`xbuild` provides two commands:
+`xbuild` provides three commands:
 
 - [`xbuild`](./xbuild.md) - Build a wheel for a target platform
 - [`xvenv`](./xvenv.md) - Convert a virtual environment into a cross-platform virtual environment
+- [`xpython`](./xpython.md) - Run a Python module inside an iOS Simulator or Android emulator/device
 
 ## Common options
 

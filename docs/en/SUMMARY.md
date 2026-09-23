@@ -60,6 +60,7 @@ search:
         - [Command reference](reference/commands/index.md)
         - [`xbuild`](reference/commands/xbuild.md)
         - [`xvenv`](reference/commands/xvenv.md)
+        - [`xpython`](reference/commands/xpython.md)
     - [Project configuration](reference/project-configuration.md)
     - [Environment variables](reference/environment-variables.md)
 - [About `xbuild`](about/index.md)
