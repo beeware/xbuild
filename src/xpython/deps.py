@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import tomllib
 from pathlib import Path
@@ -74,7 +75,8 @@ def install_requirements(
         command.extend(["--find-links", str(directory)])
     command.extend(requirements)
 
-    subprocess.run(command, check=True)
+    env = {**os.environ, "XBUILD_ENV": "off"}
+    subprocess.run(command, check=True, env=env)
 
 
 __all__ = ["install_requirements", "resolve_requirements"]

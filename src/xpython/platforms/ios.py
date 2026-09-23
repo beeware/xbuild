@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -48,7 +49,7 @@ def stage_and_run(
     testbed_clone = work_dir / "testbed"
 
     subprocess.run(
-        ["python", str(testbed_source), "clone", str(testbed_clone)],
+        [sys.executable, str(testbed_source), "clone", str(testbed_clone)],
         check=True,
     )
 
@@ -61,7 +62,7 @@ def stage_and_run(
     for item in packages_dir.iterdir():
         _copy_into(item, app_packages_dir)
 
-    run_command = ["python", str(testbed_clone), "run"]
+    run_command = [sys.executable, str(testbed_clone), "run"]
     if simulator is not None:
         run_command.extend(["--simulator", simulator])
     if verbose > 0:

@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import Mock
 
 import pytest
@@ -56,7 +57,7 @@ def test_clones_testbed(mock_run, testbed_layout, tmp_path):
 
     clone_call = mock_run.call_args_list[0]
     args = clone_call.args[0]
-    assert args[:2] == ["python", str(testbed_layout["archive_dir"] / "testbed")]
+    assert args[:2] == [sys.executable, str(testbed_layout["archive_dir"] / "testbed")]
     assert args[2] == "clone"
     assert args[3] == str(testbed_layout["work_dir"] / "testbed")
 
@@ -125,7 +126,7 @@ def test_runs_with_module_and_args(mock_run, testbed_layout, tmp_path):
 
     run_call = mock_run.call_args_list[1]
     args = run_call.args[0]
-    assert args[:2] == ["python", str(testbed_layout["work_dir"] / "testbed")]
+    assert args[:2] == [sys.executable, str(testbed_layout["work_dir"] / "testbed")]
     assert args[2] == "run"
     assert args[-4:] == ["--", "pytest", "tests", "-v"]
 
