@@ -59,6 +59,7 @@ virtualenv = [
 [project.scripts]
 xbuild = "xbuild.__main__:entrypoint"
 xvenv = "xvenv.__main__:entrypoint"
+xpython = "xpython.__main__:entrypoint"
 
 [project.urls]
 Project = "https://github.com/beeware/xbuild"
@@ -103,6 +104,7 @@ filterwarnings = [
 toplevel = [
     "xbuild",
     "xvenv",
+    "xpython",
 ]
 
 [tool.ruff.lint]
@@ -127,6 +129,7 @@ extend-select = [
 known-first-party = [
     "xbuild",
     "xvenv",
+    "xpython",
 ]
 known-third-party = [
     "build",
