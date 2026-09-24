@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from xpython.__main__ import main, main_parser
+from xpython.__main__ import _parse_args, main
 from xvenv.api import CrossVenvResult
 
 
@@ -12,17 +12,33 @@ from xvenv.api import CrossVenvResult
     ("args", "error"),
     [
         pytest.param(
-            ["--platform", "android", "--simulator", "iPhone 16e", "-m", "pytest"],
+            [
+                "--platform",
+                "android",
+                "--simulator",
+                "iPhone 16e",
+                "--",
+                "-m",
+                "pytest",
+            ],
             "--simulator requires --platform ios",
             id="simulator-without-ios",
         ),
         pytest.param(
-            ["--platform", "ios", "--managed", "maxVersion", "-m", "pytest"],
+            ["--platform", "ios", "--managed", "maxVersion", "--", "-m", "pytest"],
             "--managed requires --platform android",
             id="managed-without-android",
         ),
         pytest.param(
-            ["--platform", "ios", "--connected", "emulator-5554", "-m", "pytest"],
+            [
+                "--platform",
+                "ios",
+                "--connected",
+                "emulator-5554",
+                "--",
+                "-m",
+                "pytest",
+            ],
             "--connected requires --platform android",
             id="connected-without-android",
         ),
@@ -34,6 +50,7 @@ from xvenv.api import CrossVenvResult
                 "maxVersion",
                 "--connected",
                 "emulator-5554",
+                "--",
                 "-m",
                 "pytest",
             ],
@@ -41,16 +58,21 @@ from xvenv.api import CrossVenvResult
             id="managed-and-connected-together",
         ),
         pytest.param(
-            ["--platform", "bogus", "-m", "pytest"],
+            ["--platform", "bogus", "--", "-m", "pytest"],
             "invalid choice",
             id="unknown-platform",
+        ),
+        pytest.param(
+            ["--platform", "ios", "--", "pytest", "tests"],
+            "-m",
+            id="ios-forwarded-args-must-start-with-m",
         ),
     ],
 )
 def test_invalid_args(args, error, capsys):
     """Invalid flag combinations raise a usage error."""
     with pytest.raises(SystemExit) as excinfo:
-        main(args)
+        _parse_args(args)
 
     assert excinfo.value.code == 2
     assert error in capsys.readouterr().err
@@ -59,44 +81,15 @@ def test_invalid_args(args, error, capsys):
 def test_missing_platform(capsys):
     """--platform is required."""
     with pytest.raises(SystemExit) as excinfo:
-        main(["-m", "pytest"])
+        _parse_args(["--", "-m", "pytest"])
 
     assert excinfo.value.code == 2
     assert "required" in capsys.readouterr().err
 
 
-def test_missing_module_args(capsys):
-    """`-m` with no module name is a usage error."""
-    with pytest.raises(SystemExit) as excinfo:
-        main(["--platform", "android", "-m"])
-
-    assert excinfo.value.code == 2
-    assert "the following arguments are required: -m" in capsys.readouterr().err
-
-
-def test_missing_m_flag(capsys):
-    """Omitting -m entirely is a usage error."""
-    with pytest.raises(SystemExit) as excinfo:
-        main(["--platform", "android"])
-
-    assert excinfo.value.code == 2
-    assert "the following arguments are required: -m" in capsys.readouterr().err
-
-
-def test_module_and_args_split():
-    """-m MODULE arg1 arg2 splits into module + module_args."""
-    parser = main_parser()
-
-    args = parser.parse_args(["--platform", "ios", "-m", "pytest", "tests", "-v"])
-
-    assert args.module_and_args == ["pytest", "tests", "-v"]
-
-
 def test_defaults():
     """Default values are set correctly when only required args are given."""
-    parser = main_parser()
-
-    args = parser.parse_args(["--platform", "android", "-m", "pytest"])
+    args = _parse_args(["--platform", "android"])
 
     assert args.platform == "android"
     assert args.arch is None
@@ -110,13 +103,12 @@ def test_defaults():
     assert args.connected is None
     assert args.work_dir is None
     assert args.verbosity == 0
+    assert args.forwarded_args == []
 
 
 def test_repeatable_flags():
     """-d/--dependency, --group, --find-links, --src can be repeated."""
-    parser = main_parser()
-
-    args = parser.parse_args(
+    args = _parse_args(
         [
             "--platform",
             "ios",
@@ -134,6 +126,7 @@ def test_repeatable_flags():
             "tests",
             "--src",
             "conftest.py",
+            "--",
             "-m",
             "pytest",
         ]
@@ -143,6 +136,71 @@ def test_repeatable_flags():
     assert args.groups == ["test", "extra"]
     assert args.find_links == ["/tmp/wheels"]
     assert args.src == [Path("tests"), Path("conftest.py")]
+    assert args.module == "pytest"
+    assert args.module_args == []
+
+
+def test_ios_module_and_args_split():
+    """iOS: -- -m MODULE arg1 arg2 splits into module + module_args, with
+    the leading -m token stripped."""
+    args = _parse_args(["--platform", "ios", "--", "-m", "pytest", "tests", "-v"])
+
+    assert args.module == "pytest"
+    assert args.module_args == ["tests", "-v"]
+
+
+def test_ios_empty_forwarded_args_no_parse_error():
+    """iOS: omitting -- (or providing an empty --) is not a parse-time
+    error; module ends up None, module_args ends up empty."""
+    args = _parse_args(["--platform", "ios"])
+
+    assert args.module is None
+    assert args.module_args == []
+
+
+def test_ios_bare_trailing_separator_same_as_omitted():
+    """iOS: an explicit trailing -- with nothing after it behaves the same
+    as omitting -- entirely."""
+    args = _parse_args(["--platform", "ios", "--"])
+
+    assert args.module is None
+    assert args.module_args == []
+
+
+def test_ios_forwarded_args_with_embedded_double_dash():
+    """Only the first -- is treated as the xpython/forwarded-args
+    separator; a second -- embedded in the forwarded command is preserved
+    verbatim in module_args."""
+    args = _parse_args(["--platform", "ios", "--", "-m", "pytest", "--", "--some-flag"])
+
+    assert args.module == "pytest"
+    assert args.module_args == ["--", "--some-flag"]
+
+
+def test_android_forwarded_args_accepts_dash_c():
+    """Android: forwarded args starting with -c (not -m) are accepted with
+    no xpython-side validation error, and stored verbatim."""
+    args = _parse_args(["--platform", "android", "--", "-c", "print(1)"])
+
+    assert args.forwarded_args == ["-c", "print(1)"]
+
+
+def test_android_empty_forwarded_args_no_error():
+    """Android: an empty forwarded-args list (bare trailing --, or --
+    omitted entirely) is not a parse-time error."""
+    args = _parse_args(["--platform", "android"])
+
+    assert args.forwarded_args == []
+
+
+def test_android_forwarded_args_with_embedded_double_dash():
+    """Android: only the first -- is the separator; embedded -- in the
+    forwarded command is preserved verbatim."""
+    args = _parse_args(
+        ["--platform", "android", "--", "-m", "pytest", "--", "--some-flag"]
+    )
+
+    assert args.forwarded_args == ["-m", "pytest", "--", "--some-flag"]
 
 
 @pytest.fixture

@@ -149,15 +149,61 @@ def main_parser() -> argparse.ArgumentParser:
             "xpython exits."
         ),
     )
-    parser.add_argument(
-        "-m",
-        dest="module_and_args",
-        nargs=argparse.REMAINDER,
-        required=True,
-        metavar="MODULE [arg ...]",
-        help="The module to run, and any arguments to pass to it.",
-    )
     return parser
+
+
+def _parse_args(cli_args: Sequence[str], prog: str | None = None) -> argparse.Namespace:
+    """Parse and validate CLI arguments, including the `--` separator
+    split and platform-specific forwarded-argument handling.
+
+    Everything before the first literal `"--"` in `cli_args` is parsed as
+    `xpython`'s own flags. Everything after it is treated as a raw,
+    unparsed list of forwarded arguments: for `--platform ios`, the first
+    forwarded argument must be `-m` (stripped, then split into
+    `args.module`/`args.module_args`); for `--platform android`, the
+    forwarded arguments are stored verbatim as `args.forwarded_args`, with
+    no validation.
+
+    If `"--"` is absent from `cli_args` entirely, the forwarded-argument
+    list is treated as empty (not an error).
+
+    :param cli_args: CLI arguments
+    :param prog: Program name to show in help text
+    :returns: The parsed, validated, and platform-annotated namespace.
+    :raises SystemExit: via `parser.error(...)` (exit code 2) for any
+        invalid flag combination, including a non-`-m` first forwarded
+        argument on iOS.
+    """
+    parser = main_parser()
+    if prog:
+        parser.prog = prog
+
+    try:
+        separator_index = cli_args.index("--")
+        xpython_args = cli_args[:separator_index]
+        forwarded_args = list(cli_args[separator_index + 1 :])
+    except ValueError:
+        xpython_args = cli_args
+        forwarded_args = []
+
+    args = parser.parse_args(xpython_args)
+
+    if args.simulator is not None and args.platform != "ios":
+        parser.error("--simulator requires --platform ios")
+    if args.managed is not None and args.platform != "android":
+        parser.error("--managed requires --platform android")
+    if args.connected is not None and args.platform != "android":
+        parser.error("--connected requires --platform android")
+
+    if args.platform == "ios":
+        if forwarded_args and forwarded_args[0] != "-m":
+            parser.error("iOS requires the first argument after -- to be -m")
+        args.module = forwarded_args[1] if forwarded_args else None
+        args.module_args = forwarded_args[2:] if forwarded_args else []
+    else:
+        args.forwarded_args = forwarded_args
+
+    return args
 
 
 def main(cli_args: Sequence[str], prog: str | None = None) -> None:
@@ -166,22 +212,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     :param cli_args: CLI arguments
     :param prog: Program name to show in help text
     """
-    parser = main_parser()
-    if prog:
-        parser.prog = prog
-    args = parser.parse_args(cli_args)
-
-    if args.simulator is not None and args.platform != "ios":
-        parser.error("--simulator requires --platform ios")
-    if args.managed is not None and args.platform != "android":
-        parser.error("--managed requires --platform android")
-    if args.connected is not None and args.platform != "android":
-        parser.error("--connected requires --platform android")
-    if not args.module_and_args:
-        parser.error("the following arguments are required: -m")
-
-    args.module = args.module_and_args[0]
-    args.module_args = args.module_and_args[1:]
+    args = _parse_args(cli_args, prog)
 
     try:
         if args.work_dir is not None:
