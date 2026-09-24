@@ -1,6 +1,6 @@
 # `xpython`
 
-`xpython` runs a Python module inside an iOS Simulator or Android emulator/device, using the same "testbed" project that CPython uses to run its own test suite. This testbed is included as part of the official CPython releases.
+`xpython` runs a Python module inside an iOS Simulator or Android emulator/device, using the same "testbed" project that Python uses to run its own test suite. This testbed is included as part of the official Python releases.
 
 ## Usage
 
@@ -11,8 +11,8 @@
 
 `xpython`:
 
-1. Creates (or reuses) a cross-platform venv for the target `--platform`/`--arch`, downloading and caching the target Python build the same way `xvenv --platform ...` does.
-2. Resolves dependencies (`-d`/`--dependency` specs and/or `--group` names from `[dependency-groups]` in `./pyproject.toml`) and installs them using that venv's own `pip`.
+1. Creates (or reuses) a cross-platform virtual environment for the target `--platform`/`--arch`, downloading and caching the target Python build the same way `xvenv --platform ...` does.
+2. Resolves dependencies (`-d`/`--dependency` specs and/or `--group` names from `[dependency-groups]` in `./pyproject.toml`) and installs them using that environment's own `pip`.
 3. Copies each `--src` path into the testbed's working directory.
 4. Forwards everything after `--` to the platform's testbed (see the `-- [args ...]` option below).
 5. Exits with the exit code produced by the module (or by the testbed driver itself, if it failed to build/launch before the module could run).
