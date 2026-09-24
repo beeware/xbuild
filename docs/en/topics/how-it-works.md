@@ -21,7 +21,7 @@ That generated module patches:
 - `--build-details PATH` and `--sysconfig PATH` point directly at a pre-existing target-platform Python build's own configuration file (the Python 3.14+ `build-details.json` format, or the legacy `_sysconfigdata__*.py` format for Python ≤3.13, respectively).
 - `--platform {ios,android,emscripten}` adds a download-and-cache step in front: it downloads (or reuses a cached copy of) a matching target-platform Python build, then locates that same kind of configuration file inside it, and proceeds identically to `--build-details`/`--sysconfig` from that point on.
 
-In both cases, the configuration file is "localized" before being used to generate the monkeypatch module described above: path references to the *original* build machine's install prefix are rewritten to point at the new virtual environment's own location, and absolute paths to the original build machine's toolchain (e.g. `CC`, `AR`) are stripped down to bare tool names, to be resolved via `PATH` on whatever machine actually uses the environment.
+In both cases, the configuration file is "localized" before being used to generate the monkeypatch module described above: path references to the *original* build machine's install prefix are rewritten to point at the new virtual environment's own location, and absolute paths to the original build machine's tools (e.g. `CC`, `AR`) are stripped down to bare tool names, to be resolved via `PATH` on whatever machine actually uses the environment.
 
 ## Isolated build environments
 
