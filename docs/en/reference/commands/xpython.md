@@ -14,7 +14,7 @@
 1. Creates (or reuses) a cross-platform venv for the target `--platform`/`--arch`, downloading and caching the target Python build the same way `xvenv --platform ...` does.
 2. Resolves dependencies (`-d`/`--dependency` specs and/or `--group` names from `[dependency-groups]` in `./pyproject.toml`) and installs them using that venv's own `pip`.
 3. Copies each `--src` path into the testbed's working directory.
-4. Runs `-m <module> <args...>` inside the platform's testbed app.
+4. Forwards everything after `--` to the platform's testbed (see the `-- [args ...]` option below).
 5. Exits with the exit code produced by the module (or by the testbed driver itself, if it failed to build/launch before the module could run).
 
 Only pure-Python dependencies are supported. Projects with compiled extensions should use [`cibuildwheel`](https://cibuildwheel.pypa.io/) instead.
