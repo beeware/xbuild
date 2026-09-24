@@ -19,13 +19,12 @@ def stage_and_run(
     work_dir: Path,
     src_paths: list[Path],
     packages_dir: Path,
-    module: str,
-    module_args: list[str],
+    forwarded_args: list[str],
     managed: str | None,
     connected: str | None,
     verbose: int,
 ) -> int:
-    """Stage source/package files and run `-m <module> <module_args>`
+    """Stage source/package files and run `android.py test -- <forwarded_args>`
     inside an Android emulator/device, using the `android.py` driver
     bundled alongside the downloaded Android Python archive.
 
@@ -37,8 +36,11 @@ def stage_and_run(
     :param src_paths: Paths to copy into `work_dir / "cwd"`.
     :param packages_dir: A directory whose contents are copied into
         `work_dir / "site-packages"`.
-    :param module: The module to run (as `python -m module` would).
-    :param module_args: Arguments to pass to the module.
+    :param forwarded_args: Arguments to pass verbatim to `android.py
+        test`'s own `-- <args>` mechanism (e.g. `["-m", "pytest",
+        "tests"]` or `["-c", "print(1)"]`). No validation is applied here
+        -- `android.py` itself accepts `-c`/`-m`, or defaults to `-m test`
+        if `forwarded_args` is empty.
     :param managed: The name of a Gradle-managed device to use, or `None`.
     :param connected: The serial of an already-connected device to use, or
         `None`. Mutually exclusive with `managed`; if both are `None`,
@@ -72,7 +74,7 @@ def stage_and_run(
         command.extend(["--managed", managed or "maxVersion"])
     if verbose > 0:
         command.append("-v")
-    command.extend(["--", "-m", module, *module_args])
+    command.extend(["--", *forwarded_args])
 
     result = subprocess.run(command, check=False)
     return result.returncode

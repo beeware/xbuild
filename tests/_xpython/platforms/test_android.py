@@ -47,8 +47,7 @@ def test_builds_site_packages_from_packages_dir(
         work_dir=work_dir,
         src_paths=[],
         packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
+        forwarded_args=["-m", "pytest"],
         managed=None,
         connected=None,
         verbose=0,
@@ -69,8 +68,7 @@ def test_builds_cwd_from_src_paths(mock_run, archive_dir, work_dir, packages_dir
         work_dir=work_dir,
         src_paths=[src],
         packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
+        forwarded_args=["-m", "pytest"],
         managed=None,
         connected=None,
         verbose=0,
@@ -84,14 +82,14 @@ def test_invokes_android_py_test_with_defaults(
     mock_run, archive_dir, work_dir, packages_dir
 ):
     """android.py test is invoked with --site-packages, --cwd, and default
-    --managed maxVersion when neither --managed nor --connected is given."""
+    --managed maxVersion when neither --managed nor --connected is given;
+    forwarded_args is passed through verbatim after --."""
     stage_and_run(
         archive_dir=archive_dir,
         work_dir=work_dir,
         src_paths=[],
         packages_dir=packages_dir,
-        module="pytest",
-        module_args=["tests"],
+        forwarded_args=["-m", "pytest", "tests"],
         managed=None,
         connected=None,
         verbose=0,
@@ -110,6 +108,47 @@ def test_invokes_android_py_test_with_defaults(
     assert args[-4:] == ["--", "-m", "pytest", "tests"]
 
 
+def test_forwards_arbitrary_args_including_dash_c(
+    mock_run, archive_dir, work_dir, packages_dir
+):
+    """forwarded_args starting with -c (not -m) are passed through
+    verbatim, with no xpython-side validation or forced -m."""
+    stage_and_run(
+        archive_dir=archive_dir,
+        work_dir=work_dir,
+        src_paths=[],
+        packages_dir=packages_dir,
+        forwarded_args=["-c", "print(1)"],
+        managed=None,
+        connected=None,
+        verbose=0,
+    )
+
+    args = mock_run.call_args.args[0]
+    assert args[-3:] == ["--", "-c", "print(1)"]
+
+
+def test_forwards_empty_args_as_bare_double_dash(
+    mock_run, archive_dir, work_dir, packages_dir
+):
+    """An empty forwarded_args list still results in a bare trailing --
+    (no error, no forced -m); android.py's own driver defaults to -m test
+    in this case."""
+    stage_and_run(
+        archive_dir=archive_dir,
+        work_dir=work_dir,
+        src_paths=[],
+        packages_dir=packages_dir,
+        forwarded_args=[],
+        managed=None,
+        connected=None,
+        verbose=0,
+    )
+
+    args = mock_run.call_args.args[0]
+    assert args[-1] == "--"
+
+
 def test_forwards_managed_flag(mock_run, archive_dir, work_dir, packages_dir):
     """An explicit --managed overrides the default."""
     stage_and_run(
@@ -117,8 +156,7 @@ def test_forwards_managed_flag(mock_run, archive_dir, work_dir, packages_dir):
         work_dir=work_dir,
         src_paths=[],
         packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
+        forwarded_args=["-m", "pytest"],
         managed="minVersion",
         connected=None,
         verbose=0,
@@ -135,8 +173,7 @@ def test_forwards_connected_flag(mock_run, archive_dir, work_dir, packages_dir):
         work_dir=work_dir,
         src_paths=[],
         packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
+        forwarded_args=["-m", "pytest"],
         managed=None,
         connected="emulator-5554",
         verbose=0,
@@ -155,8 +192,7 @@ def test_forwards_verbose_flag(mock_run, archive_dir, work_dir, packages_dir):
         work_dir=work_dir,
         src_paths=[],
         packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
+        forwarded_args=["-m", "pytest"],
         managed=None,
         connected=None,
         verbose=1,
@@ -175,8 +211,7 @@ def test_returns_exit_code(mock_run, archive_dir, work_dir, packages_dir):
         work_dir=work_dir,
         src_paths=[],
         packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
+        forwarded_args=["-m", "pytest"],
         managed=None,
         connected=None,
         verbose=0,
