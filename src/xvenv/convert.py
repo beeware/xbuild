@@ -46,6 +46,13 @@ def localized_vars(orig_vars, slice_path):
             final = final.replace("-F .", f"-F {slice_path}")
         localized_vars[key] = final
 
+    # Remove LDLIBRARY from the sysconfig vars. At runtime, ctypes on Android
+    # uses `sysconfig.get_config_var("LDLIBRARY")` to find libPython; this
+    # fails in a cross-environment. Removing the LDLIBRARY key causes ctypes
+    # to fall back to `ctypes.DLL(None)`, which is the default behavior on
+    # desktop platforms anyway.
+    localized_vars.pop("LDLIBRARY")
+
     return localized_vars
 
 
