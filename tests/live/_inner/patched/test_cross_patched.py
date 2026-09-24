@@ -96,7 +96,7 @@ def test_sysconfig_get_paths_venv_local(name):
 @pytest.mark.parametrize("name", ["AR", "CC", "CXX"])
 def test_clean_sysconfig_get_config_vars(name):
     """Path-containing sysconfig config vars have been cleaned."""
-    value = sysconfig.get_config_vars().get(name)
+    value = sysconfig.get_config_vars().get(name, "")
     assert "/Users" not in value
     assert "/home" not in value
     assert "/usr" not in value

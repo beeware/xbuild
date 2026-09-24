@@ -4,7 +4,7 @@ import re
 import sys
 from importlib import import_module
 from importlib import util as importlib_util
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 def localized_vars(orig_vars, slice_path):
@@ -21,10 +21,12 @@ def localized_vars(orig_vars, slice_path):
     # name (to be resolved via PATH on whatever machine actually uses this
     # environment). If CC has no directory component (e.g. iOS's bare
     # "arm64-apple-ios-clang") or is missing, there's nothing to strip.
+    # This is processed as a Posix path, as the build machine will always
+    # be Posix.
     tool_dir = None
     cc = orig_vars.get("CC")
     if isinstance(cc, str):
-        candidate = str(Path(cc).parent)
+        candidate = str(PurePosixPath(cc).parent)
         if candidate != ".":
             tool_dir = candidate
 
