@@ -6,10 +6,7 @@ from argparse import ArgumentParser
 from collections.abc import Sequence
 from pathlib import Path
 
-from build.__main__ import (
-    _cprint,
-    _error,
-)
+from build.__main__ import _error
 
 import xvenv
 from xvenv.api import create_cross_venv
@@ -123,14 +120,13 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
 
     try:
         if args.platform is not None:
-            result = create_cross_venv(
+            create_cross_venv(
                 venv_path,
                 args.platform,
                 args.arch,
                 args.cache,
                 with_pip=args.with_pip,
             )
-            description = result.description
         else:
             build_details_path = (
                 Path(args.build_details_path).resolve()
@@ -144,7 +140,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
             )
             if not venv_path.exists():
                 venv.create(venv_path, with_pip=args.with_pip)
-            description = convert_venv(
+            convert_venv(
                 venv_path,
                 build_details_path=build_details_path,
                 sysconfigdata_path=sysconfigdata_path,
@@ -152,11 +148,6 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     except (ValueError, NotImplementedError) as e:
         _error(e)
         sys.exit(1)
-    else:
-        _cprint(
-            "{bold}{green}{}{reset}",
-            f"{args.venv} is now an {description} cross venv.",
-        )
 
 
 def entrypoint() -> None:

@@ -34,13 +34,13 @@ You can then activate and deactivate the `x-venv` environment as you would any o
 
 ## Documentation
 
-Documentation for Toga Chart can be found on [Read The Docs](https://toga-chart.readthedocs.io).
+Documentation for `xbuild` can be found on [Read The Docs](https://xbuild.beeware.org/).
 
 ## Community
 
 `xbuild` is part of the [BeeWare suite](http://beeware.org). You can talk to the community through:
 
-- [@pybeeware on Twitter](https://twitter.com/pybeeware)
+- [@beeware@fosstodon.org on Mastodon](https://fosstodon.org/@beeware)
 - [Discord](https://beeware.org/bee/chat/)
 
 We foster a welcoming and respectful community as described in our [BeeWare Community Code of Conduct](http://beeware.org/community/behavior/).
