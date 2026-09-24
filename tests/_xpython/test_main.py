@@ -247,7 +247,18 @@ def test_main_ios_end_to_end_with_temp_dir(mock_pipeline):
     """main() creates a cross-venv, installs deps, and dispatches to the
     iOS platform module, using a temp dir that gets cleaned up."""
     with pytest.raises(SystemExit) as excinfo:
-        main(["--platform", "ios", "-d", "requests", "-m", "pytest", "tests"])
+        main(
+            [
+                "--platform",
+                "ios",
+                "-d",
+                "requests",
+                "--",
+                "-m",
+                "pytest",
+                "tests",
+            ]
+        )
 
     assert excinfo.value.code == 0
     mock_pipeline["create_cross_venv"].assert_called_once()
@@ -271,9 +282,10 @@ def test_main_ios_end_to_end_with_temp_dir(mock_pipeline):
 
 
 def test_main_android_dispatches_to_android_module(mock_pipeline):
-    """--platform android dispatches to android_stage_and_run, not iOS."""
+    """--platform android dispatches to android_stage_and_run, not iOS,
+    forwarding args verbatim via forwarded_args."""
     with pytest.raises(SystemExit) as excinfo:
-        main(["--platform", "android", "-m", "pytest"])
+        main(["--platform", "android", "--", "-m", "pytest"])
 
     assert excinfo.value.code == 0
     mock_pipeline["android_stage_and_run"].assert_called_once()
@@ -281,6 +293,18 @@ def test_main_android_dispatches_to_android_module(mock_pipeline):
     stage_kwargs = mock_pipeline["android_stage_and_run"].call_args.kwargs
     assert stage_kwargs["managed"] is None
     assert stage_kwargs["connected"] is None
+    assert stage_kwargs["forwarded_args"] == ["-m", "pytest"]
+
+
+def test_main_android_forwards_dash_c_verbatim(mock_pipeline):
+    """Android forwards -c invocations verbatim, with no xpython-side
+    validation forcing -m."""
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--platform", "android", "--", "-c", "print(1)"])
+
+    assert excinfo.value.code == 0
+    stage_kwargs = mock_pipeline["android_stage_and_run"].call_args.kwargs
+    assert stage_kwargs["forwarded_args"] == ["-c", "print(1)"]
 
 
 def test_main_propagates_nonzero_exit_code(mock_pipeline):
@@ -288,7 +312,7 @@ def test_main_propagates_nonzero_exit_code(mock_pipeline):
     mock_pipeline["ios_stage_and_run"].return_value = 3
 
     with pytest.raises(SystemExit) as excinfo:
-        main(["--platform", "ios", "-m", "pytest"])
+        main(["--platform", "ios", "--", "-m", "pytest"])
 
     assert excinfo.value.code == 3
 
@@ -298,7 +322,17 @@ def test_main_work_dir_used_and_not_cleaned_up(mock_pipeline, tmp_path):
     work_dir = tmp_path / "my-work-dir"
 
     with pytest.raises(SystemExit) as excinfo:
-        main(["--platform", "ios", "--work-dir", str(work_dir), "-m", "pytest"])
+        main(
+            [
+                "--platform",
+                "ios",
+                "--work-dir",
+                str(work_dir),
+                "--",
+                "-m",
+                "pytest",
+            ]
+        )
 
     assert excinfo.value.code == 0
     assert work_dir.exists()
@@ -312,7 +346,7 @@ def test_main_skips_install_when_no_requirements(mock_pipeline):
     mock_pipeline["resolve_requirements"].return_value = []
 
     with pytest.raises(SystemExit):
-        main(["--platform", "ios", "-m", "pytest"])
+        main(["--platform", "ios", "--", "-m", "pytest"])
 
     mock_pipeline["install_requirements"].assert_not_called()
 
@@ -325,7 +359,7 @@ def test_main_reports_dependency_resolution_error(mock_pipeline, capsys):
     )
 
     with pytest.raises(SystemExit) as excinfo:
-        main(["--platform", "ios", "--group", "missing", "-m", "pytest"])
+        main(["--platform", "ios", "--group", "missing", "--", "-m", "pytest"])
 
     assert excinfo.value.code == 1
     assert "missing" in capsys.readouterr().err
@@ -337,7 +371,7 @@ def test_main_reports_create_cross_venv_error(mock_pipeline, capsys):
     mock_pipeline["create_cross_venv"].side_effect = ValueError("bad arch")
 
     with pytest.raises(SystemExit) as excinfo:
-        main(["--platform", "ios", "--arch", "bogus", "-m", "pytest"])
+        main(["--platform", "ios", "--arch", "bogus", "--", "-m", "pytest"])
 
     assert excinfo.value.code == 1
     assert "bad arch" in capsys.readouterr().err
@@ -351,7 +385,7 @@ def test_main_reports_pip_install_error(mock_pipeline, capsys):
     )
 
     with pytest.raises(SystemExit) as excinfo:
-        main(["--platform", "ios", "-d", "requests", "-m", "pytest"])
+        main(["--platform", "ios", "-d", "requests", "--", "-m", "pytest"])
 
     assert excinfo.value.code == 1
     assert "testbed" in capsys.readouterr().err.lower()

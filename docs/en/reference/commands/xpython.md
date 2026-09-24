@@ -5,8 +5,8 @@
 ## Usage
 
 ```console
-(venv) $ xpython --platform ios --src tests -d pytest -m pytest tests
-(venv) $ xpython --platform android --group test -m pytest tests
+(venv) $ xpython --platform ios --src tests -d pytest -- -m pytest tests
+(venv) $ xpython --platform android --group test -- -m pytest tests
 ```
 
 `xpython`:
@@ -67,6 +67,9 @@ The serial number of an already-connected Android device to use. Only valid with
 
 Use this directory for the cross-venv, dependency install, and testbed staging, instead of a temporary directory. Unlike a temporary directory, this directory is **not** deleted when `xpython` exits — useful for inspecting a failed run.
 
-### `-m MODULE [arg ...]`
+### `-- [args ...]`
 
-The module to run, and any arguments to pass to it (as `python -m MODULE arg ...` would). Required. Must be the last option given, since everything after `-m` is captured as the module name and its arguments.
+Everything after `--` is forwarded to the platform's testbed:
+
+- **iOS**: the first forwarded argument must be `-m` (e.g. `-- -m pytest tests`). This mimics `python -m` invocation; the `-m` token itself is not passed through to the underlying test runner. If nothing follows `--`, no module is run and the testbed reports its own usage error.
+- **Android**: forwarded arguments are passed through unchanged to the bundled `android.py test` driver's own `-- <args>` mechanism, which accepts `-m <module>`, `-c <code>`, or (if neither is given) defaults to running Python's own test suite via `-m test`.
