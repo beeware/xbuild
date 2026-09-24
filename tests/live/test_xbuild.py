@@ -263,9 +263,14 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
 
     # Now run the test suite for the project, installing the 'test' dependency
     # group, and installing the binary wheel from the build output directory.
-    # This can't be done in CI on macOS because GitHub Actions doesn't support
+    # Android tests can't be run in CI on macOS because GitHub Actions doesn't support
     # acceleration.
-    if not ("CI" in os.environ and sys.platform == "darwin"):
+    is_ci = "CI" in os.environ
+    is_android = platform_name == "android"
+    is_macOS = sys.platform == "darwin"
+    if is_ci and is_android and is_macOS:
+        print("Running in CI; can't performing live Android test on macOS")
+    else:
         result = subprocess.run(
             [
                 sys.executable,
