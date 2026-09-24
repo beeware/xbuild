@@ -1,46 +1,47 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
-
-def _copy_into(src: Path, dst_dir: Path) -> None:
-    """Copy `src` (file or directory) into `dst_dir / src.name`."""
-    target = dst_dir / src.name
-    if src.is_dir():
-        shutil.copytree(src, target, dirs_exist_ok=True)
-    else:
-        shutil.copy(src, target)
+from ..deps import copy_into
 
 
-def stage_and_run(
+def packages_dir(work_dir):
+    return work_dir / "site-packages"
+
+
+def setup(
     archive_dir: Path,
     work_dir: Path,
     src_paths: list[Path],
-    packages_dir: Path,
-    forwarded_args: list[str],
+) -> int:
+    src_dir = work_dir / "src"
+    src_dir.mkdir(parents=True, exist_ok=True)
+
+    copy_into(archive_dir / "android.py", work_dir)
+    copy_into(archive_dir / "testbed", work_dir)
+    (work_dir / "prefix").symlink_to(archive_dir / "prefix")
+    (work_dir / "android-env.sh").symlink_to(archive_dir / "android-env.sh")
+
+    for src in src_paths:
+        copy_into(src, src_dir)
+
+
+def run(
+    work_dir: Path,
+    args: list[str],
     managed: str | None,
     connected: str | None,
     verbose: int,
+    **kwargs,
 ) -> int:
-    """Stage source/package files and run `android.py test -- <forwarded_args>`
-    inside an Android emulator/device, using the `android.py` driver
-    bundled alongside the downloaded Android Python archive.
+    """Run the testbed project on an Android emulator/device..
 
-    :param archive_dir: The extracted Android Python archive directory
-        (contains `android.py` and its own bundled `testbed/` Gradle
-        project, used in place -- no separate clone step, unlike iOS).
     :param work_dir: The working directory to build staging directories
         in (`work_dir / "site-packages"`, `work_dir / "cwd"`).
-    :param src_paths: Paths to copy into `work_dir / "cwd"`.
-    :param packages_dir: A directory whose contents are copied into
-        `work_dir / "site-packages"`.
-    :param forwarded_args: Arguments to pass verbatim to `android.py
-        test`'s own `-- <args>` mechanism (e.g. `["-m", "pytest",
-        "tests"]` or `["-c", "print(1)"]`). No validation is applied here
-        -- `android.py` itself accepts `-c`/`-m`, or defaults to `-m test`
-        if `forwarded_args` is empty.
+    :param args: Arguments to pass to the testbed process. Accepts any
+        argument list starting with `-c`/`-m`; defaults to `-m test`
+        if `args` is empty.
     :param managed: The name of a Gradle-managed device to use, or `None`.
     :param connected: The serial of an already-connected device to use, or
         `None`. Mutually exclusive with `managed`; if both are `None`,
@@ -48,25 +49,14 @@ def stage_and_run(
     :param verbose: Verbosity level; > 0 forwards `-v` to `android.py`.
     :returns: The exit code of the `android.py test` subprocess.
     """
-    site_packages_dir = work_dir / "site-packages"
-    cwd_dir = work_dir / "cwd"
-    site_packages_dir.mkdir(parents=True, exist_ok=True)
-    cwd_dir.mkdir(parents=True, exist_ok=True)
 
-    for item in packages_dir.iterdir():
-        _copy_into(item, site_packages_dir)
-
-    for src in src_paths:
-        _copy_into(src, cwd_dir)
-
-    android_driver = archive_dir / "android.py"
     command = [
-        str(android_driver),
+        str(work_dir / "android.py"),
         "test",
         "--site-packages",
-        str(site_packages_dir),
+        str(packages_dir(work_dir)),
         "--cwd",
-        str(cwd_dir),
+        str(work_dir / "src"),
     ]
     if connected is not None:
         command.extend(["--connected", connected])
@@ -74,10 +64,10 @@ def stage_and_run(
         command.extend(["--managed", managed or "maxVersion"])
     if verbose > 0:
         command.append("-v")
-    command.extend(["--", *forwarded_args])
+    command.extend(["--", *args])
 
     result = subprocess.run(command, check=False)
     return result.returncode
 
 
-__all__ = ["stage_and_run"]
+__all__ = ["run", "setup"]

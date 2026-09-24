@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from xpython.platforms.ios import stage_and_run
+from xpython.platforms.ios import run, setup
 
 
 @pytest.fixture
@@ -16,11 +16,9 @@ def mock_run(monkeypatch):
 
 @pytest.fixture
 def testbed_layout(tmp_path):
-    """Simulate the directory structure stage_and_run() expects to exist
-    after cloning, without actually running the real testbed clone
-    subprocess (which is mocked)."""
-    archive_dir = tmp_path / "archive"
-    (archive_dir / "testbed").mkdir(parents=True)
+    """Simulate the directory structure run() expects to exist
+    after setup(), without actually running the real testbed clone
+    subprocess."""
     work_dir = tmp_path / "work"
     work_dir.mkdir()
 
@@ -32,220 +30,164 @@ def testbed_layout(tmp_path):
     app_packages_dir.mkdir(parents=True)
 
     return {
-        "archive_dir": archive_dir,
         "work_dir": work_dir,
         "app_dir": app_dir,
         "app_packages_dir": app_packages_dir,
     }
 
 
-def test_clones_testbed(mock_run, testbed_layout, tmp_path):
-    """stage_and_run() clones the testbed before running."""
-    packages_dir = tmp_path / "packages"
-    packages_dir.mkdir()
+def test_testbed_clone(mock_run, tmp_path):
+    """The tesbed and each --src path is copied into the cloned testbed's app/
+    directory."""
+    archive_dir = tmp_path / "archive"
+    (archive_dir / "testbed").mkdir(parents=True)
 
-    stage_and_run(
-        archive_dir=testbed_layout["archive_dir"],
-        work_dir=testbed_layout["work_dir"],
-        src_paths=[],
-        packages_dir=packages_dir,
-        module="pytest",
-        module_args=["tests"],
-        simulator=None,
-        verbose=0,
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    app_dir = work_dir / "testbed" / "iOSTestbed" / "app"
+
+    for path in ["tests", "deep/other"]:
+        src = tmp_path / path
+        src.mkdir(parents=True)
+        (src / "test_thing.py").write_text("def test_x(): pass\n")
+
+    setup(
+        archive_dir=archive_dir,
+        work_dir=work_dir,
+        src_paths=[
+            tmp_path / "tests",
+            tmp_path / "deep/other",
+        ],
     )
 
+    # Clone was invoked
     clone_call = mock_run.call_args_list[0]
     args = clone_call.args[0]
-    assert args[:2] == [sys.executable, str(testbed_layout["archive_dir"] / "testbed")]
+    assert args[:2] == [sys.executable, str(archive_dir / "testbed")]
     assert args[2] == "clone"
-    assert args[3] == str(testbed_layout["work_dir"] / "testbed")
+    assert args[3] == str(work_dir / "testbed")
+
+    # The *leaf* folders have been preserved in the final location.
+    for path in ["tests", "other"]:
+        copied = app_dir / path / "test_thing.py"
+        assert copied.is_file()
+        assert copied.read_text() == "def test_x(): pass\n"
 
 
-def test_copies_src_paths_into_app_dir(mock_run, testbed_layout, tmp_path):
-    """Each --src path is copied into the cloned testbed's app/ directory."""
-    src = tmp_path / "tests"
-    src.mkdir()
-    (src / "test_thing.py").write_text("def test_x(): pass\n")
-    packages_dir = tmp_path / "packages"
-    packages_dir.mkdir()
-
-    stage_and_run(
-        archive_dir=testbed_layout["archive_dir"],
-        work_dir=testbed_layout["work_dir"],
-        src_paths=[src],
-        packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
-        simulator=None,
-        verbose=0,
-    )
-
-    copied = testbed_layout["app_dir"] / "tests" / "test_thing.py"
-    assert copied.is_file()
-    assert copied.read_text() == "def test_x(): pass\n"
-
-
-def test_copies_packages_into_app_packages_dir(mock_run, testbed_layout, tmp_path):
-    """Contents of packages_dir are copied into app_packages/."""
-    packages_dir = tmp_path / "packages"
-    packages_dir.mkdir()
-    (packages_dir / "requests").mkdir()
-    (packages_dir / "requests" / "__init__.py").write_text("# fake requests\n")
-
-    stage_and_run(
-        archive_dir=testbed_layout["archive_dir"],
-        work_dir=testbed_layout["work_dir"],
-        src_paths=[],
-        packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
-        simulator=None,
-        verbose=0,
-    )
-
-    copied = testbed_layout["app_packages_dir"] / "requests" / "__init__.py"
-    assert copied.is_file()
-
-
-def test_runs_with_module_and_args(mock_run, testbed_layout, tmp_path):
+def test_run_with_module_and_args(mock_run, testbed_layout):
     """The run subcommand is invoked with -- <module> <module_args>."""
-    packages_dir = tmp_path / "packages"
-    packages_dir.mkdir()
+    mock_run.return_value = Mock(returncode=3)
 
-    stage_and_run(
-        archive_dir=testbed_layout["archive_dir"],
+    result = run(
         work_dir=testbed_layout["work_dir"],
-        src_paths=[],
-        packages_dir=packages_dir,
-        module="pytest",
-        module_args=["tests", "-v"],
+        args=["-m", "pytest", "tests", "-v"],
         simulator=None,
         verbose=0,
     )
 
-    run_call = mock_run.call_args_list[1]
-    args = run_call.args[0]
-    assert args[:2] == [sys.executable, str(testbed_layout["work_dir"] / "testbed")]
-    assert args[2] == "run"
-    assert args[-4:] == ["--", "pytest", "tests", "-v"]
+    # Testbed was invoked
+    mock_run.assert_called_once_with(
+        [
+            sys.executable,
+            str(testbed_layout["work_dir"] / "testbed"),
+            "run",
+            "--",
+            "pytest",
+            "tests",
+            "-v",
+        ],
+        check=False,
+    )
+
+    # Return code of the testbed is the result
+    assert result == 3
 
 
-def test_forwards_simulator_flag(mock_run, testbed_layout, tmp_path):
-    """--simulator is forwarded to the run subcommand."""
-    packages_dir = tmp_path / "packages"
-    packages_dir.mkdir()
-
-    stage_and_run(
-        archive_dir=testbed_layout["archive_dir"],
+def test_args_empty(mock_run, testbed_layout):
+    """An empty args list still results in a bare trailing --."""
+    run(
         work_dir=testbed_layout["work_dir"],
-        src_paths=[],
-        packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
+        args=[],
+        simulator=None,
+        verbose=0,
+    )
+
+    mock_run.assert_called_once_with(
+        [
+            sys.executable,
+            str(testbed_layout["work_dir"] / "testbed"),
+            "run",
+            "--",
+        ],
+        check=False,
+    )
+
+
+def test_forwards_simulator_flag(mock_run, testbed_layout):
+    """--simulator is forwarded to the run subcommand."""
+    run(
+        work_dir=testbed_layout["work_dir"],
+        args=["-m", "pytest"],
         simulator="iPhone 16e",
         verbose=0,
     )
 
-    run_call = mock_run.call_args_list[1]
-    args = run_call.args[0]
-    assert "--simulator" in args
-    assert args[args.index("--simulator") + 1] == "iPhone 16e"
+    mock_run.assert_called_once_with(
+        [
+            sys.executable,
+            str(testbed_layout["work_dir"] / "testbed"),
+            "run",
+            "--simulator",
+            "iPhone 16e",
+            "--",
+            "pytest",
+        ],
+        check=False,
+    )
 
 
 def test_forwards_verbose_flag(mock_run, testbed_layout, tmp_path):
     """verbose > 0 adds -v to the run subcommand."""
-    packages_dir = tmp_path / "packages"
-    packages_dir.mkdir()
-
-    stage_and_run(
-        archive_dir=testbed_layout["archive_dir"],
+    run(
         work_dir=testbed_layout["work_dir"],
-        src_paths=[],
-        packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
+        args=["-m", "pytest"],
         simulator=None,
         verbose=1,
     )
 
-    run_call = mock_run.call_args_list[1]
-    args = run_call.args[0]
-    assert "-v" in args
-
-
-def test_returns_run_exit_code(mock_run, testbed_layout, tmp_path):
-    """stage_and_run() returns the run subcommand's exit code verbatim."""
-    packages_dir = tmp_path / "packages"
-    packages_dir.mkdir()
-    mock_run.side_effect = [
-        Mock(returncode=0),  # clone
-        Mock(returncode=3),  # run
-    ]
-
-    result = stage_and_run(
-        archive_dir=testbed_layout["archive_dir"],
-        work_dir=testbed_layout["work_dir"],
-        src_paths=[],
-        packages_dir=packages_dir,
-        module="pytest",
-        module_args=[],
-        simulator=None,
-        verbose=0,
+    mock_run.assert_called_once_with(
+        [
+            sys.executable,
+            str(testbed_layout["work_dir"] / "testbed"),
+            "run",
+            "-v",
+            "--",
+            "pytest",
+        ],
+        check=False,
     )
 
-    assert result == 3
 
+@pytest.mark.parametrize(
+    "args",
+    [
+        pytest.param(["-m"], id="missing-module"),
+        pytest.param(["-c", "print('hello')"], id="inline"),
+        pytest.param(["hello.py"], id="script"),
+    ],
+)
+def test_bad_args(mock_run, testbed_layout, args):
+    """Unsupported arguments to run() raise a ValueError."""
 
-def test_omits_module_segment_when_module_is_none(mock_run, testbed_layout, tmp_path):
-    """When module is None, the run subcommand's command has no trailing
-    -- <module> <args> segment at all."""
-    packages_dir = tmp_path / "packages"
-    packages_dir.mkdir()
+    with pytest.raises(
+        ValueError, match="iOS requires -m <module> as the first two arguments after --"
+    ):
+        run(
+            work_dir=testbed_layout["work_dir"],
+            args=args,
+            simulator=None,
+            verbose=0,
+        )
 
-    stage_and_run(
-        archive_dir=testbed_layout["archive_dir"],
-        work_dir=testbed_layout["work_dir"],
-        src_paths=[],
-        packages_dir=packages_dir,
-        module=None,
-        module_args=[],
-        simulator=None,
-        verbose=0,
-    )
-
-    run_call = mock_run.call_args_list[1]
-    args = run_call.args[0]
-    assert args == [sys.executable, str(testbed_layout["work_dir"] / "testbed"), "run"]
-    assert "--" not in args
-
-
-def test_omits_module_segment_but_keeps_simulator_and_verbose(
-    mock_run, testbed_layout, tmp_path
-):
-    """module=None still allows --simulator/-v to be forwarded; only the
-    trailing -- <module> <args> segment is omitted."""
-    packages_dir = tmp_path / "packages"
-    packages_dir.mkdir()
-
-    stage_and_run(
-        archive_dir=testbed_layout["archive_dir"],
-        work_dir=testbed_layout["work_dir"],
-        src_paths=[],
-        packages_dir=packages_dir,
-        module=None,
-        module_args=[],
-        simulator="iPhone 16e",
-        verbose=1,
-    )
-
-    run_call = mock_run.call_args_list[1]
-    args = run_call.args[0]
-    assert args == [
-        sys.executable,
-        str(testbed_layout["work_dir"] / "testbed"),
-        "run",
-        "--simulator",
-        "iPhone 16e",
-        "-v",
-    ]
+    # Run wasn't called.
+    mock_run.assert_not_called()

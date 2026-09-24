@@ -23,6 +23,7 @@ def localized_vars(orig_vars, slice_path):
             final = final.replace("-F .", f"-F {slice_path}")
         localized_vars[key] = final
 
+    localized_vars.pop("LDLIBRARY")
     return localized_vars
 
 

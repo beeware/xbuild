@@ -99,7 +99,6 @@ def test_install_requirements_runs_pip(tmp_path, monkeypatch):
         "attrs>=23",
     ]
     assert mock_run.call_args.kwargs["check"] is True
-    assert mock_run.call_args.kwargs["env"]["XBUILD_ENV"] == "off"
 
 
 def test_install_requirements_multiple_find_links(tmp_path, monkeypatch):
@@ -115,22 +114,6 @@ def test_install_requirements_multiple_find_links(tmp_path, monkeypatch):
     assert called_args.count("--find-links") == 2
     assert "/tmp/a" in called_args
     assert "/tmp/b" in called_args
-
-
-def test_install_requirements_disables_cross_venv_shim(tmp_path, monkeypatch):
-    """install_requirements() runs pip with XBUILD_ENV=off so the cross-venv
-    sys.platform shim doesn't interfere with pip's own ctypes usage."""
-    mock_run = Mock()
-    monkeypatch.setattr("xpython.deps.subprocess.run", mock_run)
-    monkeypatch.setenv("SOME_OTHER_VAR", "keep-me")
-    venv_python = tmp_path / "venv" / "bin" / "python"
-    packages_dir = tmp_path / "packages"
-
-    install_requirements(venv_python, ["requests"], packages_dir, [])
-
-    called_env = mock_run.call_args.kwargs["env"]
-    assert called_env["XBUILD_ENV"] == "off"
-    assert called_env["SOME_OTHER_VAR"] == "keep-me"
 
 
 def test_install_requirements_noop_when_empty(tmp_path, monkeypatch):

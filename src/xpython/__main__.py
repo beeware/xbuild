@@ -11,8 +11,8 @@ from build.__main__ import _cprint, _error
 
 import xpython
 from xpython.deps import install_requirements, resolve_requirements
-from xpython.platforms.android import stage_and_run as android_stage_and_run
-from xpython.platforms.ios import stage_and_run as ios_stage_and_run
+from xpython.platforms import android as android_platform
+from xpython.platforms import ios as ios_platform
 from xvenv.api import create_cross_venv
 
 
@@ -89,6 +89,7 @@ def main_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--find-links",
+        "-f",
         dest="find_links",
         action="append",
         default=[],
@@ -195,13 +196,7 @@ def _parse_args(cli_args: Sequence[str], prog: str | None = None) -> argparse.Na
     if args.connected is not None and args.platform != "android":
         parser.error("--connected requires --platform android")
 
-    if args.platform == "ios":
-        if forwarded_args and (forwarded_args[0] != "-m" or len(forwarded_args) < 2):
-            parser.error("iOS requires -m <module> as the first two arguments after --")
-        args.module = forwarded_args[1] if forwarded_args else None
-        args.module_args = forwarded_args[2:] if forwarded_args else []
-    else:
-        args.forwarded_args = forwarded_args
+    args.forwarded_args = forwarded_args
 
     return args
 
@@ -216,6 +211,8 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
 
     try:
         if args.work_dir is not None:
+            if args.work_dir.exists():
+                _error(f"Working directory `{args.work_dir}` already exists.")
             args.work_dir.mkdir(parents=True, exist_ok=True)
             exit_code = _run(args)
         else:
@@ -233,7 +230,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
 
 
 def _run(args: argparse.Namespace) -> int:
-    """Run the full create-venv/install-deps/stage-and-run pipeline for an
+    """Run the full create-venv/create/install-deps/run pipeline for an
     already-validated, already-parsed set of arguments.
 
     :param args: The parsed CLI namespace, with `work_dir` resolved to an
@@ -244,39 +241,37 @@ def _run(args: argparse.Namespace) -> int:
     venv_path = args.work_dir / "venv"
     result = create_cross_venv(venv_path, args.platform, args.arch, args.cache)
 
+    platform_module = {
+        "android": android_platform,
+        "ios": ios_platform,
+    }[args.platform]
+
+    _cprint("{bold}Creating testbed project...{reset}")
+    platform_module.setup(
+        archive_dir=result.archive_dir,
+        work_dir=args.work_dir,
+        src_paths=args.src,
+    )
+
+    _cprint("{bold}Installing dependencies...{reset}")
     requirements = resolve_requirements(
         args.dependencies, args.groups, Path("pyproject.toml")
     )
-
-    packages_dir = args.work_dir / "packages"
+    packages_dir = platform_module.packages_dir(args.work_dir)
     packages_dir.mkdir(parents=True, exist_ok=True)
     if requirements:
-        _cprint("{bold}Installing dependencies...{reset}")
         venv_python = venv_path / "bin" / "python3"
         install_requirements(venv_python, requirements, packages_dir, args.find_links)
 
-    if args.platform == "ios":
-        return ios_stage_and_run(
-            archive_dir=result.archive_dir,
-            work_dir=args.work_dir,
-            src_paths=args.src,
-            packages_dir=packages_dir,
-            module=args.module,
-            module_args=args.module_args,
-            simulator=args.simulator,
-            verbose=args.verbosity,
-        )
-    else:
-        return android_stage_and_run(
-            archive_dir=result.archive_dir,
-            work_dir=args.work_dir,
-            src_paths=args.src,
-            packages_dir=packages_dir,
-            forwarded_args=args.forwarded_args,
-            managed=args.managed,
-            connected=args.connected,
-            verbose=args.verbosity,
-        )
+    _cprint("{bold}Running testbed...{reset}")
+    return platform_module.run(
+        work_dir=args.work_dir,
+        args=args.forwarded_args,
+        simulator=args.simulator,
+        managed=args.managed,
+        connected=args.connected,
+        verbose=args.verbosity,
+    )
 
 
 def entrypoint() -> None:

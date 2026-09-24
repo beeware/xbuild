@@ -1,11 +1,20 @@
 from __future__ import annotations
 
-import os
+import shutil
 import subprocess
 import tomllib
 from pathlib import Path
 
 from dependency_groups import resolve as resolve_dependency_groups
+
+
+def copy_into(src: Path, dst_dir: Path) -> None:
+    """Copy `src` (file or directory) into `dst_dir / src.name`."""
+    target = dst_dir / src.name
+    if src.is_dir():
+        shutil.copytree(src, target, dirs_exist_ok=True)
+    else:
+        shutil.copy(src, target)
 
 
 def resolve_requirements(
@@ -75,8 +84,7 @@ def install_requirements(
         command.extend(["--find-links", str(directory)])
     command.extend(requirements)
 
-    env = {**os.environ, "XBUILD_ENV": "off"}
-    subprocess.run(command, check=True, env=env)
+    subprocess.run(command, check=True)
 
 
 __all__ = ["install_requirements", "resolve_requirements"]
