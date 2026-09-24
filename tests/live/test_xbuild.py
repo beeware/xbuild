@@ -50,6 +50,7 @@ CASES = [
                 sys.platform != "darwin",
                 reason="iOS tests can only be run on macOS",
             ),
+            pytest.mark.iOS,
         ],
     ),
     pytest.param(
@@ -64,6 +65,7 @@ CASES = [
                 sys.version_info < (3, 13),
                 reason="Android tests require Python 3.13+",
             ),
+            pytest.mark.android,
         ],
     ),
 ]
@@ -219,6 +221,7 @@ def _build_env_android(config_path, arch):
     return {**os.environ, **sourced}
 
 
+@pytest.mark.live
 @pytest.mark.parametrize("platform_name", CASES)
 @pytest.mark.parametrize("sample_project", SAMPLE_PROJECTS)
 def test_build_wheel(tmp_path, platform_name, sample_project):
@@ -260,27 +263,30 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
 
     # Now run the test suite for the project, installing the 'test' dependency
     # group, and installing the binary wheel from the build output directory.
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "xpython",
-            "--platform",
-            platform_name,
-            "--src",
-            project_dir / "tests",
-            "--group",
-            "test",
-            "--dependency",
-            sample_project.name,
-            "--find-links",
-            out_dir,
-            "--",
-            "-m",
-            "pytest",
-            "tests",
-        ],
-        env=env,
-        check=True,
-    )
-    assert result.returncode == 0
+    # This can't be done in CI on macOS because GitHub Actions doesn't support
+    # acceleration.
+    if not ("CI" in os.environ and sys.platform == "darwin"):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "xpython",
+                "--platform",
+                platform_name,
+                "--src",
+                project_dir / "tests",
+                "--group",
+                "test",
+                "--dependency",
+                sample_project.name,
+                "--find-links",
+                out_dir,
+                "--",
+                "-m",
+                "pytest",
+                "tests",
+            ],
+            env=env,
+            check=True,
+        )
+        assert result.returncode == 0

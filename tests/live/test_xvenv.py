@@ -28,12 +28,14 @@ IOS_SKIPS = [
         sys.platform != "darwin",
         reason="iOS tests can only be run on macOS",
     ),
+    pytest.mark.iOS,
 ]
 ANDROID_SKIPS = [
     pytest.mark.skipif(
         sys.version_info < (3, 13),
         reason="Android tests require Python 3.13+",
     ),
+    pytest.mark.android,
 ]
 
 CASES = [
@@ -107,6 +109,7 @@ def _verify_patched(
     sys.version_info < (3, 13),
     reason="Android tests require Python 3.13+",
 )
+@pytest.mark.live
 def test_convert_existing_venv(tmp_path):
     """xvenv converts an already-existing native venv in place."""
     expected_path = _expected_values_path()
@@ -132,6 +135,7 @@ def test_convert_existing_venv(tmp_path):
 
 
 @pytest.mark.parametrize(("platform_name", "arch"), CASES)
+@pytest.mark.live
 def test_create_xvenv(tmp_path, platform_name, arch):
     """xvenv can creates a brand new cross-platform venv."""
     expected_path = _expected_values_path()

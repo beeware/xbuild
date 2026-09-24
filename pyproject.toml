@@ -101,6 +101,11 @@ testpaths = ["tests"]
 filterwarnings = [
     "error",
 ]
+markers = [
+    "live: mark a test as a live (slow) test.",
+    "iOS: mark test as iOS specific.",
+    "android: mark test as Android specific.",
+]
 
 [tool.check-wheel-contents]
 toplevel = [
