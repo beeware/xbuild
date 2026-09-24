@@ -20,7 +20,7 @@ def stage_and_run(
     work_dir: Path,
     src_paths: list[Path],
     packages_dir: Path,
-    module: str,
+    module: str | None,
     module_args: list[str],
     simulator: str | None,
     verbose: int,
@@ -37,7 +37,9 @@ def stage_and_run(
         `iOSTestbed/app/` directory.
     :param packages_dir: A directory whose contents are copied into the
         cloned testbed's `iOSTestbed/app_packages/` directory.
-    :param module: The module to run (as `python -m module` would).
+    :param module: The module to run (as `python -m module` would), or
+        `None` if no module was specified (the testbed's own `run`
+        subcommand will then report its own usage error).
     :param module_args: Arguments to pass to the module.
     :param simulator: The name of the iOS simulator to use, or `None` to
         use the testbed driver's own default.
@@ -67,7 +69,8 @@ def stage_and_run(
         run_command.extend(["--simulator", simulator])
     if verbose > 0:
         run_command.append("-v")
-    run_command.extend(["--", module, *module_args])
+    if module is not None:
+        run_command.extend(["--", module, *module_args])
 
     result = subprocess.run(run_command, check=False)
     return result.returncode

@@ -195,3 +195,57 @@ def test_returns_run_exit_code(mock_run, testbed_layout, tmp_path):
     )
 
     assert result == 3
+
+
+def test_omits_module_segment_when_module_is_none(mock_run, testbed_layout, tmp_path):
+    """When module is None, the run subcommand's command has no trailing
+    -- <module> <args> segment at all."""
+    packages_dir = tmp_path / "packages"
+    packages_dir.mkdir()
+
+    stage_and_run(
+        archive_dir=testbed_layout["archive_dir"],
+        work_dir=testbed_layout["work_dir"],
+        src_paths=[],
+        packages_dir=packages_dir,
+        module=None,
+        module_args=[],
+        simulator=None,
+        verbose=0,
+    )
+
+    run_call = mock_run.call_args_list[1]
+    args = run_call.args[0]
+    assert args == [sys.executable, str(testbed_layout["work_dir"] / "testbed"), "run"]
+    assert "--" not in args
+
+
+def test_omits_module_segment_but_keeps_simulator_and_verbose(
+    mock_run, testbed_layout, tmp_path
+):
+    """module=None still allows --simulator/-v to be forwarded; only the
+    trailing -- <module> <args> segment is omitted."""
+    packages_dir = tmp_path / "packages"
+    packages_dir.mkdir()
+
+    stage_and_run(
+        archive_dir=testbed_layout["archive_dir"],
+        work_dir=testbed_layout["work_dir"],
+        src_paths=[],
+        packages_dir=packages_dir,
+        module=None,
+        module_args=[],
+        simulator="iPhone 16e",
+        verbose=1,
+    )
+
+    run_call = mock_run.call_args_list[1]
+    args = run_call.args[0]
+    assert args == [
+        sys.executable,
+        str(testbed_layout["work_dir"] / "testbed"),
+        "run",
+        "--simulator",
+        "iPhone 16e",
+        "-v",
+    ]
