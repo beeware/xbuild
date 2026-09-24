@@ -4,7 +4,7 @@ import re
 import sys
 from importlib import import_module
 from importlib import util as importlib_util
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 def localized_vars(orig_vars, slice_path):
@@ -13,15 +13,45 @@ def localized_vars(orig_vars, slice_path):
     # The host's sysconfigdata will include references to build-time variables.
     # Update these to refer to the current known install location.
     orig_prefix = orig_vars["prefix"]
+
+    # The host's sysconfigdata may also include absolute paths to the
+    # build machine's copy of the build toolchain (e.g. the Android NDK).
+    # Identify that toolchain directory from CC, so it can be stripped from
+    # every other variable that references it, leaving just the bare tool
+    # name (to be resolved via PATH on whatever machine actually uses this
+    # environment). If CC has no directory component (e.g. iOS's bare
+    # "arm64-apple-ios-clang") or is missing, there's nothing to strip.
+    # This is processed as a Posix path, as the build machine will always
+    # be Posix.
+    tool_dir = None
+    cc = orig_vars.get("CC")
+    if isinstance(cc, str):
+        candidate = str(PurePosixPath(cc).parent)
+        if candidate != ".":
+            tool_dir = candidate
+
     localized_vars = {}
     for key, value in orig_vars.items():
         final = value
         if isinstance(value, str):
-            # Replace any reference to the build installation prefix
+            # Replace any reference to the build machine's toolchain directory.
+            # This must run *before* the install-prefix substitution, because
+            # the toolchain *could* (and is, on official Android x86_64 builds)
+            # be installed in the build prefix.
+            if tool_dir is not None:
+                final = final.replace(f"{tool_dir}/", "")
+            # Replace any reference to the build prefix
             final = final.replace(orig_prefix, str(slice_path))
             # Replace any reference to the build-time Framework location
             final = final.replace("-F .", f"-F {slice_path}")
         localized_vars[key] = final
+
+    # Remove LDLIBRARY from the sysconfig vars. At runtime, ctypes on Android
+    # uses `sysconfig.get_config_var("LDLIBRARY")` to find libPython; this
+    # fails in a cross-environment. Removing the LDLIBRARY key causes ctypes
+    # to fall back to `ctypes.DLL(None)`, which is the default behavior on
+    # desktop platforms anyway.
+    localized_vars.pop("LDLIBRARY")
 
     return localized_vars
 
