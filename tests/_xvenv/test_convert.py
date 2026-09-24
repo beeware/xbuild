@@ -82,6 +82,7 @@ def test_missing_cc_key():
     orig_vars = {
         "prefix": "/usr/local",
         "BINDIR": "/usr/local/bin",
+        "LDLIBRARY": "libPython.so",
     }
 
     result = localized_vars(orig_vars, "/slice/path")
