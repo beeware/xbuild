@@ -67,6 +67,11 @@ from xvenv.api import CrossVenvResult
             "-m",
             id="ios-forwarded-args-must-start-with-m",
         ),
+        pytest.param(
+            ["--platform", "ios", "--", "-m"],
+            "-m",
+            id="ios-forwarded-args-m-with-no-module-name",
+        ),
     ],
 )
 def test_invalid_args(args, error, capsys):

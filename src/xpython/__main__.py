@@ -196,8 +196,8 @@ def _parse_args(cli_args: Sequence[str], prog: str | None = None) -> argparse.Na
         parser.error("--connected requires --platform android")
 
     if args.platform == "ios":
-        if forwarded_args and forwarded_args[0] != "-m":
-            parser.error("iOS requires the first argument after -- to be -m")
+        if forwarded_args and (forwarded_args[0] != "-m" or len(forwarded_args) < 2):
+            parser.error("iOS requires -m <module> as the first two arguments after --")
         args.module = forwarded_args[1] if forwarded_args else None
         args.module_args = forwarded_args[2:] if forwarded_args else []
     else:
