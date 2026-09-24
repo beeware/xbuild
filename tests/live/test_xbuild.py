@@ -1,5 +1,6 @@
 """Live, end-to-end verification that `xbuild` can build a real binary
-wheel for a project containing a C extension.
+wheel for a project containing a C extension, and that `xpython` can run
+a test suite for that binary wheel.
 
 Drives the real `xbuild` CLI (no mocking) against a real downloaded target
 Python build, for the default/host-native architecture of each supported
@@ -230,7 +231,7 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
     cache_dir = resolve_cache_dir(None)
     config_path, _ = fetch_python(platform_name, arch, cache_dir)
 
-    project_dir = tmp_path / "sample"
+    project_dir = tmp_path / sample_project.name
     shutil.copytree(sample_project, project_dir)
     out_dir = tmp_path / "dist"
 
