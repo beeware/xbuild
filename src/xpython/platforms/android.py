@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import platform
 import subprocess
 from pathlib import Path
 
@@ -49,6 +51,26 @@ def run(
     :param verbose: Verbosity level; > 0 forwards `-v` to `android.py`.
     :returns: The exit code of the `android.py test` subprocess.
     """
+    if "GITHUB_ACTIONS" in os.environ and platform.system() == "Linux":
+        # Enable emulator hardware acceleration on GitHub Actions.
+        # (https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/).
+        print("Enabling GitHub Actions hardware acceleration...")
+        subprocess.run(
+            ["sudo", "tee", "/etc/udev/rules.d/99-kvm4all.rules"],
+            input=(
+                'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"\n'
+            ),
+            text=True,
+            check=True,
+        )
+        subprocess.run(
+            ["sudo", "udevadm", "control", "--reload-rules"],
+            check=True,
+        )
+        subprocess.run(
+            ["sudo", "udevadm", "trigger", "--name-match=kvm"],
+            check=True,
+        )
 
     command = [
         str(work_dir / "android.py"),
