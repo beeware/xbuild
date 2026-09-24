@@ -93,6 +93,15 @@ def test_sysconfig_get_paths_venv_local(name):
     assert paths[name].startswith(sys.prefix)
 
 
+@pytest.mark.parametrize("name", ["AR", "CC", "CXX"])
+def test_clean_sysconfig_get_config_vars(name):
+    """Path-containing sysconfig config vars have been cleaned."""
+    value = sysconfig.get_config_vars().get(name, "")
+    assert "/Users" not in value
+    assert "/home" not in value
+    assert "/usr" not in value
+
+
 @pytest.mark.skipif(sys.platform != "ios", reason="iOS-specific check")
 def test_platform_ios():
     """iOS platform properties are as expected"""
