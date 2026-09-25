@@ -17,9 +17,8 @@ from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path
 class CrossVenvResult:
     """The result of creating (or reusing) a cross-platform venv.
 
-    :param description: A human-readable description of the resulting
-        cross-platform venv, as returned by `convert_venv()` (e.g.
-        `"android aarch64-linux-android"`).
+    :param platform: The platform for the cross venv.
+    :param arch: The architecture of the cross venv.
     :param archive_path: The root of the target-platform Python
         archive that was used to build the venv (the same directory
         `xvenv.fetch.fetch_python()` extracted the download into). Contains
@@ -28,9 +27,14 @@ class CrossVenvResult:
     :param venv_path: The path to the cross-platform environment.
     """
 
-    description: str
+    platform: str
+    arch: str
     archive_path: Path
     venv_path: Path
+
+    @property
+    def description(self) -> str:
+        return f"{self.platform} {self.arch}"
 
 
 def create_cross_venv(
@@ -95,14 +99,15 @@ def create_cross_venv(
             Path(sysconfigdata_path).resolve() if sysconfigdata_path else None
         )
 
-    description = convert_venv(
+    platform, arch = convert_venv(
         venv_path,
         build_details_path=resolved_build_details_path,
         sysconfigdata_path=resolved_sysconfigdata_path,
     )
 
     return CrossVenvResult(
-        description=description,
+        platform=platform,
+        arch=arch,
         archive_path=archive_path,
         venv_path=venv_path,
     )
@@ -217,15 +222,16 @@ def convert_venv(
     venv_path: Path,
     build_details_path: Path | None,
     sysconfigdata_path: Path | None,
-) -> str:
+) -> tuple[str, str]:
     """Convert a virtual environment into a cross-platform environment.
 
     :param venv_path: The path to the root of the venv.
     :param build_details_path: The path to build-details.json file for the
         target platform.
-    :param sysconfigdata_path: The path to the sysconfigdata python file
-        for the target platform.
-    :returns: A description of the venv (e.g., iOS arm64-iphonesimulator)
+    :param sysconfigdata_path: The path to the sysconfigdata python file for the
+        target platform.
+    :returns: A (platform, arch) pair for the new cross-platform environment
+        (e.g., ("iOS", "arm64-iphonesimulator")
     """
     if not venv_path.exists():
         raise ValueError(f"Virtual environment {venv_path} does not exist.")
@@ -348,4 +354,4 @@ def convert_venv(
         f"import {cross_multiarch}\n"
     )
 
-    return f"{context['os']} {multiarch}"
+    return context["os"], multiarch

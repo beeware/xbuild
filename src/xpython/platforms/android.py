@@ -19,13 +19,12 @@ def setup(
 ) -> int:
     """Clone the Android testbed, and stage source files into it.
 
-    :param archive_path: The extracted iOS Python archive directory
+    :param archive_path: The extracted Android Python archive directory
         (contains a `testbed/` subdirectory with the testbed driver
         script).
-    :param work_path: The working directory to clone the testbed into (as
-        `work_path / "testbed"`).
+    :param work_path: The working directory to clone the testbed into.
     :param src_paths: Paths to copy into the cloned testbed's src directory.
-    :raises RuntimeError: if running on macOS
+    :raises RuntimeError: if running on GitHub actions on a macOS runner.
     """
     if sys.platform == "darwin" and "GITHUB_ACTIONS" in os.environ:
         raise RuntimeError(

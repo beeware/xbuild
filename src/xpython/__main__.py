@@ -7,11 +7,12 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
-from build.__main__ import _cprint, _error
+from build.__main__ import _cprint, _error, _setup_cli
 
 import xpython
 from xpython.deps import install_requirements, resolve_requirements
 from xpython.platforms import android as android_platform
+from xpython.platforms import emscripten as emscripten_platform
 from xpython.platforms import ios as ios_platform
 from xvenv.convert import create_cross_venv
 
@@ -78,9 +79,10 @@ def main_parser() -> argparse.ArgumentParser:
         dest="cache",
         type=Path,
         help=(
-            "The directory to use for caching downloaded Python builds. "
-            "Defaults to the XBUILD_CACHE environment variable, or a "
-            "platform-appropriate cache directory."
+            "The directory to use for caching downloaded Python builds, "
+            "for use with --platform. Defaults to the XBUILD_CACHE "
+            "environment variable, or a platform-appropriate cache "
+            "directory."
         ),
     )
     parser.add_argument(
@@ -234,6 +236,8 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     """
     args = _parse_args(cli_args, prog)
 
+    _setup_cli(verbosity=args.verbosity)
+
     try:
         if args.work_path is not None:
             if args.work_path.exists():
@@ -277,7 +281,8 @@ def _run(args: argparse.Namespace) -> int:
     platform_module = {
         "android": android_platform,
         "ios": ios_platform,
-    }[args.platform]
+        "emscripten": emscripten_platform,
+    }[result.platform.lower()]
 
     _cprint("{bold}Creating testbed project...{reset}")
     platform_module.setup(

@@ -21,10 +21,10 @@ def setup(archive_path: Path, work_path: Path, src_paths: list[Path]):
     :param archive_path: The extracted iOS Python archive directory
         (contains a `testbed/` subdirectory with the testbed driver
         script).
-    :param work_path: The working directory to clone the testbed into (as
-        `work_path / "testbed"`).
+    :param work_path: The working directory to clone the testbed into.
     :param src_paths: Paths to copy into the cloned testbed's
         `iOSTestbed/app/` directory.
+    :raises RuntimeError: If not on a macOS machine.
     """
     if sys.platform != "darwin":
         raise RuntimeError("Can't run an iOS project on non-macOS hardware.")

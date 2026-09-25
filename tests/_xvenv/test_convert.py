@@ -23,7 +23,7 @@ def mock_deps(monkeypatch, tmp_path):
         "resolve_cache_path": Mock(return_value=cache_path),
         "resolve_arch": Mock(return_value="aarch64"),
         "fetch_python": Mock(return_value=(config_path, True)),
-        "convert_venv": Mock(return_value="android aarch64-linux-android"),
+        "convert_venv": Mock(return_value=("Android", "aarch64-linux-android")),
     }
     monkeypatch.setattr("xvenv.convert.venv.create", mocks["create"])
     monkeypatch.setattr("xvenv.convert.resolve_cache_path", mocks["resolve_cache_path"])
@@ -56,7 +56,10 @@ def test_creates_venv_when_missing(tmp_path, mock_deps):
         "android", "aarch64", mock_deps["cache_path"]
     )
     mock_deps["convert_venv"].assert_called_once()
-    assert result.description == "android aarch64-linux-android"
+    assert result.description == "Android aarch64-linux-android"
+    assert result.platform == "Android"
+    assert result.arch == "aarch64-linux-android"
+    assert result.venv_path == venv_path
     assert result.archive_path == mock_deps["archive_path"]
 
 

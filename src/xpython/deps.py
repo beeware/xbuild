@@ -9,7 +9,7 @@ from dependency_groups import resolve as resolve_dependency_groups
 
 
 def copy_into(src: Path, dst: Path) -> None:
-    """Copy `src` (file or directory) into `dst_dir / src.name`."""
+    """Copy `src` (file or directory) into `dst / src.name`."""
     target = dst / src.name
     if src.is_dir():
         shutil.copytree(src, target, dirs_exist_ok=True)

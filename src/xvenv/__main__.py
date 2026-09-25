@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 from collections.abc import Sequence
 from pathlib import Path
 
-from build.__main__ import _error
+from build.__main__ import _error, _setup_cli
 
 import xvenv
 from xvenv.convert import create_cross_venv
@@ -113,6 +113,8 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         parser.error("--arch requires --platform")
     if args.cache is not None and args.platform is None:
         parser.error("--cache requires --platform")
+
+    _setup_cli(verbosity=args.verbosity)
 
     venv_path = Path(args.venv).resolve()
 

@@ -309,10 +309,12 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
 
     try:
         if args.platform is not None:
-            cache_dir = resolve_cache_path(args.cache)
+            cache_path = resolve_cache_path(args.cache)
             arch = resolve_arch(args.platform, args.arch)
 
-            config_path, is_build_details = fetch_python(args.platform, arch, cache_dir)
+            config_path, is_build_details = fetch_python(
+                args.platform, arch, cache_path
+            )
             if is_build_details:
                 build_details_path = config_path
             else:
