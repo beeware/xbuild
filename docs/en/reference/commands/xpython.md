@@ -9,13 +9,22 @@
 (venv) $ xpython --platform android --group test -- -m pytest tests
 ```
 
-`xpython`:
+`xpython` will:
 
-1. Creates (or reuses) a cross-platform virtual environment for the target `--platform`/`--arch`, downloading and caching the target Python build the same way `xvenv --platform ...` does.
-2. Resolves dependencies (`-d`/`--dependency` specs and/or `--group` names from `[dependency-groups]` in `./pyproject.toml`) and installs them using that environment's own `pip`.
-3. Copies each `--src` path into the testbed's working directory.
-4. Forwards everything after `--` to the platform's testbed (see the `-- [args ...]` option below).
-5. Exits with the exit code produced by the module (or by the testbed driver itself, if it failed to build/launch before the module could run).
+1. Create (or reuses) a cross-platform virtual environment for the target `--platform`/`--arch`, downloading and caching the target Python build the same way `xvenv --platform ...` does.
+2. Resolve dependencies (`-d`/`--dependency` specs and/or `--group` names from `[dependency-groups]` in `./pyproject.toml`) and installs them using that environment's own `pip`.
+3. Copy each `--src` path into the testbed's working directory.
+4. Forward everything after `--` to the platform's testbed (see the `-- [args ...]` option below).
+5. Run the project on a simulator/emulator
+6. Exit with the exit code produced by the test code (or by the testbed driver itself, if it failed to build/launch before the test code could run).
+
+/// note | `xpython` in CI environments
+
+`xpython` is able to run Android projects on macOS; but the macOS GitHub Actions environment isn't able to start an Android emulator. `xpython` will raise an error if it detects it is in a GitHub Actions environment and you try to run an Android project.
+
+When `xpython` runs an Android project on Linux, and it is running in a GitHub Actions CI environment, and it will automatically enable [hardware accelerated virtualization](https://gitHub.blog/changelog/2024-04-02-gitHub-actions-hardware-accelerated-android-virtualization-now-available/).
+
+///
 
 See the [Common options](./index.md#common-options) page for options shared with `xbuild`/`xvenv`.
 

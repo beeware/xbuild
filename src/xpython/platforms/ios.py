@@ -26,6 +26,9 @@ def setup(archive_dir: Path, work_dir: Path, src_paths: list[Path]):
     :param src_paths: Paths to copy into the cloned testbed's
         `iOSTestbed/app/` directory.
     """
+    if sys.platform != "darwin":
+        raise RuntimeError("Can't run an iOS project on non-macOS hardware.")
+
     testbed_source = archive_dir / "testbed"
     testbed_clone = testbed_dir(work_dir)
 

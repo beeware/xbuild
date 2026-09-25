@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import Mock
 
 import pytest
@@ -20,8 +21,11 @@ def work_dir(tmp_path):
     return work
 
 
-def test_testbed_clone(tmp_path):
+def test_testbed_clone(monkeypatch, tmp_path):
     """The testbed and each --src path is copied into work_dir/cwd."""
+    # Monkeypatch so that it looks like we're
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+
     archive_dir = tmp_path / "archive"
     archive_dir.mkdir()
     (archive_dir / "android.py").write_text("def main(): pass\n")
@@ -57,6 +61,19 @@ def test_testbed_clone(tmp_path):
         copied = work_dir / "src" / path / "test_thing.py"
         assert copied.is_file()
         assert copied.read_text() == "def test_x(): pass\n"
+
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="macOS specific test")
+def test_testbed_clone_macOS_ci(monkeypatch, tmp_path):
+    """If running on GitHub Actions under macOS, an error is raised on clone."""
+    # Monkeypatch so that it looks like we're in CI, regardless of whether we are.
+    monkeypatch.setenv("GITHUB_ACTIONS", "1")
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"GitHub Actions can't start an Android emulator on a macOS runner.",
+    ):
+        setup(archive_dir=tmp_path / "archive", work_dir=tmp_path / "work")
 
 
 def test_run_with_module_and_args(mock_run, work_dir):

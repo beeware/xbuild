@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-import platform
 import subprocess
+import sys
 from pathlib import Path
 
 from ..deps import copy_into
@@ -17,6 +17,21 @@ def setup(
     work_dir: Path,
     src_paths: list[Path],
 ) -> int:
+    """Clone the Android testbed, and stage source files into it.
+
+    :param archive_dir: The extracted iOS Python archive directory
+        (contains a `testbed/` subdirectory with the testbed driver
+        script).
+    :param work_dir: The working directory to clone the testbed into (as
+        `work_dir / "testbed"`).
+    :param src_paths: Paths to copy into the cloned testbed's src directory.
+    :raises RuntimeError: if running on macOS
+    """
+    if sys.platform == "darwin" and "GITHUB_ACTIONS" in os.environ:
+        raise RuntimeError(
+            "GitHub Actions can't start an Android emulator on a macOS runner."
+        )
+
     src_dir = work_dir / "src"
     src_dir.mkdir(parents=True, exist_ok=True)
 
@@ -51,7 +66,7 @@ def run(
     :param verbose: Verbosity level; > 0 forwards `-v` to `android.py`.
     :returns: The exit code of the `android.py test` subprocess.
     """
-    if "GITHUB_ACTIONS" in os.environ and platform.system() == "Linux":
+    if "GITHUB_ACTIONS" in os.environ and sys.platform == "linux":
         # Enable emulator hardware acceleration on GitHub Actions.
         # (https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/).
         print("Enabling GitHub Actions hardware acceleration...")
