@@ -23,7 +23,7 @@ from build._util import _format_dep_chain
 import xbuild
 from xbuild._builder import ProjectXBuilder
 from xbuild.env import XBuildIsolatedEnv
-from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path
+from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path, use_archive_path
 
 
 def _build(
@@ -269,7 +269,8 @@ def main_parser() -> argparse.ArgumentParser:
             "useful value based on the host machine's architecture."
         ),
     )
-    parser.add_argument(
+    source_group = parser.add_mutually_exclusive_group()
+    source_group.add_argument(
         "--cache",
         dest="cache",
         type=Path,
@@ -278,6 +279,17 @@ def main_parser() -> argparse.ArgumentParser:
             "for use with --platform. Defaults to the XBUILD_CACHE "
             "environment variable, or a platform-appropriate cache "
             "directory."
+        ),
+    )
+    source_group.add_argument(
+        "--archive",
+        dest="archive",
+        type=Path,
+        help=(
+            "Use an already-extracted Python build at this location "
+            "instead of downloading one, for use with --platform. Must be "
+            "laid out the same way an archive downloaded via --platform "
+            "would have been unpacked."
         ),
     )
 
@@ -299,6 +311,8 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         parser.error("--arch requires --platform")
     if args.cache is not None and args.platform is None:
         parser.error("--cache requires --platform")
+    if args.archive is not None and args.platform is None:
+        parser.error("--archive requires --platform")
 
     _setup_cli(verbosity=args.verbosity)
 
@@ -309,12 +323,18 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
 
     try:
         if args.platform is not None:
-            cache_path = resolve_cache_path(args.cache)
             arch = resolve_arch(args.platform, args.arch)
 
-            config_path, is_build_details = fetch_python(
-                args.platform, arch, cache_path
-            )
+            if args.archive is not None:
+                config_path, is_build_details = use_archive_path(
+                    args.platform, arch, args.archive
+                )
+            else:
+                cache_path = resolve_cache_path(args.cache)
+                config_path, is_build_details = fetch_python(
+                    args.platform, arch, cache_path
+                )
+
             if is_build_details:
                 build_details_path = config_path
             else:
