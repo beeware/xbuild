@@ -39,6 +39,16 @@ from xpython.__main__ import _parse_args
             id="sysconfig-and-cache",
         ),
         pytest.param(
+            ("--cache", "/path/to/cache", "--archive", "/path/to/archive"),
+            "not allowed with argument",
+            id="cache-and-archive",
+        ),
+        pytest.param(
+            ("--archive", "/path/to/archive", "--sysconfig", "/path/to/sysconfig.py"),
+            "--archive requires --platform",
+            id="sysconfig-and-archive",
+        ),
+        pytest.param(
             [
                 "--platform",
                 "android",
@@ -112,6 +122,7 @@ def test_defaults():
     assert args.platform == "android"
     assert args.arch is None
     assert args.cache is None
+    assert args.archive is None
     assert args.dependencies == []
     assert args.groups == []
     assert args.find_links == []
