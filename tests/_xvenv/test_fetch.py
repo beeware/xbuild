@@ -8,6 +8,7 @@ from xvenv.fetch import (
     fetch_python,
     resolve_arch,
     resolve_cache_path,
+    use_archive_path,
 )
 
 from ..utils import VersionInfo, _make_archive
@@ -230,3 +231,106 @@ def test_fetch_python(tmp_path, monkeypatch):
         expected_extracted_dir / "prefix" / "lib" / "python3.14" / "build-details.json"
     )
     assert is_build_details is True
+
+
+def test_use_archive_path_build_details(tmp_path):
+    """A pre-extracted archive with a build-details.json (Python 3.14+) is
+    used directly, with no download."""
+    version_info = VersionInfo(
+        major=3, minor=14, micro=7, releaselevel="final", serial=0
+    )
+    config_file = tmp_path / "prefix" / "lib" / "python3.14" / "build-details.json"
+    config_file.parent.mkdir(parents=True)
+    config_file.write_text('{"language": {"version": "3.14.7"}}')
+
+    with (
+        mock.patch("xvenv.fetch._current_version_info", return_value=version_info),
+        mock.patch("urllib.request.urlretrieve") as urlretrieve,
+    ):
+        path, is_build_details = use_archive_path("android", "aarch64", tmp_path)
+
+    urlretrieve.assert_not_called()
+    assert path == config_file
+    assert is_build_details is True
+
+
+def test_use_archive_path_legacy_sysconfigdata(tmp_path):
+    """A pre-extracted archive with a legacy _sysconfigdata__*.py (Python
+    <=3.13) is used directly, with no version-content check."""
+    version_info = VersionInfo(
+        major=3, minor=13, micro=5, releaselevel="final", serial=0
+    )
+    config_file = (
+        tmp_path
+        / "prefix"
+        / "lib"
+        / "python3.13"
+        / "_sysconfigdata__android_aarch64-linux-android.py"
+    )
+    config_file.parent.mkdir(parents=True)
+    config_file.write_text("build_time_vars = {}")
+
+    with mock.patch("xvenv.fetch._current_version_info", return_value=version_info):
+        path, is_build_details = use_archive_path("android", "aarch64", tmp_path)
+
+    assert path == config_file
+    assert is_build_details is False
+
+
+def test_use_archive_path_missing_directory(tmp_path):
+    """A nonexistent archive_path raises a clear error."""
+    missing = tmp_path / "does-not-exist"
+    version_info = VersionInfo(
+        major=3, minor=14, micro=7, releaselevel="final", serial=0
+    )
+
+    with (
+        mock.patch("xvenv.fetch._current_version_info", return_value=version_info),
+        pytest.raises(ValueError, match="does not exist"),
+    ):
+        use_archive_path("android", "aarch64", missing)
+
+
+def test_use_archive_path_missing_config_file(tmp_path):
+    """An archive_path that exists but doesn't contain the expected config
+    file raises a clear error."""
+    version_info = VersionInfo(
+        major=3, minor=14, micro=7, releaselevel="final", serial=0
+    )
+
+    with (
+        mock.patch("xvenv.fetch._current_version_info", return_value=version_info),
+        pytest.raises(ValueError, match="Could not find"),
+    ):
+        use_archive_path("android", "aarch64", tmp_path)
+
+
+def test_use_archive_path_missing_config_file_ios(tmp_path):
+    """Same missing-config-file check for a second platform (ios), to
+    confirm the function isn't accidentally android-specific."""
+    version_info = VersionInfo(
+        major=3, minor=14, micro=7, releaselevel="final", serial=0
+    )
+
+    with (
+        mock.patch("xvenv.fetch._current_version_info", return_value=version_info),
+        pytest.raises(ValueError, match="Could not find"),
+    ):
+        use_archive_path("ios", "arm64-iphonesimulator", tmp_path)
+
+
+def test_use_archive_path_version_mismatch(tmp_path):
+    """A build-details.json whose language.version doesn't match the
+    running interpreter raises a clear error."""
+    version_info = VersionInfo(
+        major=3, minor=14, micro=7, releaselevel="final", serial=0
+    )
+    config_file = tmp_path / "prefix" / "lib" / "python3.14" / "build-details.json"
+    config_file.parent.mkdir(parents=True)
+    config_file.write_text('{"language": {"version": "3.14.2"}}')
+
+    with (
+        mock.patch("xvenv.fetch._current_version_info", return_value=version_info),
+        pytest.raises(ValueError, match="but xvenv is running under Python"),
+    ):
+        use_archive_path("android", "aarch64", tmp_path)
