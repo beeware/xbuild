@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-import venv
 from argparse import ArgumentParser
 from collections.abc import Sequence
 from pathlib import Path
@@ -9,8 +8,7 @@ from pathlib import Path
 from build.__main__ import _error
 
 import xvenv
-from xvenv.api import create_cross_venv
-from xvenv.convert import convert_venv
+from xvenv.convert import create_cross_venv
 
 
 def main_parser():
@@ -119,32 +117,15 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     venv_path = Path(args.venv).resolve()
 
     try:
-        if args.platform is not None:
-            create_cross_venv(
-                venv_path,
-                args.platform,
-                args.arch,
-                args.cache,
-                with_pip=args.with_pip,
-            )
-        else:
-            build_details_path = (
-                Path(args.build_details_path).resolve()
-                if args.build_details_path
-                else None
-            )
-            sysconfigdata_path = (
-                Path(args.sysconfigdata_path).resolve()
-                if args.sysconfigdata_path
-                else None
-            )
-            if not venv_path.exists():
-                venv.create(venv_path, with_pip=args.with_pip)
-            convert_venv(
-                venv_path,
-                build_details_path=build_details_path,
-                sysconfigdata_path=sysconfigdata_path,
-            )
+        create_cross_venv(
+            venv_path,
+            platform=args.platform,
+            arch=args.arch,
+            build_details_path=args.build_details_path,
+            sysconfigdata_path=args.sysconfigdata_path,
+            cache_path=args.cache,
+            with_pip=args.with_pip,
+        )
     except (ValueError, NotImplementedError) as e:
         _error(e)
         sys.exit(1)

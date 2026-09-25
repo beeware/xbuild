@@ -9,6 +9,36 @@ from xpython.__main__ import _parse_args
     ("args", "error"),
     [
         pytest.param(
+            (
+                "--sysconfig",
+                "/path/to/sysconfig.py",
+                "--build-details",
+                "/path/to/build-details.json",
+            ),
+            "not allowed with argument",
+            id="sysconfig-and-build-details",
+        ),
+        pytest.param(
+            ("--sysconfig", "/path/to/sysconfig.py", "--platform", "ios"),
+            "not allowed with argument",
+            id="sysconfig-and-platform",
+        ),
+        pytest.param(
+            ("--build-details", "/path/to/build-details.json", "--platform", "android"),
+            "not allowed with argument",
+            id="build-details-and-platform",
+        ),
+        pytest.param(
+            ("--sysconfig", "/path/to/sysconfig.py", "--arch", "arm64"),
+            "--arch requires --platform",
+            id="sysconfig-and-arch",
+        ),
+        pytest.param(
+            ("--cache", "/path/to/cache", "--sysconfig", "/path/to/sysconfig.py"),
+            "--cache requires --platform",
+            id="sysconfig-and-cache",
+        ),
+        pytest.param(
             [
                 "--platform",
                 "android",
@@ -89,7 +119,7 @@ def test_defaults():
     assert args.simulator is None
     assert args.managed is None
     assert args.connected is None
-    assert args.work_dir is None
+    assert args.work_path is None
     assert args.verbosity == 0
     assert args.forwarded_args == []
 

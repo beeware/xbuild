@@ -7,30 +7,30 @@ from pathlib import Path
 from ..deps import copy_into
 
 
-def testbed_dir(work_dir):
-    return work_dir / "testbed"
+def testbed_path(work_path):
+    return work_path / "testbed"
 
 
-def packages_dir(work_dir):
-    return testbed_dir(work_dir) / "iOSTestbed" / "app_packages"
+def packages_path(work_path):
+    return testbed_path(work_path) / "iOSTestbed" / "app_packages"
 
 
-def setup(archive_dir: Path, work_dir: Path, src_paths: list[Path]):
+def setup(archive_path: Path, work_path: Path, src_paths: list[Path]):
     """Clone the iOS testbed, and stage source files into it.
 
-    :param archive_dir: The extracted iOS Python archive directory
+    :param archive_path: The extracted iOS Python archive directory
         (contains a `testbed/` subdirectory with the testbed driver
         script).
-    :param work_dir: The working directory to clone the testbed into (as
-        `work_dir / "testbed"`).
+    :param work_path: The working directory to clone the testbed into (as
+        `work_path / "testbed"`).
     :param src_paths: Paths to copy into the cloned testbed's
         `iOSTestbed/app/` directory.
     """
     if sys.platform != "darwin":
         raise RuntimeError("Can't run an iOS project on non-macOS hardware.")
 
-    testbed_source = archive_dir / "testbed"
-    testbed_clone = testbed_dir(work_dir)
+    testbed_source = archive_path / "testbed"
+    testbed_clone = testbed_path(work_path)
 
     subprocess.run(
         [sys.executable, str(testbed_source), "clone", str(testbed_clone)],
@@ -42,7 +42,7 @@ def setup(archive_dir: Path, work_dir: Path, src_paths: list[Path]):
 
 
 def run(
-    work_dir: Path,
+    work_path: Path,
     args: list[str],
     simulator: str | None,
     verbose: int,
@@ -50,8 +50,8 @@ def run(
 ) -> int:
     """Run the testbed project inside the iOS Simulator.
 
-    :param work_dir: The working directory to clone the testbed into (as
-        `work_dir / "testbed"`).
+    :param work_path: The working directory to clone the testbed into (as
+        `work_path / "testbed"`).
     :param args: Arguments to pass to the testbed.
     :param simulator: The name of the iOS simulator to use, or `None` to
         use the testbed driver's own default.
@@ -62,7 +62,7 @@ def run(
     if args and (args[0] != "-m" or len(args) < 2):
         raise ValueError("iOS requires -m <module> as the first two arguments after --")
 
-    testbed_clone = testbed_dir(work_dir)
+    testbed_clone = testbed_path(work_path)
 
     run_command = [sys.executable, str(testbed_clone), "run"]
     if simulator is not None:

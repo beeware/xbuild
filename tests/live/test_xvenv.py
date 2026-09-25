@@ -8,7 +8,7 @@ sys/platform/sysconfig metadata against hardcoded ground-truth values.
 
 Requires network access (downloads real Python builds on first run per
 platform/arch/Python-version combination; cached afterwards via the
-existing XBUILD_CACHE/platformdirs resolution in xvenv.fetch.resolve_cache_dir()).
+existing XBUILD_CACHE/platformdirs resolution in xvenv.fetch.resolve_cache_path()).
 """
 
 import os

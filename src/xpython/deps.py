@@ -8,9 +8,9 @@ from pathlib import Path
 from dependency_groups import resolve as resolve_dependency_groups
 
 
-def copy_into(src: Path, dst_dir: Path) -> None:
+def copy_into(src: Path, dst: Path) -> None:
     """Copy `src` (file or directory) into `dst_dir / src.name`."""
-    target = dst_dir / src.name
+    target = dst / src.name
     if src.is_dir():
         shutil.copytree(src, target, dirs_exist_ok=True)
     else:
@@ -60,10 +60,10 @@ def resolve_requirements(
 def install_requirements(
     venv_python: Path,
     requirements: list[str],
-    packages_dir: Path,
+    packages_path: Path,
     find_links: list[str],
 ) -> None:
-    """Install `requirements` into `packages_dir`, using `venv_python`'s
+    """Install `requirements` into `packages_path`, using `venv_python`'s
     own `pip`.
 
     No-op if `requirements` is empty.
@@ -71,7 +71,7 @@ def install_requirements(
     :param venv_python: Path to the Python executable of the (cross-)venv
         whose pip should be used to resolve/install the requirements.
     :param requirements: PEP 508 requirement strings to install.
-    :param packages_dir: The `--target` directory to install into.
+    :param packages_path: The `--target` directory to install into.
     :param find_links: Directories to pass as `--find-links` (searched for
         local wheels before/alongside PyPI).
     :raises subprocess.CalledProcessError: if pip fails.
@@ -79,7 +79,7 @@ def install_requirements(
     if not requirements:
         return
 
-    command = [str(venv_python), "-m", "pip", "install", "--target", str(packages_dir)]
+    command = [str(venv_python), "-m", "pip", "install", "--target", str(packages_path)]
     for directory in find_links:
         command.extend(["--find-links", str(directory)])
     command.extend(requirements)

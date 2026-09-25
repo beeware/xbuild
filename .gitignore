@@ -41,7 +41,8 @@ temp/
 _build
 
 # Agent tooling
-.opencode
 .kilo
-docs/superpowers/
+.opencode
+.superpowers/
 .worktrees/
+docs/superpowers/

@@ -19,20 +19,20 @@ def testbed_layout(tmp_path):
     """Simulate the directory structure run() expects to exist
     after setup(), without actually running the real testbed clone
     subprocess."""
-    work_dir = tmp_path / "work"
-    work_dir.mkdir()
+    work_path = tmp_path / "work"
+    work_path.mkdir()
 
     # Simulate the clone subcommand's effect by pre-creating the app/
     # and app_packages/ directories the real testbed clone would create.
-    app_dir = work_dir / "testbed" / "iOSTestbed" / "app"
-    app_packages_dir = work_dir / "testbed" / "iOSTestbed" / "app_packages"
-    app_dir.mkdir(parents=True)
-    app_packages_dir.mkdir(parents=True)
+    app_path = work_path / "testbed" / "iOSTestbed" / "app"
+    app_packages_path = work_path / "testbed" / "iOSTestbed" / "app_packages"
+    app_path.mkdir(parents=True)
+    app_packages_path.mkdir(parents=True)
 
     return {
-        "work_dir": work_dir,
-        "app_dir": app_dir,
-        "app_packages_dir": app_packages_dir,
+        "work_path": work_path,
+        "app_path": app_path,
+        "app_packages_path": app_packages_path,
     }
 
 
@@ -40,12 +40,12 @@ def testbed_layout(tmp_path):
 def test_testbed_clone_macOS(mock_run, tmp_path):
     """The tesbed and each --src path is copied into the cloned testbed's app/
     directory."""
-    archive_dir = tmp_path / "archive"
-    (archive_dir / "testbed").mkdir(parents=True)
+    archive_path = tmp_path / "archive"
+    (archive_path / "testbed").mkdir(parents=True)
 
-    work_dir = tmp_path / "work"
-    work_dir.mkdir()
-    app_dir = work_dir / "testbed" / "iOSTestbed" / "app"
+    work_path = tmp_path / "work"
+    work_path.mkdir()
+    app_path = work_path / "testbed" / "iOSTestbed" / "app"
 
     for path in ["tests", "deep/other"]:
         src = tmp_path / path
@@ -53,8 +53,8 @@ def test_testbed_clone_macOS(mock_run, tmp_path):
         (src / "test_thing.py").write_text("def test_x(): pass\n")
 
     setup(
-        archive_dir=archive_dir,
-        work_dir=work_dir,
+        archive_path=archive_path,
+        work_path=work_path,
         src_paths=[
             tmp_path / "tests",
             tmp_path / "deep/other",
@@ -64,13 +64,13 @@ def test_testbed_clone_macOS(mock_run, tmp_path):
     # Clone was invoked
     clone_call = mock_run.call_args_list[0]
     args = clone_call.args[0]
-    assert args[:2] == [sys.executable, str(archive_dir / "testbed")]
+    assert args[:2] == [sys.executable, str(archive_path / "testbed")]
     assert args[2] == "clone"
-    assert args[3] == str(work_dir / "testbed")
+    assert args[3] == str(work_path / "testbed")
 
     # The *leaf* folders have been preserved in the final location.
     for path in ["tests", "other"]:
-        copied = app_dir / path / "test_thing.py"
+        copied = app_path / path / "test_thing.py"
         assert copied.is_file()
         assert copied.read_text() == "def test_x(): pass\n"
 
@@ -84,8 +84,8 @@ def test_testbed_clone_non_macOS(tmp_path):
         match=r"Can't run an iOS project on non-macOS hardware.",
     ):
         setup(
-            archive_dir=tmp_path / "archive",
-            work_dir=tmp_path / "work",
+            archive_path=tmp_path / "archive",
+            work_path=tmp_path / "work",
             src_paths=[],
         )
 
@@ -95,7 +95,7 @@ def test_run_with_module_and_args(mock_run, testbed_layout):
     mock_run.return_value = Mock(returncode=3)
 
     result = run(
-        work_dir=testbed_layout["work_dir"],
+        work_path=testbed_layout["work_path"],
         args=["-m", "pytest", "tests", "-v"],
         simulator=None,
         verbose=0,
@@ -105,7 +105,7 @@ def test_run_with_module_and_args(mock_run, testbed_layout):
     mock_run.assert_called_once_with(
         [
             sys.executable,
-            str(testbed_layout["work_dir"] / "testbed"),
+            str(testbed_layout["work_path"] / "testbed"),
             "run",
             "--",
             "pytest",
@@ -122,7 +122,7 @@ def test_run_with_module_and_args(mock_run, testbed_layout):
 def test_args_empty(mock_run, testbed_layout):
     """An empty args list still results in a bare trailing --."""
     run(
-        work_dir=testbed_layout["work_dir"],
+        work_path=testbed_layout["work_path"],
         args=[],
         simulator=None,
         verbose=0,
@@ -131,7 +131,7 @@ def test_args_empty(mock_run, testbed_layout):
     mock_run.assert_called_once_with(
         [
             sys.executable,
-            str(testbed_layout["work_dir"] / "testbed"),
+            str(testbed_layout["work_path"] / "testbed"),
             "run",
             "--",
         ],
@@ -142,7 +142,7 @@ def test_args_empty(mock_run, testbed_layout):
 def test_forwards_simulator_flag(mock_run, testbed_layout):
     """--simulator is forwarded to the run subcommand."""
     run(
-        work_dir=testbed_layout["work_dir"],
+        work_path=testbed_layout["work_path"],
         args=["-m", "pytest"],
         simulator="iPhone 16e",
         verbose=0,
@@ -151,7 +151,7 @@ def test_forwards_simulator_flag(mock_run, testbed_layout):
     mock_run.assert_called_once_with(
         [
             sys.executable,
-            str(testbed_layout["work_dir"] / "testbed"),
+            str(testbed_layout["work_path"] / "testbed"),
             "run",
             "--simulator",
             "iPhone 16e",
@@ -165,7 +165,7 @@ def test_forwards_simulator_flag(mock_run, testbed_layout):
 def test_forwards_verbose_flag(mock_run, testbed_layout, tmp_path):
     """verbose > 0 adds -v to the run subcommand."""
     run(
-        work_dir=testbed_layout["work_dir"],
+        work_path=testbed_layout["work_path"],
         args=["-m", "pytest"],
         simulator=None,
         verbose=1,
@@ -174,7 +174,7 @@ def test_forwards_verbose_flag(mock_run, testbed_layout, tmp_path):
     mock_run.assert_called_once_with(
         [
             sys.executable,
-            str(testbed_layout["work_dir"] / "testbed"),
+            str(testbed_layout["work_path"] / "testbed"),
             "run",
             "-v",
             "--",
@@ -199,7 +199,7 @@ def test_bad_args(mock_run, testbed_layout, args):
         ValueError, match="iOS requires -m <module> as the first two arguments after --"
     ):
         run(
-            work_dir=testbed_layout["work_dir"],
+            work_path=testbed_layout["work_path"],
             args=args,
             simulator=None,
             verbose=0,

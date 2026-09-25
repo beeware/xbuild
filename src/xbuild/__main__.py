@@ -23,7 +23,7 @@ from build._util import _format_dep_chain
 import xbuild
 from xbuild._builder import ProjectXBuilder
 from xbuild.env import XBuildIsolatedEnv
-from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_dir
+from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path
 
 
 def _build(
@@ -309,7 +309,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
 
     try:
         if args.platform is not None:
-            cache_dir = resolve_cache_dir(args.cache)
+            cache_dir = resolve_cache_path(args.cache)
             arch = resolve_arch(args.platform, args.arch)
 
             config_path, is_build_details = fetch_python(args.platform, arch, cache_dir)

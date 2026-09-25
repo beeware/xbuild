@@ -1,6 +1,116 @@
+from unittest.mock import Mock
+
 import pytest
 
-from xvenv.convert import localized_vars
+from xvenv.convert import create_cross_venv, localized_vars
+
+
+@pytest.fixture
+def mock_deps(monkeypatch, tmp_path):
+    # config_path must live under the *resolved cache dir* (tmp_path /
+    # "cache"), not some unrelated directory -- create_cross_venv() derives
+    # archive_path by walking config_path back up to its ancestor directly
+    # under resolved_cache_path, so config_path.relative_to(resolved_cache_path)
+    # must actually succeed.
+    cache_path = tmp_path / "cache"
+    archive_path = cache_path / "python-3.14.7-aarch64-linux-android"
+    config_path = archive_path / "prefix" / "lib" / "python3.14" / "build-details.json"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("{}")
+
+    mocks = {
+        "create": Mock(),
+        "resolve_cache_path": Mock(return_value=cache_path),
+        "resolve_arch": Mock(return_value="aarch64"),
+        "fetch_python": Mock(return_value=(config_path, True)),
+        "convert_venv": Mock(return_value="android aarch64-linux-android"),
+    }
+    monkeypatch.setattr("xvenv.convert.venv.create", mocks["create"])
+    monkeypatch.setattr("xvenv.convert.resolve_cache_path", mocks["resolve_cache_path"])
+    monkeypatch.setattr("xvenv.convert.resolve_arch", mocks["resolve_arch"])
+    monkeypatch.setattr("xvenv.convert.fetch_python", mocks["fetch_python"])
+    monkeypatch.setattr("xvenv.convert.convert_venv", mocks["convert_venv"])
+    mocks["cache_path"] = cache_path
+    mocks["archive_path"] = archive_path
+    return mocks
+
+
+def test_creates_venv_when_missing(tmp_path, mock_deps):
+    """create_cross_venv() creates the venv if it doesn't exist, and returns
+    the description + archive dir."""
+    venv_path = tmp_path / "x-venv"
+
+    result = create_cross_venv(
+        venv_path,
+        platform="android",
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+    )
+
+    mock_deps["create"].assert_called_once_with(venv_path, with_pip=True)
+    mock_deps["resolve_cache_path"].assert_called_once_with(None)
+    mock_deps["resolve_arch"].assert_called_once_with("android", None)
+    mock_deps["fetch_python"].assert_called_once_with(
+        "android", "aarch64", mock_deps["cache_path"]
+    )
+    mock_deps["convert_venv"].assert_called_once()
+    assert result.description == "android aarch64-linux-android"
+    assert result.archive_path == mock_deps["archive_path"]
+
+
+def test_reuses_existing_venv(tmp_path, mock_deps):
+    """create_cross_venv() does not re-create an already-existing venv."""
+    venv_path = tmp_path / "x-venv"
+    venv_path.mkdir()
+
+    create_cross_venv(
+        venv_path,
+        platform="android",
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+    )
+
+    mock_deps["create"].assert_not_called()
+
+
+def test_without_pip_passthrough(tmp_path, mock_deps):
+    """with_pip=False is passed through to venv.create()."""
+    venv_path = tmp_path / "x-venv"
+
+    create_cross_venv(
+        venv_path,
+        platform="android",
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+        with_pip=False,
+    )
+
+    mock_deps["create"].assert_called_once_with(venv_path, with_pip=False)
+
+
+def test_archive_path_derived_from_config_path(tmp_path, mock_deps):
+    """archive_path is the top-level extracted directory, not the config
+    file's immediate parent -- i.e. it walks back up to the directory
+    fetch_python() extracted the archive into."""
+    venv_path = tmp_path / "x-venv"
+
+    result = create_cross_venv(
+        venv_path,
+        platform="android",
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+    )
+
+    # The fixture's config_path is archive_path/prefix/lib/python3.14/build-details.json
+    assert result.archive_path == mock_deps["archive_path"]
 
 
 @pytest.mark.parametrize(
