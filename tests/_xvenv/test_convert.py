@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -23,6 +24,7 @@ def mock_deps(monkeypatch, tmp_path):
         "resolve_cache_path": Mock(return_value=cache_path),
         "resolve_arch": Mock(return_value="aarch64"),
         "fetch_python": Mock(return_value=(config_path, True)),
+        "use_archive_path": Mock(return_value=(config_path, True)),
         "convert_venv": Mock(
             return_value=CrossVenv(
                 platform="Android",
@@ -36,6 +38,7 @@ def mock_deps(monkeypatch, tmp_path):
     monkeypatch.setattr("xvenv.convert.resolve_cache_path", mocks["resolve_cache_path"])
     monkeypatch.setattr("xvenv.convert.resolve_arch", mocks["resolve_arch"])
     monkeypatch.setattr("xvenv.convert.fetch_python", mocks["fetch_python"])
+    monkeypatch.setattr("xvenv.convert.use_archive_path", mocks["use_archive_path"])
     monkeypatch.setattr("xvenv.convert.convert_venv", mocks["convert_venv"])
     mocks["cache_path"] = cache_path
     mocks["archive_path"] = archive_path
@@ -208,3 +211,58 @@ def test_missing_cc_key():
     result = localized_vars(orig_vars, "/slice/path")
 
     assert result["BINDIR"] == "/slice/path/bin"
+
+
+def test_archive_path_routes_to_use_archive_path(tmp_path, mock_deps):
+    """When archive_path is given, use_archive_path() is called instead of
+    resolve_cache_path()/fetch_python(), and the result flows into
+    convert_venv() the same way fetch_python()'s result would."""
+    venv_path = tmp_path / "x-venv"
+    supplied_archive = tmp_path / "my-existing-build"
+    supplied_archive.mkdir()
+
+    create_cross_venv(
+        venv_path,
+        platform="android",
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+        archive_path=supplied_archive,
+    )
+
+    mock_deps["resolve_cache_path"].assert_not_called()
+    mock_deps["fetch_python"].assert_not_called()
+    mock_deps["use_archive_path"].assert_called_once_with(
+        "android", "aarch64", supplied_archive.resolve()
+    )
+    mock_deps["convert_venv"].assert_called_once()
+
+
+def test_archive_path_is_resolved(tmp_path, mock_deps):
+    """A relative archive_path is resolved to an absolute path before being
+    passed to use_archive_path(), matching how build_details_path/
+    sysconfigdata_path are already resolved elsewhere in this function."""
+    venv_path = tmp_path / "x-venv"
+    (tmp_path / "relative-build").mkdir()
+
+    import os
+
+    old_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        create_cross_venv(
+            venv_path,
+            platform="android",
+            arch=None,
+            build_details_path=None,
+            sysconfigdata_path=None,
+            cache_path=None,
+            archive_path=Path("relative-build"),
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    mock_deps["use_archive_path"].assert_called_once_with(
+        "android", "aarch64", tmp_path / "relative-build"
+    )

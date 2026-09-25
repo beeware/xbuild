@@ -10,7 +10,7 @@ from importlib import import_module
 from importlib import util as importlib_util
 from pathlib import Path, PurePosixPath
 
-from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path
+from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path, use_archive_path
 
 
 @dataclasses.dataclass(frozen=True)
@@ -44,6 +44,7 @@ def create_cross_venv(
     build_details_path: Path | None,
     sysconfigdata_path: Path | None,
     cache_path: Path | None,
+    archive_path: Path | None = None,
     with_pip: bool = True,
 ) -> Path:
     """Create (if `venv_path` doesn't already exist) and convert a virtual
@@ -62,13 +63,17 @@ def create_cross_venv(
         Ignored if `platform` is specified.
     :param cache_path: The directory to use for caching downloaded Python builds,
         or `None` to use the default resolution order (see
-        `xvenv.fetch.resolve_cache_path()`).
+        `xvenv.fetch.resolve_cache_path()`). Ignored if `archive_path` is given.
+    :param archive_path: The path to an already-extracted Python build to use
+        instead of downloading one, or `None` to download (and cache) as
+        usual. Ignored if `platform` is not specified.
     :param with_pip: Whether to install pip when creating the venv. Only
         relevant if `venv_path` doesn't already exist.
     :returns: A `CrossVenv` describing the resulting venv and the archive
         directory the target Python build was extracted into.
     :raises ValueError: on an unknown/unsupported arch, or any other error
-        `resolve_arch()`, `fetch_python()`, or `convert_venv()` raise.
+        `resolve_arch()`, `fetch_python()`, `use_archive_path()`, or
+        `convert_venv()` raise.
     :raises NotImplementedError: if `platform`/`arch` isn't supported for
         download yet (e.g. emscripten).
     """
@@ -76,12 +81,17 @@ def create_cross_venv(
         venv.create(venv_path, with_pip=with_pip)
 
     if platform is not None:
-        resolved_cache_path = resolve_cache_path(cache_path)
         resolved_arch = resolve_arch(platform, arch)
 
-        config_path, is_build_details = fetch_python(
-            platform, resolved_arch, resolved_cache_path
-        )
+        if archive_path is not None:
+            config_path, is_build_details = use_archive_path(
+                platform, resolved_arch, Path(archive_path).resolve()
+            )
+        else:
+            resolved_cache_path = resolve_cache_path(cache_path)
+            config_path, is_build_details = fetch_python(
+                platform, resolved_arch, resolved_cache_path
+            )
 
         resolved_build_details_path = config_path if is_build_details else None
         resolved_sysconfigdata_path = None if is_build_details else config_path
