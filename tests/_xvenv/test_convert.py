@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from xvenv.convert import create_cross_venv, localized_vars
+from xvenv.convert import CrossVenv, create_cross_venv, localized_vars
 
 
 @pytest.fixture
@@ -23,7 +23,14 @@ def mock_deps(monkeypatch, tmp_path):
         "resolve_cache_path": Mock(return_value=cache_path),
         "resolve_arch": Mock(return_value="aarch64"),
         "fetch_python": Mock(return_value=(config_path, True)),
-        "convert_venv": Mock(return_value=("Android", "aarch64-linux-android")),
+        "convert_venv": Mock(
+            return_value=CrossVenv(
+                platform="Android",
+                arch="aarch64-linux-android",
+                archive_path=archive_path,
+                venv_path=tmp_path / "x-venv",
+            )
+        ),
     }
     monkeypatch.setattr("xvenv.convert.venv.create", mocks["create"])
     monkeypatch.setattr("xvenv.convert.resolve_cache_path", mocks["resolve_cache_path"])

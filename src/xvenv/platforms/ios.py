@@ -40,6 +40,12 @@ def download_url(version_info: tuple, arch: str) -> str:
     )
 
 
+def archive_path(path: Path) -> Path:
+    """Determine the root of the Python archive based on the location of a
+    build_details.json/sysconfigdata.py file."""
+    return path.parents[4]
+
+
 def config_path(extracted_dir: Path, version_info: tuple, arch: str) -> Path:
     """Locate the sysconfig/build-details file inside an extracted iOS
     XCframework archive.

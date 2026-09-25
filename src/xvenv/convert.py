@@ -14,7 +14,7 @@ from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path
 
 
 @dataclasses.dataclass(frozen=True)
-class CrossVenvResult:
+class CrossVenv:
     """The result of creating (or reusing) a cross-platform venv.
 
     :param platform: The platform for the cross venv.
@@ -65,7 +65,7 @@ def create_cross_venv(
         `xvenv.fetch.resolve_cache_path()`).
     :param with_pip: Whether to install pip when creating the venv. Only
         relevant if `venv_path` doesn't already exist.
-    :returns: A `CrossVenvResult` describing the resulting venv and the archive
+    :returns: A `CrossVenv` describing the resulting venv and the archive
         directory the target Python build was extracted into.
     :raises ValueError: on an unknown/unsupported arch, or any other error
         `resolve_arch()`, `fetch_python()`, or `convert_venv()` raise.
@@ -83,11 +83,6 @@ def create_cross_venv(
             platform, resolved_arch, resolved_cache_path
         )
 
-        # archive_path is the single path component directly under
-        # resolved_cache_path that is an ancestor of config_path.
-        relative = config_path.relative_to(resolved_cache_path)
-        archive_path = resolved_cache_path / relative.parts[0]
-
         resolved_build_details_path = config_path if is_build_details else None
         resolved_sysconfigdata_path = None if is_build_details else config_path
 
@@ -99,17 +94,10 @@ def create_cross_venv(
             Path(sysconfigdata_path).resolve() if sysconfigdata_path else None
         )
 
-    platform, arch = convert_venv(
+    return convert_venv(
         venv_path,
         build_details_path=resolved_build_details_path,
         sysconfigdata_path=resolved_sysconfigdata_path,
-    )
-
-    return CrossVenvResult(
-        platform=platform,
-        arch=arch,
-        archive_path=archive_path,
-        venv_path=venv_path,
     )
 
 
@@ -222,7 +210,7 @@ def convert_venv(
     venv_path: Path,
     build_details_path: Path | None,
     sysconfigdata_path: Path | None,
-) -> tuple[str, str]:
+) -> CrossVenv:
     """Convert a virtual environment into a cross-platform environment.
 
     :param venv_path: The path to the root of the venv.
@@ -230,8 +218,7 @@ def convert_venv(
         target platform.
     :param sysconfigdata_path: The path to the sysconfigdata python file for the
         target platform.
-    :returns: A (platform, arch) pair for the new cross-platform environment
-        (e.g., ("iOS", "arm64-iphonesimulator")
+    :returns: A CrossVEnv value describing the environment that was created.
     """
     if not venv_path.exists():
         raise ValueError(f"Virtual environment {venv_path} does not exist.")
@@ -335,11 +322,14 @@ def convert_venv(
             build_details = platform_module.build_details_from_sysconfigdata(
                 sysconfigdata
             )
+            archive_path = platform_module.archive_path(sysconfigdata_path)
+        else:
+            archive_path = platform_module.archive_path(build_details_path)
 
         platform_module.extend_context(context, build_details)
     except ImportError:
         raise ValueError(
-            f"Don't know how to build a cross-venv file for {platform}"
+            f"Don't know how to build a cross-venv for {platform}"
         ) from None
 
     cross_multiarch = f"_cross_{platform}_{multiarch.replace('-', '_')}"
@@ -354,4 +344,9 @@ def convert_venv(
         f"import {cross_multiarch}\n"
     )
 
-    return context["os"], multiarch
+    return CrossVenv(
+        platform=context["os"],
+        arch=multiarch,
+        archive_path=archive_path,
+        venv_path=venv_path,
+    )
