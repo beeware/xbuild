@@ -40,6 +40,7 @@ classifiers = [
 ]
 dependencies = [
     "build >= 1.6.0",
+    "dependency-groups",
     "platformdirs",
     "filelock",
 ]
@@ -59,6 +60,7 @@ virtualenv = [
 [project.scripts]
 xbuild = "xbuild.__main__:entrypoint"
 xvenv = "xvenv.__main__:entrypoint"
+xpython = "xpython.__main__:entrypoint"
 
 [project.urls]
 Project = "https://github.com/beeware/xbuild"
@@ -99,11 +101,17 @@ testpaths = ["tests"]
 filterwarnings = [
     "error",
 ]
+markers = [
+    "live: mark a test as a live (slow) test.",
+    "iOS: mark test as iOS specific.",
+    "android: mark test as Android specific.",
+]
 
 [tool.check-wheel-contents]
 toplevel = [
     "xbuild",
     "xvenv",
+    "xpython",
 ]
 
 [tool.ruff.lint]
@@ -128,6 +136,7 @@ extend-select = [
 known-first-party = [
     "xbuild",
     "xvenv",
+    "xpython",
 ]
 known-third-party = [
     "build",

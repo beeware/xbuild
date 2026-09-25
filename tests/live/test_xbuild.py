@@ -1,5 +1,6 @@
 """Live, end-to-end verification that `xbuild` can build a real binary
-wheel for a project containing a C extension.
+wheel for a project containing a C extension, and that `xpython` can run
+a test suite for that binary wheel.
 
 Drives the real `xbuild` CLI (no mocking) against a real downloaded target
 Python build, for the default/host-native architecture of each supported
@@ -36,7 +37,9 @@ import pytest
 
 from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_dir
 
-SAMPLE_PROJECT = Path(__file__).parents[1] / "samples" / "test1"
+SAMPLE_PROJECTS = [
+    pytest.param(Path(__file__).parents[1] / "samples" / "test1", id="test1"),
+]
 
 CASES = [
     pytest.param(
@@ -47,6 +50,7 @@ CASES = [
                 sys.platform != "darwin",
                 reason="iOS tests can only be run on macOS",
             ),
+            pytest.mark.iOS,
         ],
     ),
     pytest.param(
@@ -61,6 +65,7 @@ CASES = [
                 sys.version_info < (3, 13),
                 reason="Android tests require Python 3.13+",
             ),
+            pytest.mark.android,
         ],
     ),
 ]
@@ -216,8 +221,10 @@ def _build_env_android(config_path, arch):
     return {**os.environ, **sourced}
 
 
+@pytest.mark.live
 @pytest.mark.parametrize("platform_name", CASES)
-def test_build_wheel(tmp_path, platform_name):
+@pytest.mark.parametrize("sample_project", SAMPLE_PROJECTS)
+def test_build_wheel(tmp_path, platform_name, sample_project):
     """xbuild can build a real binary wheel for a project containing a C
     extension, for the default arch of the current host."""
     # Fail fast on preconditions that don't require a download first.
@@ -227,8 +234,8 @@ def test_build_wheel(tmp_path, platform_name):
     cache_dir = resolve_cache_dir(None)
     config_path, _ = fetch_python(platform_name, arch, cache_dir)
 
-    project_dir = tmp_path / "test1"
-    shutil.copytree(SAMPLE_PROJECT, project_dir)
+    project_dir = tmp_path / sample_project.name
+    shutil.copytree(sample_project, project_dir)
     out_dir = tmp_path / "dist"
 
     env = _build_env(platform_name, config_path, arch)
@@ -238,15 +245,11 @@ def test_build_wheel(tmp_path, platform_name):
             sys.executable,
             "-m",
             "xbuild",
-            str(project_dir),
+            project_dir,
             "--platform",
             platform_name,
-            "--arch",
-            arch,
-            "--cache",
-            str(cache_dir),
             "-o",
-            str(out_dir),
+            out_dir,
         ],
         env=env,
         check=True,
@@ -257,3 +260,41 @@ def test_build_wheel(tmp_path, platform_name):
     assert not wheels[0].name.endswith("-none-any.whl"), (
         f"{wheels[0].name} is not a binary wheel"
     )
+
+    # Now run the test suite for the project, installing the 'test' dependency
+    # group, and installing the binary wheel from the build output directory.
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "xpython",
+                "--platform",
+                platform_name,
+                "--src",
+                project_dir / "tests",
+                "--group",
+                "test",
+                "--dependency",
+                sample_project.name,
+                "--find-links",
+                out_dir,
+                "--",
+                "-m",
+                "pytest",
+                "tests",
+            ],
+            env=env,
+            check=True,
+        )
+        assert result.returncode == 0
+    except subprocess.CalledProcessError:
+        # Android tests can't be run in CI on macOS because GitHub Actions doesn't
+        # support acceleration.
+        is_ci = "GITHUB_ACTIONS" in os.environ
+        is_android = platform_name == "android"
+        is_macOS = sys.platform == "darwin"
+        if is_ci and is_android and is_macOS:
+            print("Running on GitHub Actions; Android xpython test aborted.")
+        else:
+            raise

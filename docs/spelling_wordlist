@@ -3,6 +3,7 @@ BeeWare
 Bugfixes
 Emscripten
 frontend
+Gradle
 Homebrew
 JDK
 JSON
@@ -14,6 +15,8 @@ pre
 PyPI
 README
 SDK
+testbed
+testbed's
 toga
 towncrier
 WASM

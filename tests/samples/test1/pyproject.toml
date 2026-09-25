@@ -7,6 +7,11 @@ name = "test1"
 version = "0.1.0"
 requires-python = ">=3.11"
 
+[dependency-groups]
+test = [
+    "pytest"
+]
+
 [tool.setuptools]
 ext-modules = [
     {name = "test1._native", sources=["src/test1/_native.c"]}

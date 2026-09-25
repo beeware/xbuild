@@ -8,6 +8,7 @@ __pycache__/
 
 # Environments
 venv/
+.venv
 
 # Distribution / packaging
 build/lib/
