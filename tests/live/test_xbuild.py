@@ -288,7 +288,7 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
             check=True,
         )
         assert result.returncode == 0
-    except RuntimeError:
+    except subprocess.CalledProcessError:
         # Android tests can't be run in CI on macOS because GitHub Actions doesn't
         # support acceleration.
         is_ci = "GITHUB_ACTIONS" in os.environ
