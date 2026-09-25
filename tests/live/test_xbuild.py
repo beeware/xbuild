@@ -7,7 +7,7 @@ Python build, for the default/host-native architecture of each supported
 platform. Requires network access (downloads real Python builds on first
 run per platform/Python-version combination; cached afterwards via the
 existing XBUILD_CACHE/platformdirs resolution in
-xvenv.fetch.resolve_cache_dir()).
+xvenv.fetch.resolve_cache_path()).
 
 Unlike tests/live/test_xvenv.py (which only exercises xvenv's venv
 metadata patching), this test performs a *real compilation* of a C
@@ -35,7 +35,7 @@ from pathlib import Path
 
 import pytest
 
-from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_dir
+from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path
 
 SAMPLE_PROJECTS = [
     pytest.param(Path(__file__).parents[1] / "samples" / "test1", id="test1"),
@@ -231,7 +231,7 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
     _check_preconditions(platform_name)
 
     arch = resolve_arch(platform_name, None)
-    cache_dir = resolve_cache_dir(None)
+    cache_dir = resolve_cache_path(None)
     config_path, _ = fetch_python(platform_name, arch, cache_dir)
 
     project_dir = tmp_path / sample_project.name

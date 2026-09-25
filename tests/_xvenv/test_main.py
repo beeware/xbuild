@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -11,14 +12,10 @@ def venv_path(tmp_path):
 
 
 @pytest.fixture
-def mock_create(monkeypatch):
-    create = Mock()
-    monkeypatch.setattr("xvenv.__main__.venv.create", create)
-    monkeypatch.setattr(
-        "xvenv.__main__.convert_venv",
-        Mock(return_value="test"),
-    )
-    return create
+def mock_create_cross_venv(monkeypatch):
+    create_cross_venv = Mock()
+    monkeypatch.setattr("xvenv.__main__.create_cross_venv", create_cross_venv)
+    return create_cross_venv
 
 
 @pytest.mark.parametrize(
@@ -68,20 +65,77 @@ def test_invalid_args(args, error, tmp_path, capsys):
 @pytest.mark.parametrize(
     ("args", "already_exists", "create_kwargs"),
     [
-        ([], False, {"with_pip": True}),
-        (["--without-pip"], False, {"with_pip": False}),
-        ([], True, None),
+        pytest.param(
+            ["--platform", "android"],
+            False,
+            {
+                "platform": "android",
+                "with_pip": True,
+            },
+            id="platform",
+        ),
+        pytest.param(
+            ["--platform", "android", "--without-pip"],
+            False,
+            {
+                "platform": "android",
+                "with_pip": False,
+            },
+            id="no-pip",
+        ),
+        pytest.param(
+            ["--platform", "android", "--arch", "arm64_v8a"],
+            False,
+            {
+                "platform": "android",
+                "arch": "arm64_v8a",
+            },
+            id="platform-with-arch",
+        ),
+        pytest.param(
+            ["--platform", "android", "--cache", "path/to/cache"],
+            False,
+            {
+                "platform": "android",
+                "cache_path": Path("path/to/cache"),
+            },
+            id="cache",
+        ),
+        pytest.param(
+            ["--build-details", "path/to/build-config.json"],
+            True,
+            {"build_details_path": Path("path/to/build-config.json")},
+            id="build-details",
+        ),
+        pytest.param(
+            ["--sysconfig", "path/to/sysconfigdata.py"],
+            False,
+            {"sysconfigdata_path": Path("path/to/sysconfigdata.py")},
+            id="sysconfig",
+        ),
     ],
 )
-def test_valid_args(venv_path, mock_create, args, already_exists, create_kwargs):
+def test_valid_args(
+    venv_path,
+    mock_create_cross_venv,
+    args,
+    already_exists,
+    create_kwargs,
+):
     """Verify some valid argument cases."""
     # If the venv should already exist, create it
     if already_exists:
         venv_path.mkdir()
 
-    main(["--build-details", "path/to/build-config.json", *args, str(venv_path)])
+    main([*args, str(venv_path)])
 
-    if create_kwargs is None:
-        mock_create.assert_not_called()
-    else:
-        mock_create.assert_called_once_with(venv_path, **create_kwargs)
+    kwargs = {
+        "platform": None,
+        "arch": None,
+        "build_details_path": None,
+        "sysconfigdata_path": None,
+        "cache_path": None,
+        "with_pip": True,
+    }
+    kwargs.update(create_kwargs)
+    mock_create_cross_venv.assert_called_once_with(venv_path, **kwargs)

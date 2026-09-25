@@ -7,53 +7,53 @@ import pytest
 from xvenv.fetch import (
     fetch_python,
     resolve_arch,
-    resolve_cache_dir,
+    resolve_cache_path,
 )
 
 from ..utils import VersionInfo, _make_archive
 
 
-def test_resolve_cache_dir_explicit_arg_wins(tmp_path, monkeypatch):
+def test_resolve_cache_path_explicit_arg_wins(tmp_path, monkeypatch):
     """An explicit cache directory takes precedence."""
     monkeypatch.setenv("XBUILD_CACHE", str(tmp_path / "from-env"))
     explicit = tmp_path / "from-arg"
 
-    result = resolve_cache_dir(explicit)
+    result = resolve_cache_path(explicit)
 
     assert result == explicit
     assert explicit.is_dir()
 
 
-def test_resolve_cache_dir_env_var_used_when_no_arg(tmp_path, monkeypatch):
+def test_resolve_cache_path_env_var_used_when_no_arg(tmp_path, monkeypatch):
     """The environment variable takes precedence if there's no explicit cache dir."""
     from_env = tmp_path / "from-env"
     monkeypatch.setenv("XBUILD_CACHE", str(from_env))
 
-    result = resolve_cache_dir(None)
+    result = resolve_cache_path(None)
 
     assert result == from_env
     assert from_env.is_dir()
 
 
-def test_resolve_cache_dir_falls_back_to_platformdirs(tmp_path, monkeypatch):
+def test_resolve_cache_path_falls_back_to_platformdirs(tmp_path, monkeypatch):
     """Platformdirs is used if there's no explicit location or environment variable."""
     monkeypatch.delenv("XBUILD_CACHE", raising=False)
     fallback = tmp_path / "platformdirs-cache"
     monkeypatch.setattr(platformdirs, "user_cache_dir", lambda appname: str(fallback))
 
-    result = resolve_cache_dir(None)
+    result = resolve_cache_path(None)
 
     assert result == fallback
     assert fallback.is_dir()
 
 
-def test_resolve_cache_dir_creates_missing_directory(tmp_path, monkeypatch):
+def test_resolve_cache_path_creates_missing_directory(tmp_path, monkeypatch):
     """The cache directory will be created if it doesn't exist yet."""
     monkeypatch.delenv("XBUILD_CACHE", raising=False)
     target = tmp_path / "does" / "not" / "exist" / "yet"
     assert not target.is_dir()
 
-    result = resolve_cache_dir(target)
+    result = resolve_cache_path(target)
 
     assert result == target
     assert target.is_dir()

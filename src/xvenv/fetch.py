@@ -12,7 +12,7 @@ import platformdirs
 from filelock import FileLock
 
 
-def resolve_cache_dir(cache_arg: Path | None) -> Path:
+def resolve_cache_path(cache_arg: Path | None) -> Path:
     """Resolve the cache directory to use for downloaded Python builds.
 
     Priority order:
@@ -27,14 +27,14 @@ def resolve_cache_dir(cache_arg: Path | None) -> Path:
     :returns: The resolved cache directory.
     """
     if cache_arg is not None:
-        cache_dir = Path(cache_arg)
+        cache_path = Path(cache_arg)
     elif (env_cache := os.environ.get("XBUILD_CACHE")) is not None:
-        cache_dir = Path(env_cache)
+        cache_path = Path(env_cache)
     else:
-        cache_dir = Path(platformdirs.user_cache_dir("xbuild"))
+        cache_path = Path(platformdirs.user_cache_dir("xbuild"))
 
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir
+    cache_path.mkdir(parents=True, exist_ok=True)
+    return cache_path
 
 
 _RELEASELEVEL_SUFFIX = {
@@ -81,14 +81,14 @@ def _current_version_info():
     return sys.version_info
 
 
-def fetch_python(platform_name: str, arch: str, cache_dir: Path) -> tuple[Path, bool]:
+def fetch_python(platform_name: str, arch: str, cache_path: Path) -> tuple[Path, bool]:
     """Download (if not already cached) and locate the sysconfig/build-details
     file for a target platform/arch's Python build.
 
     :param platform_name: One of `"ios"`, `"android"`, `"emscripten"`.
     :param arch: The target architecture.
-    :param cache_dir: The (already-resolved, already-existing) cache
-        directory to use — see :func:`resolve_cache_dir`.
+    :param cache_path: The (already-resolved, already-existing) cache
+        directory to use — see :func:`resolve_cache_path`.
     :returns: A tuple of `(config_path, is_build_details)`, where
         `is_build_details` is `True` if `config_path` is a
         `build-details.json` file, `False` if it's a legacy
@@ -101,10 +101,10 @@ def fetch_python(platform_name: str, arch: str, cache_dir: Path) -> tuple[Path, 
 
     archive_name = url.rsplit("/", 1)[-1]
     extracted_name = archive_name[: -len(".tar.gz")]
-    extracted_dir = cache_dir / extracted_name
+    extracted_path = cache_path / extracted_name
 
-    if not extracted_dir.is_dir():
-        archive_path = cache_dir / archive_name
+    if not extracted_path.is_dir():
+        archive_path = cache_path / archive_name
         with FileLock(str(archive_path) + ".lock"):
             if archive_path.is_file():
                 print(f"Cached {archive_name} exists.")
@@ -118,14 +118,14 @@ def fetch_python(platform_name: str, arch: str, cache_dir: Path) -> tuple[Path, 
                     raise ValueError(f"Failed to download {url}: {e}") from e
 
         # NOTE: if extraction fails partway (disk full, corrupt archive),
-        # extracted_dir already exists and will be treated as a valid cache
+        # extracted_path already exists and will be treated as a valid cache
         # hit on retry. No rollback/cleanup on partial failure -- delete the
         # cache directory manually to retry a failed download.
         print(f"Extracting {archive_name}...", end="", flush=True)
-        extracted_dir.mkdir()
+        extracted_path.mkdir()
         with tarfile.open(archive_path) as tar:
-            tar.extractall(extracted_dir, filter="data")
+            tar.extractall(extracted_path, filter="data")
         print(" done.")
 
-    config_file = platform_module.config_path(extracted_dir, version_info, arch)
+    config_file = platform_module.config_path(extracted_path, version_info, arch)
     return config_file, config_file.name == "build-details.json"

@@ -93,7 +93,9 @@ def test_platform_arg_defines_both_config_path_variables(tmp_path, monkeypatch):
         "xbuild.__main__.fetch_python",
         lambda platform_name, arch, cache_dir: (tmp_path / "build-details.json", True),
     )
-    monkeypatch.setattr("xbuild.__main__.resolve_cache_dir", lambda cache_arg: tmp_path)
+    monkeypatch.setattr(
+        "xbuild.__main__.resolve_cache_path", lambda cache_arg: tmp_path
+    )
     monkeypatch.setattr(
         "xbuild.__main__.resolve_arch",
         lambda platform_name, arch: "arm64-iphonesimulator",

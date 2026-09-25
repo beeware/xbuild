@@ -8,44 +8,43 @@ from pathlib import Path
 from ..deps import copy_into
 
 
-def packages_dir(work_dir):
-    return work_dir / "site-packages"
+def packages_path(work_path):
+    return work_path / "site-packages"
 
 
 def setup(
-    archive_dir: Path,
-    work_dir: Path,
+    archive_path: Path,
+    work_path: Path,
     src_paths: list[Path],
 ) -> int:
     """Clone the Android testbed, and stage source files into it.
 
-    :param archive_dir: The extracted iOS Python archive directory
+    :param archive_path: The extracted Android Python archive directory
         (contains a `testbed/` subdirectory with the testbed driver
         script).
-    :param work_dir: The working directory to clone the testbed into (as
-        `work_dir / "testbed"`).
+    :param work_path: The working directory to clone the testbed into.
     :param src_paths: Paths to copy into the cloned testbed's src directory.
-    :raises RuntimeError: if running on macOS
+    :raises RuntimeError: if running on GitHub actions on a macOS runner.
     """
     if sys.platform == "darwin" and "GITHUB_ACTIONS" in os.environ:
         raise RuntimeError(
             "GitHub Actions can't start an Android emulator on a macOS runner."
         )
 
-    src_dir = work_dir / "src"
-    src_dir.mkdir(parents=True, exist_ok=True)
+    src_path = work_path / "src"
+    src_path.mkdir(parents=True, exist_ok=True)
 
-    copy_into(archive_dir / "android.py", work_dir)
-    copy_into(archive_dir / "testbed", work_dir)
-    (work_dir / "prefix").symlink_to(archive_dir / "prefix")
-    (work_dir / "android-env.sh").symlink_to(archive_dir / "android-env.sh")
+    copy_into(archive_path / "android.py", work_path)
+    copy_into(archive_path / "testbed", work_path)
+    (work_path / "prefix").symlink_to(archive_path / "prefix")
+    (work_path / "android-env.sh").symlink_to(archive_path / "android-env.sh")
 
     for src in src_paths:
-        copy_into(src, src_dir)
+        copy_into(src, src_path)
 
 
 def run(
-    work_dir: Path,
+    work_path: Path,
     args: list[str],
     managed: str | None,
     connected: str | None,
@@ -54,8 +53,8 @@ def run(
 ) -> int:
     """Run the testbed project on an Android emulator/device..
 
-    :param work_dir: The working directory to build staging directories
-        in (`work_dir / "site-packages"`, `work_dir / "cwd"`).
+    :param work_path: The working directory to build staging directories
+        in (`work_path / "site-packages"`, `work_path / "cwd"`).
     :param args: Arguments to pass to the testbed process. Accepts any
         argument list starting with `-c`/`-m`; defaults to `-m test`
         if `args` is empty.
@@ -88,12 +87,12 @@ def run(
         )
 
     command = [
-        str(work_dir / "android.py"),
+        str(work_path / "android.py"),
         "test",
         "--site-packages",
-        str(packages_dir(work_dir)),
+        str(packages_path(work_path)),
         "--cwd",
-        str(work_dir / "src"),
+        str(work_path / "src"),
     ]
     if connected is not None:
         command.extend(["--connected", connected])
