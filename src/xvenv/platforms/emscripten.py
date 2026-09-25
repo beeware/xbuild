@@ -1,3 +1,5 @@
+from pathlib import Path
+
 VALID_ARCHES = ["wasm32"]
 DEFAULT_ARCH = {
     # Linux architectures
@@ -53,7 +55,15 @@ def download_url(version_info: tuple, arch: str) -> str:
     )
 
 
-def config_path(extracted_dir, version_info, arch: str):
+def archive_path(path: Path) -> Path:
+    """Determine the root of the Python archive based on the location of a
+    build_details.json/sysconfigdata.py file."""
+    raise NotImplementedError(
+        "xvenv does not yet know how to configure a Python build for emscripten."
+    )
+
+
+def config_path(extracted_path: Path, version_info, arch: str):
     raise NotImplementedError(
         "xvenv does not yet know how to configure a Python build for emscripten."
     )

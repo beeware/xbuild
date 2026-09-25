@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pytest
 
 from xbuild.__main__ import main
@@ -47,6 +49,16 @@ from xbuild.__main__ import main
             ),
             "not allowed with argument",
             id="config-and-config-json",
+        ),
+        pytest.param(
+            ("--cache", "/path/to/cache", "--archive", "/path/to/archive"),
+            "not allowed with argument",
+            id="cache-and-archive",
+        ),
+        pytest.param(
+            ("--archive", "/path/to/archive", "--sysconfig", "/path/to/sysconfig.py"),
+            "--archive requires --platform",
+            id="sysconfig-and-archive",
         ),
     ],
 )
@@ -104,5 +116,60 @@ def test_platform_arg_defines_both_config_path_variables(tmp_path, monkeypatch):
 
     main(["--platform", "ios", str(tmp_path)])
 
+    assert calls["build_details_path"] == tmp_path / "build-details.json"
+    assert calls["sysconfigdata_path"] is None
+
+
+def test_archive_arg_uses_use_archive_path_not_fetch_python(tmp_path, monkeypatch):
+    """--archive routes through use_archive_path(), not fetch_python()/
+    resolve_cache_path(), and still correctly binds build_details_path/
+    sysconfigdata_path."""
+    calls = {}
+
+    def fake_build(
+        isolation,
+        srcdir,
+        outdir,
+        distribution,
+        config_settings,
+        skip_dependency_check,
+        installer,
+        build_details_path,
+        sysconfigdata_path,
+    ):
+        calls["build_details_path"] = build_details_path
+        calls["sysconfigdata_path"] = sysconfigdata_path
+        return "fake-wheel-0.1.0-py3-none-any.whl"
+
+    fetch_python_mock = Mock()
+    resolve_cache_path_mock = Mock()
+
+    monkeypatch.setattr("xbuild.__main__.fetch_python", fetch_python_mock)
+    monkeypatch.setattr("xbuild.__main__.resolve_cache_path", resolve_cache_path_mock)
+    monkeypatch.setattr(
+        "xbuild.__main__.use_archive_path",
+        lambda platform_name, arch, archive_path: (
+            tmp_path / "build-details.json",
+            True,
+        ),
+    )
+    monkeypatch.setattr(
+        "xbuild.__main__.resolve_arch",
+        lambda platform_name, arch: "arm64-iphonesimulator",
+    )
+    monkeypatch.setattr("xbuild.__main__._build", fake_build)
+
+    main(
+        [
+            "--platform",
+            "ios",
+            "--archive",
+            str(tmp_path / "my-archive"),
+            str(tmp_path),
+        ]
+    )
+
+    fetch_python_mock.assert_not_called()
+    resolve_cache_path_mock.assert_not_called()
     assert calls["build_details_path"] == tmp_path / "build-details.json"
     assert calls["sysconfigdata_path"] is None

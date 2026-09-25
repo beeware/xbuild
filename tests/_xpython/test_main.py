@@ -1,8 +1,9 @@
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
-from xpython.__main__ import _parse_args
+from xpython.__main__ import _parse_args, _run
 
 
 @pytest.mark.parametrize(
@@ -37,6 +38,16 @@ from xpython.__main__ import _parse_args
             ("--cache", "/path/to/cache", "--sysconfig", "/path/to/sysconfig.py"),
             "--cache requires --platform",
             id="sysconfig-and-cache",
+        ),
+        pytest.param(
+            ("--cache", "/path/to/cache", "--archive", "/path/to/archive"),
+            "not allowed with argument",
+            id="cache-and-archive",
+        ),
+        pytest.param(
+            ("--archive", "/path/to/archive", "--sysconfig", "/path/to/sysconfig.py"),
+            "--archive requires --platform",
+            id="sysconfig-and-archive",
         ),
         pytest.param(
             [
@@ -112,6 +123,7 @@ def test_defaults():
     assert args.platform == "android"
     assert args.arch is None
     assert args.cache is None
+    assert args.archive is None
     assert args.dependencies == []
     assert args.groups == []
     assert args.find_links == []
@@ -198,3 +210,81 @@ def test_forwarded_args(input_args, forwarded_args):
     args = _parse_args(input_args)
 
     assert args.forwarded_args == forwarded_args
+
+
+@pytest.fixture
+def mock_create_cross_venv(monkeypatch, tmp_path):
+    create_cross_venv = Mock()
+    create_cross_venv.return_value = Mock(
+        platform="android",
+        archive_path=tmp_path / "archive",
+    )
+    monkeypatch.setattr("xpython.__main__.create_cross_venv", create_cross_venv)
+    return create_cross_venv
+
+
+@pytest.fixture
+def mock_android_platform(monkeypatch, tmp_path):
+    """Mock out the android platform module's setup/packages_path/run, so
+    `_run()` can proceed past `create_cross_venv()` without doing any real
+    testbed setup, dependency install, or subprocess work."""
+    setup = Mock()
+    packages_path = Mock(return_value=tmp_path / "site-packages")
+    run = Mock(return_value=0)
+    monkeypatch.setattr("xpython.__main__.android_platform.setup", setup)
+    monkeypatch.setattr(
+        "xpython.__main__.android_platform.packages_path", packages_path
+    )
+    monkeypatch.setattr("xpython.__main__.android_platform.run", run)
+    return {"setup": setup, "packages_path": packages_path, "run": run}
+
+
+@pytest.fixture
+def mock_resolve_requirements(monkeypatch):
+    resolve_requirements = Mock(return_value=[])
+    monkeypatch.setattr("xpython.__main__.resolve_requirements", resolve_requirements)
+    return resolve_requirements
+
+
+@pytest.mark.parametrize(
+    ("archive_args", "expected_archive_path"),
+    [
+        pytest.param(
+            ["--archive", "path/to/archive"],
+            Path("path/to/archive"),
+            id="with-archive",
+        ),
+        pytest.param(
+            [],
+            None,
+            id="without-archive",
+        ),
+    ],
+)
+def test_run_passes_archive_path_to_create_cross_venv(
+    archive_args,
+    expected_archive_path,
+    tmp_path,
+    mock_create_cross_venv,
+    mock_android_platform,
+    mock_resolve_requirements,
+):
+    """`_run()` forwards `args.archive` to `create_cross_venv()` as
+    `archive_path`, along with the other create-venv-related arguments."""
+    args = _parse_args(["--platform", "android", *archive_args, "--", "-m", "pytest"])
+    args.work_path = tmp_path / "work"
+    args.work_path.mkdir()
+
+    exit_code = _run(args)
+
+    mock_create_cross_venv.assert_called_once_with(
+        args.work_path / "venv",
+        platform="android",
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+        archive_path=expected_archive_path,
+        with_pip=True,
+    )
+    assert exit_code == 0

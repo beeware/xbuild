@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import json
 import os
 import platform
 import sys
 import tarfile
 import urllib.request
 from importlib import import_module
+from importlib import util as importlib_util
 from pathlib import Path
 
 import platformdirs
 from filelock import FileLock
+
+from xvenv import versions
 
 
 def resolve_cache_path(cache_arg: Path | None) -> Path:
@@ -129,3 +133,75 @@ def fetch_python(platform_name: str, arch: str, cache_path: Path) -> tuple[Path,
 
     config_file = platform_module.config_path(extracted_path, version_info, arch)
     return config_file, config_file.name == "build-details.json"
+
+
+def parse_sysconfigdata(path: Path) -> dict:
+    """Parse the sysconfigdata file contained at the provided path.
+
+    :param path: The path to the sysconfigdata file.
+    :returns: The parsed sysconfigdata module.
+    """
+    # Import the sysconfigdata module
+    spec = importlib_util.spec_from_file_location(path.stem, path)
+    if spec is None:
+        msg = f"Unable to load spec for {path}"
+        raise ValueError(msg)
+    if spec.loader is None:
+        msg = f"Spec for {path} does not define a loader"
+        raise ValueError(msg)
+    sysconfigdata = importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(sysconfigdata)
+    return sysconfigdata
+
+
+def use_archive_path(
+    platform_name: str, arch: str, archive_path: Path
+) -> tuple[Path, bool]:
+    """Locate the sysconfig/build-details file inside an already-extracted
+    Python build, without downloading or caching anything.
+
+    :param platform_name: One of `"ios"`, `"android"`, `"emscripten"`.
+    :param arch: The target architecture (already resolved via `resolve_arch()`).
+    :param archive_path: Path to a pre-extracted Python build, laid out the
+        same way `fetch_python()` would have extracted its own download.
+    :returns: A tuple of `(config_path, is_build_details)`, same shape as
+        `fetch_python()`.
+    :raises ValueError: if `archive_path` doesn't exist, the expected config
+        file isn't found inside it, or (for `build-details.json` builds
+        only) its Python version doesn't match the version currently
+        running xvenv/xbuild/xpython.
+    """
+    if not archive_path.is_dir():
+        raise ValueError(f"{archive_path} does not exist, or is not a directory.")
+
+    platform_module = import_module(f"xvenv.platforms.{platform_name}")
+    version_info = _current_version_info()
+    config_file = platform_module.config_path(archive_path, version_info, arch)
+
+    if not config_file.is_file():
+        raise ValueError(
+            f"Could not find a Python {versions.series(version_info)} build "
+            f"for {platform_name}/{arch} in {archive_path} "
+            f"(expected {config_file})."
+        )
+
+    expected_version = versions.series(version_info)
+    is_build_details = config_file.name == "build-details.json"
+    try:
+        if is_build_details:
+            with config_file.open() as f:
+                found_version = json.load(f)["language"]["version"]
+        else:
+            found_version = parse_sysconfigdata(config_file).build_time_vars["VERSION"]
+    except KeyError as e:
+        raise ValueError(
+            f"Unable to determine the Python version stored at {archive_path}."
+        ) from e
+
+    if found_version != expected_version:
+        raise ValueError(
+            f"{archive_path} contains a Python {found_version} build, "
+            f"but xvenv is running under Python {expected_version}."
+        )
+
+    return config_file, is_build_details

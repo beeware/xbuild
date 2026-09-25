@@ -68,7 +68,8 @@ def main_parser():
             "useful value based on the host machine's architecture."
         ),
     )
-    parser.add_argument(
+    source_group = parser.add_mutually_exclusive_group()
+    source_group.add_argument(
         "--cache",
         dest="cache",
         type=Path,
@@ -77,6 +78,17 @@ def main_parser():
             "for use with --platform. Defaults to the XBUILD_CACHE "
             "environment variable, or a platform-appropriate cache "
             "directory."
+        ),
+    )
+    source_group.add_argument(
+        "--archive",
+        dest="archive",
+        type=Path,
+        help=(
+            "Use an already-extracted Python build at this location "
+            "instead of downloading one, for use with --platform. Must be "
+            "laid out the same way an archive downloaded via --platform "
+            "would have been unpacked."
         ),
     )
     parser.add_argument(
@@ -113,6 +125,8 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         parser.error("--arch requires --platform")
     if args.cache is not None and args.platform is None:
         parser.error("--cache requires --platform")
+    if args.archive is not None and args.platform is None:
+        parser.error("--archive requires --platform")
 
     _setup_cli(verbosity=args.verbosity)
 
@@ -126,6 +140,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
             build_details_path=args.build_details_path,
             sysconfigdata_path=args.sysconfigdata_path,
             cache_path=args.cache,
+            archive_path=args.archive,
             with_pip=args.with_pip,
         )
     except (ValueError, NotImplementedError) as e:

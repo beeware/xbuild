@@ -47,3 +47,7 @@ The target architecture to use with [`--platform`][opt-platform]. Defaults to a 
 ### `--cache PATH`
 
 The directory to use for caching downloaded Python builds, for use with [`--platform`][opt-platform]. If unspecified, the location defined by the `XBUILD_CACHE` environment variable will be used; if that variable isn't defined, a platform-appropriate user cache directory will be use.d See [Environment variables](../environment-variables.md). Only valid in combination with [`--platform`][opt-platform].
+
+### `--archive PATH`
+
+Use an already-extracted Python build at `PATH` instead of downloading one, for use with [`--platform`][opt-platform]. `PATH` must be laid out the same way an archive downloaded via `--platform` would have been unpacked. Mutually exclusive with `--cache`. Only valid in combination with [`--platform`][opt-platform].

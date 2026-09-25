@@ -39,7 +39,17 @@ The output confirms the platform identifier is now the *target* platform, not th
 
 ## Using an existing Python build
 
-If you already have a target-platform Python build downloaded (rather than letting `xvenv` download and cache one for you via `--platform`), point `xvenv` at its configuration file directly:
+If you already have a target-platform Python build downloaded (rather than letting `xvenv` download and cache one for you via `--platform`), you have two options.
+
+If you know the location of the whole extracted build (the same directory structure `--platform` would have downloaded and unpacked into), use `--archive` together with `--platform`:
+
+```console
+(venv) $ xvenv --platform ios --arch arm64-iphonesimulator --archive path/to/Python-3.14.7-iOS x-venv
+```
+
+`xvenv` will use that directory directly, with no download and no interaction with `--cache`.
+
+Alternatively, if you'd rather point directly at the configuration file itself, use `--sysconfig`/`--build-details`:
 
 ```console
 (venv) $ xvenv --sysconfig path/to/_sysconfigdata__ios_arm64-iphonesimulator.py x-venv
