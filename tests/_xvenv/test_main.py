@@ -51,6 +51,16 @@ def mock_create_cross_venv(monkeypatch):
             "--cache requires --platform",
             id="sysconfig-and-cache",
         ),
+        pytest.param(
+            ("--cache", "/path/to/cache", "--archive", "/path/to/archive"),
+            "not allowed with argument",
+            id="cache-and-archive",
+        ),
+        pytest.param(
+            ("--archive", "/path/to/archive", "--sysconfig", "/path/to/sysconfig.py"),
+            "--archive requires --platform",
+            id="sysconfig-and-archive",
+        ),
     ],
 )
 def test_invalid_args(args, error, tmp_path, capsys):
@@ -102,6 +112,15 @@ def test_invalid_args(args, error, tmp_path, capsys):
             id="cache",
         ),
         pytest.param(
+            ["--platform", "android", "--archive", "path/to/archive"],
+            False,
+            {
+                "platform": "android",
+                "archive_path": Path("path/to/archive"),
+            },
+            id="archive",
+        ),
+        pytest.param(
             ["--build-details", "path/to/build-config.json"],
             True,
             {"build_details_path": Path("path/to/build-config.json")},
@@ -135,6 +154,7 @@ def test_valid_args(
         "build_details_path": None,
         "sysconfigdata_path": None,
         "cache_path": None,
+        "archive_path": None,
         "with_pip": True,
     }
     kwargs.update(create_kwargs)
