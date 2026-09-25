@@ -36,7 +36,8 @@ def testbed_layout(tmp_path):
     }
 
 
-def test_testbed_clone(mock_run, tmp_path):
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS-specific test")
+def test_testbed_clone_macOS(mock_run, tmp_path):
     """The tesbed and each --src path is copied into the cloned testbed's app/
     directory."""
     archive_dir = tmp_path / "archive"
@@ -72,6 +73,21 @@ def test_testbed_clone(mock_run, tmp_path):
         copied = app_dir / path / "test_thing.py"
         assert copied.is_file()
         assert copied.read_text() == "def test_x(): pass\n"
+
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="non-macOS-specific test")
+def test_testbed_clone_non_macOS(tmp_path):
+    """Testbed cloning fails on non-macOS platforms."""
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"Can't run an iOS project on non-macOS hardware.",
+    ):
+        setup(
+            archive_dir=tmp_path / "archive",
+            work_dir=tmp_path / "work",
+            src_paths=[],
+        )
 
 
 def test_run_with_module_and_args(mock_run, testbed_layout):

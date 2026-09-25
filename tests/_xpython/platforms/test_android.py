@@ -63,7 +63,7 @@ def test_testbed_clone(monkeypatch, tmp_path):
         assert copied.read_text() == "def test_x(): pass\n"
 
 
-@pytest.mark.skipif(sys.platform == "darwin", reason="macOS specific test")
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS specific test")
 def test_testbed_clone_macOS_ci(monkeypatch, tmp_path):
     """If running on GitHub Actions under macOS, an error is raised on clone."""
     # Monkeypatch so that it looks like we're in CI, regardless of whether we are.
@@ -73,7 +73,11 @@ def test_testbed_clone_macOS_ci(monkeypatch, tmp_path):
         RuntimeError,
         match=r"GitHub Actions can't start an Android emulator on a macOS runner.",
     ):
-        setup(archive_dir=tmp_path / "archive", work_dir=tmp_path / "work")
+        setup(
+            archive_dir=tmp_path / "archive",
+            work_dir=tmp_path / "work",
+            src_paths=[],
+        )
 
 
 def test_run_with_module_and_args(mock_run, work_dir):
