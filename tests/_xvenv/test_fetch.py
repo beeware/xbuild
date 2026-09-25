@@ -241,7 +241,7 @@ def test_use_archive_path_build_details(tmp_path):
     )
     config_file = tmp_path / "prefix" / "lib" / "python3.14" / "build-details.json"
     config_file.parent.mkdir(parents=True)
-    config_file.write_text('{"language": {"version": "3.14.7"}}')
+    config_file.write_text('{"language": {"version": "3.14"}}')
 
     with (
         mock.patch("xvenv.fetch._current_version_info", return_value=version_info),
@@ -254,7 +254,7 @@ def test_use_archive_path_build_details(tmp_path):
     assert is_build_details is True
 
 
-def test_use_archive_path_legacy_sysconfigdata(tmp_path):
+def test_use_archive_path_sysconfigdata(tmp_path):
     """A pre-extracted archive with a legacy _sysconfigdata__*.py (Python
     <=3.13) is used directly, with no version-content check."""
     version_info = VersionInfo(
@@ -268,13 +268,52 @@ def test_use_archive_path_legacy_sysconfigdata(tmp_path):
         / "_sysconfigdata__android_aarch64-linux-android.py"
     )
     config_file.parent.mkdir(parents=True)
-    config_file.write_text("build_time_vars = {}")
+    config_file.write_text("build_time_vars = {'VERSION': '3.13', 'CC': 'clang'}")
 
     with mock.patch("xvenv.fetch._current_version_info", return_value=version_info):
         path, is_build_details = use_archive_path("android", "aarch64", tmp_path)
 
     assert path == config_file
     assert is_build_details is False
+
+
+def test_use_archive_path_build_details_missing_key(tmp_path):
+    """If the [language][version] key is missing from build-details, an error
+    is raised."""
+    version_info = VersionInfo(
+        major=3, minor=14, micro=7, releaselevel="final", serial=0
+    )
+    config_file = tmp_path / "prefix" / "lib" / "python3.14" / "build-details.json"
+    config_file.parent.mkdir(parents=True)
+    config_file.write_text('{"language": {"version_info": {}}}')
+
+    with (
+        mock.patch("xvenv.fetch._current_version_info", return_value=version_info),
+        pytest.raises(ValueError, match="Unable to determine the Python version"),
+    ):
+        use_archive_path("android", "aarch64", tmp_path)
+
+
+def test_use_archive_path_sysconfigdata_missing_key(tmp_path):
+    """If the VERSION key is missing from sysconfigdata, an error is raised."""
+    version_info = VersionInfo(
+        major=3, minor=13, micro=5, releaselevel="final", serial=0
+    )
+    config_file = (
+        tmp_path
+        / "prefix"
+        / "lib"
+        / "python3.13"
+        / "_sysconfigdata__android_aarch64-linux-android.py"
+    )
+    config_file.parent.mkdir(parents=True)
+    config_file.write_text("build_time_vars = {'CC': 'clang'}")
+
+    with (
+        mock.patch("xvenv.fetch._current_version_info", return_value=version_info),
+        pytest.raises(ValueError, match="Unable to determine the Python version"),
+    ):
+        use_archive_path("android", "aarch64", tmp_path)
 
 
 def test_use_archive_path_missing_directory(tmp_path):
@@ -291,7 +330,14 @@ def test_use_archive_path_missing_directory(tmp_path):
         use_archive_path("android", "aarch64", missing)
 
 
-def test_use_archive_path_missing_config_file(tmp_path):
+@pytest.mark.parametrize(
+    ("platform", "arch"),
+    [
+        ("android", "aarch64"),
+        ("ios", "arm64-iphonesimulator"),
+    ],
+)
+def test_use_archive_path_missing_config_file(tmp_path, platform, arch):
     """An archive_path that exists but doesn't contain the expected config
     file raises a clear error."""
     version_info = VersionInfo(
@@ -302,21 +348,7 @@ def test_use_archive_path_missing_config_file(tmp_path):
         mock.patch("xvenv.fetch._current_version_info", return_value=version_info),
         pytest.raises(ValueError, match="Could not find"),
     ):
-        use_archive_path("android", "aarch64", tmp_path)
-
-
-def test_use_archive_path_missing_config_file_ios(tmp_path):
-    """Same missing-config-file check for a second platform (ios), to
-    confirm the function isn't accidentally android-specific."""
-    version_info = VersionInfo(
-        major=3, minor=14, micro=7, releaselevel="final", serial=0
-    )
-
-    with (
-        mock.patch("xvenv.fetch._current_version_info", return_value=version_info),
-        pytest.raises(ValueError, match="Could not find"),
-    ):
-        use_archive_path("ios", "arm64-iphonesimulator", tmp_path)
+        use_archive_path(platform, arch, tmp_path)
 
 
 def test_use_archive_path_version_mismatch(tmp_path):
@@ -327,7 +359,7 @@ def test_use_archive_path_version_mismatch(tmp_path):
     )
     config_file = tmp_path / "prefix" / "lib" / "python3.14" / "build-details.json"
     config_file.parent.mkdir(parents=True)
-    config_file.write_text('{"language": {"version": "3.14.2"}}')
+    config_file.write_text('{"language": {"version": "3.13"}}')
 
     with (
         mock.patch("xvenv.fetch._current_version_info", return_value=version_info),

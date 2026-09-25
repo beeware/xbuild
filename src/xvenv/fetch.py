@@ -7,6 +7,7 @@ import sys
 import tarfile
 import urllib.request
 from importlib import import_module
+from importlib import util as importlib_util
 from pathlib import Path
 
 import platformdirs
@@ -134,6 +135,25 @@ def fetch_python(platform_name: str, arch: str, cache_path: Path) -> tuple[Path,
     return config_file, config_file.name == "build-details.json"
 
 
+def parse_sysconfigdata(path: Path) -> dict:
+    """Parse the sysconfigdata file contained at the provided path.
+
+    :param path: The path to the sysconfigdata file.
+    :returns: The parsed sysconfigdata module.
+    """
+    # Import the sysconfigdata module
+    spec = importlib_util.spec_from_file_location(path.stem, path)
+    if spec is None:
+        msg = f"Unable to load spec for {path}"
+        raise ValueError(msg)
+    if spec.loader is None:
+        msg = f"Spec for {path} does not define a loader"
+        raise ValueError(msg)
+    sysconfigdata = importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(sysconfigdata)
+    return sysconfigdata
+
+
 def use_archive_path(
     platform_name: str, arch: str, archive_path: Path
 ) -> tuple[Path, bool]:
@@ -165,15 +185,23 @@ def use_archive_path(
             f"(expected {config_file})."
         )
 
+    expected_version = versions.series(version_info)
     is_build_details = config_file.name == "build-details.json"
-    if is_build_details:
-        with config_file.open() as f:
-            found_version = json.load(f)["language"]["version"]
-        expected_version = versions.version(version_info)
-        if found_version != expected_version:
-            raise ValueError(
-                f"{archive_path} contains a Python {found_version} build, "
-                f"but xvenv is running under Python {expected_version}."
-            )
+    try:
+        if is_build_details:
+            with config_file.open() as f:
+                found_version = json.load(f)["language"]["version"]
+        else:
+            found_version = parse_sysconfigdata(config_file).build_time_vars["VERSION"]
+    except KeyError as e:
+        raise ValueError(
+            f"Unable to determine the Python version stored at {archive_path}."
+        ) from e
+
+    if found_version != expected_version:
+        raise ValueError(
+            f"{archive_path} contains a Python {found_version} build, "
+            f"but xvenv is running under Python {expected_version}."
+        )
 
     return config_file, is_build_details

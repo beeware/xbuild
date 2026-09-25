@@ -7,10 +7,15 @@ import re
 import sys
 import venv
 from importlib import import_module
-from importlib import util as importlib_util
 from pathlib import Path, PurePosixPath
 
-from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path, use_archive_path
+from xvenv.fetch import (
+    fetch_python,
+    parse_sysconfigdata,
+    resolve_arch,
+    resolve_cache_path,
+    use_archive_path,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -168,18 +173,7 @@ def localize_sysconfigdata(sysconfigdata_path, venv_site_packages):
     :param venv_site_packages: The site packages folder where the localized
         sysconfigdata module should be output.
     """
-    # Import the sysconfigdata module
-    spec = importlib_util.spec_from_file_location(
-        sysconfigdata_path.stem, sysconfigdata_path
-    )
-    if spec is None:
-        msg = f"Unable to load spec for {sysconfigdata_path}"
-        raise ValueError(msg)
-    if spec.loader is None:
-        msg = f"Spec for {sysconfigdata_path} does not define a loader"
-        raise ValueError(msg)
-    sysconfigdata = importlib_util.module_from_spec(spec)
-    spec.loader.exec_module(sysconfigdata)
+    sysconfigdata = parse_sysconfigdata(sysconfigdata_path)
 
     # Write the updated sysconfigdata module into the cross-platform site.
     slice_path = sysconfigdata_path.parent.parent.parent
