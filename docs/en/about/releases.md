@@ -2,6 +2,22 @@
 
 <!-- towncrier release notes start -->
 
+## 0.3.1.dev6+g4cb83454f (2026-09-25)
+
+### Features
+
+* `xvenv` no longer produces output on success, matching the behavior of `venv` ([#87](https://github.com/beeware/xbuild/issues/87))
+* Added a new `xpython` command, providing an entry point for running Python module inside an iOS Simulator or Android emulator/device testbed. ([#90](https://github.com/beeware/xbuild/issues/90))
+* Added a `--archive` option to `xvenv`, `xbuild`, and `xpython`, allowing an already-extracted Python build to be used instead of downloading one via `--platform`. ([#92](https://github.com/beeware/xbuild/issues/92))
+
+### Bugfixes
+
+* `xvenv` no longer leaves build-machine-specific absolute paths (e.g. to the `CC`/`AR` provided by the Android NDK) in the localized `sysconfigdata` of a cross-platform environment. ([#10](https://github.com/beeware/xbuild/issues/10))
+
+### Misc
+
+* [#88](https://github.com/beeware/xbuild/issues/88), [#91](https://github.com/beeware/xbuild/issues/91)
+
 ## 0.3.0 (2026-09-22)
 
 ### Features
