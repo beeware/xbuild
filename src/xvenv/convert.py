@@ -215,6 +215,23 @@ def create_cross_venv(
     return config
 
 
+def prepare_env(config: CrossVenvConfig) -> dict[str, str]:
+    """Prepare the environment variables needed to build for the target
+    platform described by `config`.
+
+    :param config: A resolved `CrossVenvConfig` (see
+        `resolve_cross_venv_config()`).
+    :returns: A dict of environment variables to merge into `os.environ`
+        for the duration of the build.
+    :raises ValueError: if the platform module's own `prepare_env()`
+        raises (e.g. missing `ANDROID_HOME`, missing NDK, non-macOS for
+        iOS).
+    :raises NotImplementedError: for platforms that don't support
+        environment preparation yet (currently: emscripten).
+    """
+    return config.platform_module.prepare_env(config)
+
+
 def localized_vars(orig_vars, slice_path):
     """Update (where possible) any references to build-time variables with the best
     guess of the installed location."""

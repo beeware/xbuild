@@ -67,3 +67,9 @@ def config_path(extracted_path: Path, version_info, arch: str):
     raise NotImplementedError(
         "xvenv does not yet know how to configure a Python build for emscripten."
     )
+
+
+def prepare_env(config) -> dict[str, str]:
+    raise NotImplementedError(
+        "xvenv does not yet know how to prepare a build environment for emscripten."
+    )

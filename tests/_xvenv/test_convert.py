@@ -462,3 +462,27 @@ def test_resolve_cross_venv_config_missing_build_details_file(tmp_path):
             sysconfigdata_path=None,
             cache_path=None,
         )
+
+
+def test_prepare_env_dispatches_to_platform_module(tmp_path):
+    """prepare_env() delegates entirely to
+    config.platform_module.prepare_env(), passing the whole config
+    through unchanged."""
+    from xvenv.convert import prepare_env
+
+    fake_platform_module = Mock()
+    fake_platform_module.prepare_env.return_value = {"CC": "fake-clang"}
+
+    config = CrossVenvConfig(
+        platform="android",
+        arch="aarch64-linux-android",
+        archive_path=tmp_path,
+        platform_module=fake_platform_module,
+        build_details_path=None,
+        sysconfigdata_path=tmp_path / "fake.py",
+    )
+
+    result = prepare_env(config)
+
+    fake_platform_module.prepare_env.assert_called_once_with(config)
+    assert result == {"CC": "fake-clang"}
