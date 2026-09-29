@@ -32,6 +32,15 @@ When [`xbuild`](../reference/commands/xbuild.md) creates its isolated build envi
 
 `--no-isolation` skips creating a separate isolated virtual environment altogether - the build runs directly in whatever environment `xbuild` itself was invoked from.
 
+## Automatic build-environment preparation
+
+In addition to converting a venv into a cross-platform environment, `xbuild` also prepares the compiler/toolchain environment variables needed to actually compile native code for the target platform, before running the build - in both isolated and `--no-isolation` modes:
+
+- **Android**: `CC`, `AR`, `AS`, `CXX`, `LD`, `NM`, `RANLIB`, `READELF`, `STRIP`, `CFLAGS`, `LDFLAGS`, `CXXFLAGS`, `CPU_COUNT`, and (if available) `PKG_CONFIG`/`PKG_CONFIG_LIBDIR` are set based on the exact NDK version the target Android Python build was compiled with. This requires `ANDROID_HOME` to already be set, and that exact NDK version to already be installed under `$ANDROID_HOME/ndk/` - see [Platform setup: Android](../how-to/platform-setup/android.md).
+- **iOS**: `PATH` is replaced with the venv's own `bin/` directory, followed by the target-platform `Python.xcframework` slice's `bin/` directory (containing the `clang`/`ar`/`strip` shims for the target architecture), followed by a fixed, minimal set of system directories, ensuring no build-machine-native tools leak into the build - see [Platform setup: iOS](../how-to/platform-setup/ios.md).
+
+This preparation is `xbuild`-specific; it does not apply to a cross-platform venv created by `xvenv` and used directly outside of `xbuild`.
+
 ## `target-requires` vs `requires`
 
 Standard PEP 517 `requires` is always installed *for the build platform*, even inside a target-patched cross-environment. This works because `xbuild` internally sets `XBUILD_ENV=off` (see [Environment variables](../reference/environment-variables.md#xbuild_env)) while installing `requires` dependencies, temporarily disabling the cross-platform patches so `pip` resolves and installs build-platform-native packages.

@@ -2,14 +2,6 @@
 
 You must have a machine running macOS, with Xcode installed, and the iOS SDK added.
 
-It is also strongly advised that you:
+## PATH configuration is automatic
 
-- Add the path to the iOS binary shims to your path. These are provided in the `Python.xcframework/ios-arm64/bin` and `Python.xcframework/ios-arm64_x86_64-simulator/bin` folder for the iOS support package that you have downloaded.
-
-- Clear your path of any other dependencies. It is very easy for macOS ARM64 binaries from Homebrew and other sources to leak into iOS builds if they are present on the path; the safest approach is to set your path so it only contains:
-    - The path for the Python binary (ideally, your virtual environment's `bin` directory)
-    - `/usr/bin`
-    - `/bin`
-    - `/usr/sbin`
-    - `/sbin`
-    - `/Library/Apple/usr/bin`
+`xbuild` automatically configures `PATH` before running a build, so that the correct target-platform `clang`/`ar`/`strip` shims are used for compilation, and no build-machine-native tools (e.g. Homebrew binaries) leak into the build. There is no need to manually add the iOS binary shims to your path, or manually clear your path of other dependencies, before running `xbuild`.
