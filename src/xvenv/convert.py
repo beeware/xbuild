@@ -8,6 +8,7 @@ import sys
 import venv
 from importlib import import_module
 from pathlib import Path, PurePosixPath
+from types import ModuleType
 
 from xvenv.fetch import (
     fetch_python,
@@ -19,27 +20,144 @@ from xvenv.fetch import (
 
 
 @dataclasses.dataclass(frozen=True)
-class CrossVenv:
-    """The result of creating (or reusing) a cross-platform venv.
+class CrossVenvConfig:
+    """The resolved location of a target-platform Python build, and the
+    platform module that knows how to use it.
 
-    :param platform: The platform for the cross venv.
-    :param arch: The architecture of the cross venv.
+    :param platform: The target platform's module name, e.g. "android",
+        "ios", "emscripten" (lowercase, matching xvenv.platforms.*).
+    :param arch: The resolved multiarch string, e.g.
+        "aarch64-linux-android" or "arm64-iphonesimulator".
     :param archive_path: The root of the target-platform Python
-        archive that was used to build the venv (the same directory
-        `xvenv.fetch.fetch_python()` extracted the download into). Contains
-        platform-specific resources bundled inside the archive, such as the
-        iOS/Android testbed projects.
-    :param venv_path: The path to the cross-platform environment.
+        archive (the same directory `xvenv.fetch.fetch_python()`
+        extracted the download into, or an already-extracted archive
+        passed via `--archive`). Contains platform-specific resources
+        such as `android-env.sh`, the `Python.xcframework` `bin/`
+        shims, and the iOS/Android testbed projects.
+    :param platform_module: The imported `xvenv.platforms.<platform>`
+        module.
+    :param build_details_path: The path to a `build-details.json`
+        file, or `None`.
+    :param sysconfigdata_path: The path to a sysconfigdata Python
+        file, or `None`. Exactly one of `build_details_path`/
+        `sysconfigdata_path` is set.
     """
 
     platform: str
     arch: str
     archive_path: Path
-    venv_path: Path
+    platform_module: ModuleType
+    build_details_path: Path | None
+    sysconfigdata_path: Path | None
 
     @property
     def description(self) -> str:
-        return f"{self.platform} {self.arch}"
+        name = "iOS" if self.platform == "ios" else self.platform.capitalize()
+        return f"{name} {self.arch}"
+
+
+def resolve_cross_venv_config(
+    *,
+    platform: str | None,
+    arch: str | None,
+    build_details_path: Path | None,
+    sysconfigdata_path: Path | None,
+    cache_path: Path | None,
+    archive_path: Path | None = None,
+) -> CrossVenvConfig:
+    """Resolve platform/arch/build_details_path/sysconfigdata_path/
+    cache_path/archive_path into a `CrossVenvConfig`, downloading (and
+    caching) a target Python build if `platform` is given and
+    `archive_path` is not.
+
+    This is the single resolution mechanism shared by
+    `create_cross_venv()` (which additionally converts a venv) and
+    `xbuild`'s environment-preparation step (which does not).
+
+    :param platform: One of `"ios"`, `"android"`, `"emscripten"`, or
+        `None` to use `build_details_path`/`sysconfigdata_path`
+        directly.
+    :param arch: The target architecture, or `None` to use a
+        host-arch-based default (see `xvenv.fetch.resolve_arch()`).
+        Ignored if `platform` is `None`.
+    :param build_details_path: An explicit path to a build details
+        JSON file. Ignored if `platform` is specified.
+    :param sysconfigdata_path: An explicit path to a sysconfigdata
+        python file. Ignored if `platform` is specified.
+    :param cache_path: The directory to use for caching downloaded
+        Python builds, or `None` to use the default resolution order
+        (see `xvenv.fetch.resolve_cache_path()`). Ignored if
+        `archive_path` is given, or if `platform` is `None`.
+    :param archive_path: The path to an already-extracted Python build
+        to use instead of downloading one, or `None` to download (and
+        cache) as usual. Ignored if `platform` is not specified.
+    :returns: The resolved `CrossVenvConfig`.
+    :raises ValueError: on an unknown/unsupported arch/platform, a
+        missing config file, or any other error `resolve_arch()`,
+        `fetch_python()`, or `use_archive_path()` raise.
+    :raises NotImplementedError: if `platform`/`arch` isn't supported
+        for download yet (e.g. emscripten).
+    """
+    if platform is not None:
+        resolved_arch = resolve_arch(platform, arch)
+
+        if archive_path is not None:
+            config_path, is_build_details = use_archive_path(
+                platform, resolved_arch, Path(archive_path).resolve()
+            )
+        else:
+            resolved_cache_path = resolve_cache_path(cache_path)
+            config_path, is_build_details = fetch_python(
+                platform, resolved_arch, resolved_cache_path
+            )
+
+        resolved_build_details_path = config_path if is_build_details else None
+        resolved_sysconfigdata_path = None if is_build_details else config_path
+    else:
+        resolved_build_details_path = (
+            Path(build_details_path).resolve() if build_details_path else None
+        )
+        resolved_sysconfigdata_path = (
+            Path(sysconfigdata_path).resolve() if sysconfigdata_path else None
+        )
+
+    if resolved_build_details_path:
+        if not resolved_build_details_path.is_file():
+            raise ValueError(f"Could not find {resolved_build_details_path}")
+        with open(resolved_build_details_path) as fp:
+            build_details = json.load(fp)
+        platform_name = build_details["platform"].split("-")[0]
+        multiarch = build_details["implementation"]["_multiarch"]
+        source_path = resolved_build_details_path
+    elif resolved_sysconfigdata_path:
+        if not resolved_sysconfigdata_path.is_file():
+            raise ValueError(f"Could not find {resolved_sysconfigdata_path}")
+        _, _, _, platform_name, multiarch = resolved_sysconfigdata_path.stem.split(
+            "_", 4
+        )
+        source_path = resolved_sysconfigdata_path
+    else:
+        raise ValueError(
+            "Must provide path to either build_details.json or sysconfigdata"
+        )
+
+    try:
+        platform_module = import_module(f"xvenv.platforms.{platform_name}")
+    except ImportError:
+        raise ValueError(
+            f"Don't know how to build a cross-venv for {platform_name}"
+        ) from None
+
+    resolved_archive_path = platform_module.archive_path(source_path)
+
+    return CrossVenvConfig(
+        platform=platform_name,
+        arch=multiarch,
+        archive_path=resolved_archive_path,
+        platform_module=platform_module,
+        build_details_path=resolved_build_details_path,
+        sysconfigdata_path=resolved_sysconfigdata_path,
+    )
 
 
 def create_cross_venv(
@@ -214,7 +332,7 @@ def convert_venv(
     venv_path: Path,
     build_details_path: Path | None,
     sysconfigdata_path: Path | None,
-) -> CrossVenv:
+) -> CrossVenvConfig:
     """Convert a virtual environment into a cross-platform environment.
 
     :param venv_path: The path to the root of the venv.
@@ -348,7 +466,7 @@ def convert_venv(
         f"import {cross_multiarch}\n"
     )
 
-    return CrossVenv(
+    return CrossVenvConfig(
         platform=context["os"],
         arch=multiarch,
         archive_path=archive_path,

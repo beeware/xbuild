@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from xvenv.convert import CrossVenv, create_cross_venv, localized_vars
+from xvenv.convert import CrossVenvConfig, create_cross_venv, localized_vars
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def mock_deps(monkeypatch, tmp_path):
         "fetch_python": Mock(return_value=(config_path, True)),
         "use_archive_path": Mock(return_value=(config_path, True)),
         "convert_venv": Mock(
-            return_value=CrossVenv(
+            return_value=CrossVenvConfig(
                 platform="Android",
                 arch="aarch64-linux-android",
                 archive_path=archive_path,
@@ -266,3 +266,233 @@ def test_archive_path_is_resolved(tmp_path, mock_deps):
     mock_deps["use_archive_path"].assert_called_once_with(
         "android", "aarch64", tmp_path / "relative-build"
     )
+
+
+def test_cross_venv_config_description():
+    """description capitalizes platform for display, with iOS
+    special-cased to avoid the naive .capitalize() result "Ios"."""
+    from xvenv.convert import CrossVenvConfig
+
+    android_config = CrossVenvConfig(
+        platform="android",
+        arch="aarch64-linux-android",
+        archive_path=Path("/some/archive"),
+        platform_module=None,
+        build_details_path=None,
+        sysconfigdata_path=Path("/some/sysconfigdata.py"),
+    )
+    assert android_config.description == "Android aarch64-linux-android"
+
+    ios_config = CrossVenvConfig(
+        platform="ios",
+        arch="arm64-iphonesimulator",
+        archive_path=Path("/some/archive"),
+        platform_module=None,
+        build_details_path=None,
+        sysconfigdata_path=Path("/some/sysconfigdata.py"),
+    )
+    assert ios_config.description == "iOS arm64-iphonesimulator"
+
+    emscripten_config = CrossVenvConfig(
+        platform="emscripten",
+        arch="wasm32",
+        archive_path=Path("/some/archive"),
+        platform_module=None,
+        build_details_path=None,
+        sysconfigdata_path=Path("/some/sysconfigdata.py"),
+    )
+    assert emscripten_config.description == "Emscripten wasm32"
+
+
+@pytest.fixture
+def mock_resolve_deps(monkeypatch, tmp_path):
+    """Mock resolve_arch/fetch_python/use_archive_path/resolve_cache_path
+    for resolve_cross_venv_config()'s --platform branch."""
+    cache_path = tmp_path / "cache"
+    archive_dir = cache_path / "python-3.14.7-aarch64-linux-android"
+    config_path = archive_dir / "prefix" / "lib" / "python3.14" / "build-details.json"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        '{"platform": "android-24-arm64_v8a", '
+        '"implementation": {"_multiarch": "aarch64-linux-android"}}'
+    )
+
+    mocks = {
+        "resolve_cache_path": Mock(return_value=cache_path),
+        "resolve_arch": Mock(return_value="aarch64"),
+        "fetch_python": Mock(return_value=(config_path, True)),
+        "use_archive_path": Mock(return_value=(config_path, True)),
+    }
+    monkeypatch.setattr("xvenv.convert.resolve_cache_path", mocks["resolve_cache_path"])
+    monkeypatch.setattr("xvenv.convert.resolve_arch", mocks["resolve_arch"])
+    monkeypatch.setattr("xvenv.convert.fetch_python", mocks["fetch_python"])
+    monkeypatch.setattr("xvenv.convert.use_archive_path", mocks["use_archive_path"])
+    mocks["cache_path"] = cache_path
+    mocks["archive_dir"] = archive_dir
+    mocks["config_path"] = config_path
+    return mocks
+
+
+def test_resolve_cross_venv_config_via_platform(tmp_path, mock_resolve_deps):
+    """--platform resolves arch, downloads/caches, and produces a config
+    pointing at the resulting build-details.json."""
+    from xvenv.convert import resolve_cross_venv_config
+
+    config = resolve_cross_venv_config(
+        platform="android",
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+    )
+
+    mock_resolve_deps["resolve_cache_path"].assert_called_once_with(None)
+    mock_resolve_deps["resolve_arch"].assert_called_once_with("android", None)
+    mock_resolve_deps["fetch_python"].assert_called_once_with(
+        "android", "aarch64", mock_resolve_deps["cache_path"]
+    )
+    assert config.platform == "android"
+    assert config.arch == "aarch64-linux-android"
+    assert config.build_details_path == mock_resolve_deps["config_path"]
+    assert config.sysconfigdata_path is None
+    assert config.archive_path == mock_resolve_deps["archive_dir"]
+    assert config.platform_module.__name__ == "xvenv.platforms.android"
+
+
+def test_resolve_cross_venv_config_via_archive_path(tmp_path, mock_resolve_deps):
+    """archive_path routes through use_archive_path(), not
+    resolve_cache_path()/fetch_python()."""
+    from xvenv.convert import resolve_cross_venv_config
+
+    supplied_archive = tmp_path / "my-existing-build"
+    supplied_archive.mkdir()
+
+    resolve_cross_venv_config(
+        platform="android",
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+        archive_path=supplied_archive,
+    )
+
+    mock_resolve_deps["resolve_cache_path"].assert_not_called()
+    mock_resolve_deps["fetch_python"].assert_not_called()
+    mock_resolve_deps["use_archive_path"].assert_called_once_with(
+        "android", "aarch64", supplied_archive.resolve()
+    )
+
+
+def test_resolve_cross_venv_config_via_build_details_path(tmp_path):
+    """An explicit build_details_path (no --platform) is used directly,
+    with no download/cache/archive resolution."""
+    from xvenv.convert import resolve_cross_venv_config
+
+    build_details_path = tmp_path / "build-details.json"
+    build_details_path.write_text(
+        '{"platform": "ios-13.0-arm64-iphonesimulator", '
+        '"implementation": {"_multiarch": "arm64-iphonesimulator"}}'
+    )
+    archive_root = tmp_path / "Python.xcframework" / "ios-arm64_x86_64-simulator"
+    archive_root.mkdir(parents=True)
+
+    config = resolve_cross_venv_config(
+        platform=None,
+        arch=None,
+        build_details_path=build_details_path,
+        sysconfigdata_path=None,
+        cache_path=None,
+    )
+
+    assert config.platform == "ios"
+    assert config.arch == "arm64-iphonesimulator"
+    assert config.build_details_path == build_details_path.resolve()
+    assert config.sysconfigdata_path is None
+    assert config.platform_module.__name__ == "xvenv.platforms.ios"
+
+
+def test_resolve_cross_venv_config_via_sysconfigdata_path(tmp_path):
+    """An explicit sysconfigdata_path (no --platform) has platform/multiarch
+    extracted from its filename."""
+    from xvenv.convert import resolve_cross_venv_config
+
+    sysconfigdata_path = (
+        tmp_path
+        / "prefix"
+        / "lib"
+        / "python3.13"
+        / "_sysconfigdata__android_aarch64-linux-android.py"
+    )
+    sysconfigdata_path.parent.mkdir(parents=True)
+    sysconfigdata_path.write_text("build_time_vars = {}")
+
+    config = resolve_cross_venv_config(
+        platform=None,
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=sysconfigdata_path,
+        cache_path=None,
+    )
+
+    assert config.platform == "android"
+    assert config.arch == "aarch64-linux-android"
+    assert config.sysconfigdata_path == sysconfigdata_path.resolve()
+    assert config.build_details_path is None
+    assert config.platform_module.__name__ == "xvenv.platforms.android"
+
+
+def test_resolve_cross_venv_config_neither_path_given():
+    """Neither platform, build_details_path, nor sysconfigdata_path raises
+    a clear ValueError."""
+    from xvenv.convert import resolve_cross_venv_config
+
+    with pytest.raises(
+        ValueError,
+        match="Must provide path to either build_details.json or sysconfigdata",
+    ):
+        resolve_cross_venv_config(
+            platform=None,
+            arch=None,
+            build_details_path=None,
+            sysconfigdata_path=None,
+            cache_path=None,
+        )
+
+
+def test_resolve_cross_venv_config_unknown_platform(tmp_path):
+    """An unrecognized platform name (from build_details_path's contents)
+    raises a clear ValueError."""
+    from xvenv.convert import resolve_cross_venv_config
+
+    build_details_path = tmp_path / "build-details.json"
+    build_details_path.write_text(
+        '{"platform": "bogus-1.0-x86_64", '
+        '"implementation": {"_multiarch": "x86_64-bogus"}}'
+    )
+
+    with pytest.raises(
+        ValueError, match="Don't know how to build a cross-venv for bogus"
+    ):
+        resolve_cross_venv_config(
+            platform=None,
+            arch=None,
+            build_details_path=build_details_path,
+            sysconfigdata_path=None,
+            cache_path=None,
+        )
+
+
+def test_resolve_cross_venv_config_missing_build_details_file(tmp_path):
+    """A build_details_path that doesn't exist raises a clear ValueError."""
+    from xvenv.convert import resolve_cross_venv_config
+
+    missing = tmp_path / "does-not-exist.json"
+
+    with pytest.raises(ValueError, match=f"Could not find {missing}"):
+        resolve_cross_venv_config(
+            platform=None,
+            arch=None,
+            build_details_path=missing,
+            sysconfigdata_path=None,
+            cache_path=None,
+        )
