@@ -169,7 +169,7 @@ def create_cross_venv(
     cache_path: Path | None,
     archive_path: Path | None = None,
     with_pip: bool = True,
-) -> Path:
+) -> CrossVenvConfig:
     """Create (if `venv_path` doesn't already exist) and convert a virtual
     environment into a cross-platform venv for `platform`/`arch`, downloading
     (and caching) the target Python build as needed.
@@ -192,46 +192,27 @@ def create_cross_venv(
         usual. Ignored if `platform` is not specified.
     :param with_pip: Whether to install pip when creating the venv. Only
         relevant if `venv_path` doesn't already exist.
-    :returns: A `CrossVenv` describing the resulting venv and the archive
-        directory the target Python build was extracted into.
+    :returns: The resolved `CrossVenvConfig` describing the environment
+        that was created, including the archive directory the target
+        Python build was extracted into.
     :raises ValueError: on an unknown/unsupported arch, or any other error
-        `resolve_arch()`, `fetch_python()`, `use_archive_path()`, or
-        `convert_venv()` raise.
+        `resolve_cross_venv_config()` or `convert_venv()` raise.
     :raises NotImplementedError: if `platform`/`arch` isn't supported for
         download yet (e.g. emscripten).
     """
     if not venv_path.exists():
         venv.create(venv_path, with_pip=with_pip)
 
-    if platform is not None:
-        resolved_arch = resolve_arch(platform, arch)
-
-        if archive_path is not None:
-            config_path, is_build_details = use_archive_path(
-                platform, resolved_arch, Path(archive_path).resolve()
-            )
-        else:
-            resolved_cache_path = resolve_cache_path(cache_path)
-            config_path, is_build_details = fetch_python(
-                platform, resolved_arch, resolved_cache_path
-            )
-
-        resolved_build_details_path = config_path if is_build_details else None
-        resolved_sysconfigdata_path = None if is_build_details else config_path
-
-    else:
-        resolved_build_details_path = (
-            Path(build_details_path).resolve() if build_details_path else None
-        )
-        resolved_sysconfigdata_path = (
-            Path(sysconfigdata_path).resolve() if sysconfigdata_path else None
-        )
-
-    return convert_venv(
-        venv_path,
-        build_details_path=resolved_build_details_path,
-        sysconfigdata_path=resolved_sysconfigdata_path,
+    config = resolve_cross_venv_config(
+        platform=platform,
+        arch=arch,
+        build_details_path=build_details_path,
+        sysconfigdata_path=sysconfigdata_path,
+        cache_path=cache_path,
+        archive_path=archive_path,
     )
+    convert_venv(venv_path, config)
+    return config
 
 
 def localized_vars(orig_vars, slice_path):
@@ -328,19 +309,12 @@ def localize_sysconfig_vars(sysconfig_vars_path, venv_site_packages):
     return sysconfig_vars
 
 
-def convert_venv(
-    venv_path: Path,
-    build_details_path: Path | None,
-    sysconfigdata_path: Path | None,
-) -> CrossVenvConfig:
+def convert_venv(venv_path: Path, config: CrossVenvConfig) -> None:
     """Convert a virtual environment into a cross-platform environment.
 
     :param venv_path: The path to the root of the venv.
-    :param build_details_path: The path to build-details.json file for the
-        target platform.
-    :param sysconfigdata_path: The path to the sysconfigdata python file for the
-        target platform.
-    :returns: A CrossVEnv value describing the environment that was created.
+    :param config: The resolved target-platform configuration (see
+        `resolve_cross_venv_config()`).
     """
     if not venv_path.exists():
         raise ValueError(f"Virtual environment {venv_path} does not exist.")
@@ -362,45 +336,35 @@ def convert_venv(
         raise ValueError(f"Found more than one site packages in {venv_path}")
 
     venv_site_packages_path = platlibs[0]
-    if build_details_path:
-        if not build_details_path.is_file():
-            raise ValueError(f"Could not find {build_details_path}")
-
+    if config.build_details_path:
         # If build_details.json exists, then so does sysconfig_vars.
-        with open(build_details_path) as fp:
+        with open(config.build_details_path) as fp:
             build_details = json.load(fp)
 
-        # build_details platform is the full platform-min_version-multiarch
-        # format. We only need the platform part.
-        platform = build_details["platform"].split("-")[0]
         version = build_details["language"]["version"]
         abiflags = "".join(build_details["abi"]["flags"])
-        multiarch = build_details["implementation"]["_multiarch"]
 
         localize_sysconfigdata(
             (
-                build_details_path.parent
-                / f"_sysconfigdata_{abiflags}_{platform}_{multiarch}.py"
+                config.build_details_path.parent
+                / f"_sysconfigdata_{abiflags}_{config.platform}_{config.arch}.py"
             ),
             venv_site_packages_path,
         )
         localize_sysconfig_vars(
             (
-                build_details_path.parent
-                / f"_sysconfig_vars_{abiflags}_{platform}_{multiarch}.json"
+                config.build_details_path.parent
+                / f"_sysconfig_vars_{abiflags}_{config.platform}_{config.arch}.json"
             ),
             venv_site_packages_path,
         )
-    elif sysconfigdata_path:
-        if not sysconfigdata_path.is_file():
-            raise ValueError(f"Could not find {sysconfigdata_path}")
-
-        # If we've been given a sysconfigdata file, re
-        _, _, abiflags, platform, multiarch = sysconfigdata_path.stem.split("_", 4)
+    else:
+        # We've been given a sysconfigdata file instead.
+        _, _, abiflags, _, _ = config.sysconfigdata_path.stem.split("_", 4)
 
         # Localize the sysconfig data.
         sysconfigdata = localize_sysconfigdata(
-            sysconfigdata_path,
+            config.sysconfigdata_path,
             venv_site_packages_path,
         )
         version = sysconfigdata["VERSION"]
@@ -408,10 +372,6 @@ def convert_venv(
         # We'll need to reconstruct build_details-like data once we have
         # a platform module, as the keys in sysconfig data vary by platform.
         build_details = None
-    else:
-        raise ValueError(
-            "Must provide path to either build_details.json or sysconfigdata"
-        )
 
     # Check the venv version matches the configuration file that has been provided
     venv_config = (venv_path / "pyvenv.cfg").read_text()
@@ -428,33 +388,23 @@ def convert_venv(
         raise ValueError("Could not determine Python version from target venv.")
 
     # Generate the context for the templated cross-target file
-    arch, sdk = multiarch.split("-", 1)
+    arch, sdk = config.arch.split("-", 1)
     context = {
-        "platform": platform,
-        "os": platform,  # some platforms use different capitalization here
-        "multiarch": multiarch,
+        "platform": config.platform,
+        "os": config.platform,  # some platforms use different capitalization here
+        "multiarch": config.arch,
         "abiflags": abiflags,
         "arch": arch,
         "sdk": sdk,
     }
 
-    try:
-        platform_module = import_module(f"xvenv.platforms.{platform}")
-        if build_details is None:
-            build_details = platform_module.build_details_from_sysconfigdata(
-                sysconfigdata
-            )
-            archive_path = platform_module.archive_path(sysconfigdata_path)
-        else:
-            archive_path = platform_module.archive_path(build_details_path)
+    if build_details is None:
+        build_details = config.platform_module.build_details_from_sysconfigdata(
+            sysconfigdata
+        )
+    config.platform_module.extend_context(context, build_details)
 
-        platform_module.extend_context(context, build_details)
-    except ImportError:
-        raise ValueError(
-            f"Don't know how to build a cross-venv for {platform}"
-        ) from None
-
-    cross_multiarch = f"_cross_{platform}_{multiarch.replace('-', '_')}"
+    cross_multiarch = f"_cross_{config.platform}_{config.arch.replace('-', '_')}"
 
     # Render the template for the cross-target file.
     template = (Path(__file__).parent / "_cross_target.py.tmpl").read_text()
@@ -464,11 +414,4 @@ def convert_venv(
     # Write the .pth file that will enable the cross-target modifications
     (venv_site_packages_path / "_cross_venv.pth").write_text(
         f"import {cross_multiarch}\n"
-    )
-
-    return CrossVenvConfig(
-        platform=context["os"],
-        arch=multiarch,
-        archive_path=archive_path,
-        venv_path=venv_path,
     )
