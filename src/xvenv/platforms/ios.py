@@ -1,3 +1,6 @@
+import os
+import shutil
+import sys
 from pathlib import Path
 
 from xvenv import versions
@@ -121,3 +124,42 @@ def extend_context(context, build_details):
 
         return platform.IOSVersionInfo(system, release, model, {is_simulator})
 """
+
+
+def prepare_env(config) -> dict[str, str]:
+    """Prepare PATH so that target-platform clang/ar/strip shims are used
+    for compilation, and no build-machine-native tools leak in.
+
+    :param config: The resolved `xvenv.convert.CrossVenvConfig`.
+    :returns: A dict containing a fully-replaced PATH.
+    :raises ValueError: if not running on macOS, or Xcode command-line
+        tools are not installed/selected.
+    """
+    if sys.platform != "darwin":
+        raise ValueError("Building for iOS requires macOS.")
+    if shutil.which("xcrun") is None:
+        raise ValueError(
+            "Xcode command-line tools are required to build for iOS. "
+            "Run `xcode-select --install`, or select an Xcode install "
+            "with `sudo xcode-select -s /Applications/Xcode.app`."
+        )
+
+    _cpu, sdk = config.arch.rsplit("-", 1)
+    slice_dir = (
+        "ios-arm64_x86_64-simulator" if sdk == "iphonesimulator" else "ios-arm64"
+    )
+    slice_bin_dir = config.archive_path / "Python.xcframework" / slice_dir / "bin"
+
+    return {
+        "PATH": os.pathsep.join(
+            [
+                str(Path(sys.executable).parent),
+                str(slice_bin_dir),
+                "/usr/bin",
+                "/bin",
+                "/usr/sbin",
+                "/sbin",
+                "/Library/Apple/usr/bin",
+            ]
+        ),
+    }
