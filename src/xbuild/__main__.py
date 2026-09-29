@@ -23,7 +23,7 @@ from build._util import _format_dep_chain
 import xbuild
 from xbuild._builder import ProjectXBuilder
 from xbuild.env import XBuildIsolatedEnv
-from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path, use_archive_path
+from xvenv.convert import CrossVenvConfig, prepare_env, resolve_cross_venv_config
 
 
 def _build(
@@ -34,8 +34,7 @@ def _build(
     config_settings: ConfigSettings | None,
     skip_dependency_check: bool,
     installer: _env.Installer,
-    build_details_path: Path | None,
-    sysconfigdata_path: Path | None,
+    cross_venv_config: CrossVenvConfig,
 ) -> str:
     if isolation:
         return _build_in_isolated_env(
@@ -44,8 +43,7 @@ def _build(
             distribution,
             config_settings,
             installer,
-            build_details_path=build_details_path,
-            sysconfigdata_path=sysconfigdata_path,
+            cross_venv_config,
         )
     else:
         return _build_in_current_env(
@@ -63,13 +61,11 @@ def _build_in_isolated_env(
     distribution: Distribution,
     config_settings: ConfigSettings | None,
     installer: _env.Installer,
-    build_details_path: Path | None,
-    sysconfigdata_path: Path | None,
+    cross_venv_config: CrossVenvConfig,
 ) -> str:
     with XBuildIsolatedEnv(
         installer=installer,
-        build_details_path=build_details_path,
-        sysconfigdata_path=sysconfigdata_path,
+        cross_venv_config=cross_venv_config,
     ) as env:
         builder = ProjectXBuilder.from_isolated_env(env, srcdir)
 
@@ -318,27 +314,16 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
 
     config_settings = {}
 
-    build_details_path = args.build_details_path
-    sysconfigdata_path = args.sysconfigdata_path
-
     try:
-        if args.platform is not None:
-            arch = resolve_arch(args.platform, args.arch)
-
-            if args.archive is not None:
-                config_path, is_build_details = use_archive_path(
-                    args.platform, arch, args.archive
-                )
-            else:
-                cache_path = resolve_cache_path(args.cache)
-                config_path, is_build_details = fetch_python(
-                    args.platform, arch, cache_path
-                )
-
-            if is_build_details:
-                build_details_path = config_path
-            else:
-                sysconfigdata_path = config_path
+        cross_venv_config = resolve_cross_venv_config(
+            platform=args.platform,
+            arch=args.arch,
+            build_details_path=args.build_details_path,
+            sysconfigdata_path=args.sysconfigdata_path,
+            cache_path=args.cache,
+            archive_path=args.archive,
+        )
+        os.environ.update(prepare_env(cross_venv_config))
     except (ValueError, NotImplementedError) as e:
         _error(e)
         sys.exit(1)
@@ -380,8 +365,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
                 config_settings,
                 args.skip_dependency_check,
                 args.installer,
-                build_details_path=build_details_path,
-                sysconfigdata_path=sysconfigdata_path,
+                cross_venv_config,
             )
         ]
         artifact_list = _natural_language_list(
