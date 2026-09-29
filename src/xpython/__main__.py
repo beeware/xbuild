@@ -297,7 +297,7 @@ def _run(args: argparse.Namespace) -> int:
         "android": android_platform,
         "ios": ios_platform,
         "emscripten": emscripten_platform,
-    }[result.platform.lower()]
+    }[result.platform]
 
     _cprint("{bold}Creating testbed project...{reset}")
     platform_module.setup(
