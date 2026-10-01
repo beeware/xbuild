@@ -6,7 +6,7 @@ from xpython.deps import install_requirements, resolve_requirements
 
 
 def test_resolve_only_dependencies(tmp_path):
-    """--dependency specs pass through unchanged when no groups are given."""
+    """Dependency specs pass through unchanged when no groups are given."""
     pyproject_path = tmp_path / "pyproject.toml"
     pyproject_path.write_text("[dependency-groups]\n")
 
@@ -16,7 +16,7 @@ def test_resolve_only_dependencies(tmp_path):
 
 
 def test_resolve_only_groups(tmp_path):
-    """--group names expand via PEP 735 resolution against pyproject.toml."""
+    """Group names expand via PEP 735 resolution against pyproject.toml."""
     pyproject_path = tmp_path / "pyproject.toml"
     pyproject_path.write_text('[dependency-groups]\ntest = ["pytest", "pytest-cov"]\n')
 
@@ -26,7 +26,7 @@ def test_resolve_only_groups(tmp_path):
 
 
 def test_resolve_groups_and_dependencies_merged(tmp_path):
-    """--group expansions and --dependency specs are merged, groups first."""
+    """Group expansions and dependency specs are merged, groups first."""
     pyproject_path = tmp_path / "pyproject.toml"
     pyproject_path.write_text('[dependency-groups]\ntest = ["pytest"]\n')
 
@@ -36,7 +36,7 @@ def test_resolve_groups_and_dependencies_merged(tmp_path):
 
 
 def test_resolve_multiple_groups(tmp_path):
-    """Multiple --group names are all expanded and merged in order."""
+    """Multiple group names are expanded and merged in order."""
     pyproject_path = tmp_path / "pyproject.toml"
     pyproject_path.write_text(
         '[dependency-groups]\ntest = ["pytest"]\nlint = ["ruff"]\n'
@@ -65,7 +65,7 @@ def test_resolve_missing_pyproject_raises(tmp_path):
 
 
 def test_resolve_no_groups_needed_without_pyproject(tmp_path):
-    """If no --group names are given, a missing pyproject.toml is fine."""
+    """If no group names are given, a missing pyproject.toml is fine."""
     pyproject_path = tmp_path / "does-not-exist.toml"
 
     result = resolve_requirements(["requests"], [], pyproject_path)
@@ -74,7 +74,7 @@ def test_resolve_no_groups_needed_without_pyproject(tmp_path):
 
 
 def test_install_requirements_runs_pip(tmp_path, monkeypatch):
-    """install_requirements() invokes pip install --target with the given
+    """install_requirements() invokes `pip install --target` with the given
     requirements and --find-links directories."""
     mock_run = Mock()
     monkeypatch.setattr("xpython.deps.subprocess.run", mock_run)

@@ -1,3 +1,4 @@
+import os
 from unittest.mock import Mock
 
 import pytest
@@ -62,7 +63,7 @@ from xbuild.__main__ import main
         ),
     ],
 )
-def test_invalid_args(args, error, tmp_path, capsys):
+def test_invalid_args(args, error, capsys):
     """Invalid flag combinations raise errors."""
     with pytest.raises(SystemExit) as excinfo:
         main([*args])
@@ -71,15 +72,12 @@ def test_invalid_args(args, error, tmp_path, capsys):
     assert error in capsys.readouterr().err
 
 
-def test_platform_arg_defines_both_config_path_variables(tmp_path, monkeypatch):
-    """Using --platform must not leave build_details_path or
-    sysconfigdata_path completely unbound (regression test for a bug where
-    only the variable matching `is_build_details` was assigned, leaving the
-    other one to raise UnboundLocalError as soon as it was read while
-    constructing the call to `_build`)."""
+def test_main_resolves_config_and_calls_build(tmp_path, monkeypatch):
+    """main() resolves a CrossVenvConfig and passes it through to _build()."""
     calls = {}
+    mock_config = Mock()
 
-    def fake_build(
+    def mock_build(
         isolation,
         srcdir,
         outdir,
@@ -87,77 +85,33 @@ def test_platform_arg_defines_both_config_path_variables(tmp_path, monkeypatch):
         config_settings,
         skip_dependency_check,
         installer,
-        build_details_path,
-        sysconfigdata_path,
+        cross_venv_config,
     ):
-        # If the bug is present, this function is never reached: the
-        # UnboundLocalError happens while assembling this call's keyword
-        # arguments, before `_build` itself is invoked (it gets caught by
-        # `build.__main__._handle_build_error()` further up the call stack
-        # and turned into a `SystemExit(1)`, without ever reaching here).
-        # Reaching this function at all - with both arguments bound to some
-        # value, even None - is the regression check.
-        calls["build_details_path"] = build_details_path
-        calls["sysconfigdata_path"] = sysconfigdata_path
+        calls["cross_venv_config"] = cross_venv_config
         return "fake-wheel-0.1.0-py3-none-any.whl"
 
-    monkeypatch.setattr(
-        "xbuild.__main__.fetch_python",
-        lambda platform_name, arch, cache_dir: (tmp_path / "build-details.json", True),
-    )
-    monkeypatch.setattr(
-        "xbuild.__main__.resolve_cache_path", lambda cache_arg: tmp_path
-    )
-    monkeypatch.setattr(
-        "xbuild.__main__.resolve_arch",
-        lambda platform_name, arch: "arm64-iphonesimulator",
-    )
-    monkeypatch.setattr("xbuild.__main__._build", fake_build)
+    mock_config = Mock()
+    mock_config.prepare_env = Mock(return_value={"MY_TEST_VAR": "hello"})
+    mock_CrossVenvConfig = Mock(return_value=mock_config)
+
+    monkeypatch.setattr("xbuild.__main__.CrossVenvConfig", mock_CrossVenvConfig)
+    monkeypatch.setattr("xbuild.__main__._build", mock_build)
 
     main(["--platform", "ios", str(tmp_path)])
 
-    assert calls["build_details_path"] == tmp_path / "build-details.json"
-    assert calls["sysconfigdata_path"] is None
+    assert calls["cross_venv_config"] is mock_config
 
 
-def test_archive_arg_uses_use_archive_path_not_fetch_python(tmp_path, monkeypatch):
-    """--archive routes through use_archive_path(), not fetch_python()/
-    resolve_cache_path(), and still correctly binds build_details_path/
-    sysconfigdata_path."""
-    calls = {}
+def test_main_forwards_archive_arg_to_resolver(tmp_path, monkeypatch):
+    """A cross environment can be created pointing at an existing archive."""
+    mock_config = Mock()
+    mock_config.prepare_env = Mock(return_value={"MY_TEST_VAR": "hello"})
+    mock_CrossVenvConfig = Mock(return_value=mock_config)
 
-    def fake_build(
-        isolation,
-        srcdir,
-        outdir,
-        distribution,
-        config_settings,
-        skip_dependency_check,
-        installer,
-        build_details_path,
-        sysconfigdata_path,
-    ):
-        calls["build_details_path"] = build_details_path
-        calls["sysconfigdata_path"] = sysconfigdata_path
-        return "fake-wheel-0.1.0-py3-none-any.whl"
-
-    fetch_python_mock = Mock()
-    resolve_cache_path_mock = Mock()
-
-    monkeypatch.setattr("xbuild.__main__.fetch_python", fetch_python_mock)
-    monkeypatch.setattr("xbuild.__main__.resolve_cache_path", resolve_cache_path_mock)
+    monkeypatch.setattr("xbuild.__main__.CrossVenvConfig", mock_CrossVenvConfig)
     monkeypatch.setattr(
-        "xbuild.__main__.use_archive_path",
-        lambda platform_name, arch, archive_path: (
-            tmp_path / "build-details.json",
-            True,
-        ),
+        "xbuild.__main__._build", Mock(return_value="fake-wheel-0.1.0-py3-none-any.whl")
     )
-    monkeypatch.setattr(
-        "xbuild.__main__.resolve_arch",
-        lambda platform_name, arch: "arm64-iphonesimulator",
-    )
-    monkeypatch.setattr("xbuild.__main__._build", fake_build)
 
     main(
         [
@@ -169,7 +123,43 @@ def test_archive_arg_uses_use_archive_path_not_fetch_python(tmp_path, monkeypatc
         ]
     )
 
-    fetch_python_mock.assert_not_called()
-    resolve_cache_path_mock.assert_not_called()
-    assert calls["build_details_path"] == tmp_path / "build-details.json"
-    assert calls["sysconfigdata_path"] is None
+    mock_CrossVenvConfig.assert_called_once_with(
+        platform="ios",
+        arch=None,
+        archive_path=tmp_path / "my-archive",
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+    )
+
+
+def test_main_merges_prepare_env_into_os_environ(tmp_path, monkeypatch):
+    """xbuild merges platform environment details into the running environment."""
+    mock_config = Mock()
+    mock_config.prepare_env = Mock(return_value={"MY_TEST_VAR": "hello"})
+
+    monkeypatch.setattr(
+        "xbuild.__main__.CrossVenvConfig", Mock(return_value=mock_config)
+    )
+    monkeypatch.setattr(
+        "xbuild.__main__._build", Mock(return_value="fake-wheel-0.1.0-py3-none-any.whl")
+    )
+    monkeypatch.delenv("MY_TEST_VAR", raising=False)
+
+    main(["--platform", "ios", str(tmp_path)])
+
+    assert os.environ["MY_TEST_VAR"] == "hello"
+
+
+def test_main_reports_config_error(tmp_path, monkeypatch, capsys):
+    """An error when configuring the environment is surfaced."""
+    monkeypatch.setattr(
+        "xbuild.__main__.CrossVenvConfig",
+        Mock(side_effect=ValueError("boom")),
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--platform", "ios", str(tmp_path)])
+
+    assert excinfo.value.code == 1
+    assert "boom" in capsys.readouterr().err

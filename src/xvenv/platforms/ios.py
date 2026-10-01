@@ -1,3 +1,9 @@
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 from xvenv import versions
@@ -121,3 +127,115 @@ def extend_context(context, build_details):
 
         return platform.IOSVersionInfo(system, release, model, {is_simulator})
 """
+
+
+def prepare_env(config) -> dict[str, str]:
+    """Prepare PATH so that target-platform clang/ar/strip shims are used
+    for compilation, and no build-machine-native tools leak in.
+
+    :param config: The resolved `xvenv.convert.CrossVenvConfig`.
+    :returns: A dict containing a fully-replaced PATH.
+    :raises ValueError: if not running on macOS, or Xcode command-line
+        tools are not installed/selected.
+    """
+    if sys.platform != "darwin":
+        raise ValueError("Building for iOS requires macOS.")
+    if shutil.which("xcrun") is None:
+        raise ValueError(
+            "Xcode command-line tools are required to build for iOS. "
+            "Run `xcode-select --install`, or select an Xcode install "
+            "with `sudo xcode-select -s /Applications/Xcode.app`."
+        )
+
+    _cpu, sdk = config.arch.rsplit("-", 1)
+    slice_dir = (
+        "ios-arm64_x86_64-simulator" if sdk == "iphonesimulator" else "ios-arm64"
+    )
+    slice_bin_dir = config.archive_path / "Python.xcframework" / slice_dir / "bin"
+
+    return {
+        "PATH": os.pathsep.join(
+            [
+                str(Path(sys.executable).parent),
+                str(slice_bin_dir),
+                "/usr/bin",
+                "/bin",
+                "/usr/sbin",
+                "/sbin",
+                "/Library/Apple/usr/bin",
+            ]
+        ),
+    }
+
+
+def testbed_path(work_path):
+    return work_path / "testbed"
+
+
+def packages_path(work_path):
+    return testbed_path(work_path) / "iOSTestbed" / "app_packages"
+
+
+def setup_testbed(archive_path: Path, work_path: Path, src_paths: list[Path]):
+    """Clone the iOS testbed, and stage source files into it.
+
+    :param archive_path: The extracted iOS Python archive directory
+        (contains a `testbed/` subdirectory with the testbed driver
+        script).
+    :param work_path: The working directory to clone the testbed into.
+    :param src_paths: Paths to copy into the cloned testbed's
+        `iOSTestbed/app/` directory.
+    :raises RuntimeError: If not on a macOS machine.
+    """
+    if sys.platform != "darwin":
+        raise RuntimeError("Can't run an iOS project on non-macOS hardware.")
+
+    testbed_source = archive_path / "testbed"
+    testbed_clone = testbed_path(work_path)
+    target = testbed_clone / "iOSTestbed" / "app"
+
+    subprocess.run(
+        [sys.executable, str(testbed_source), "clone", str(testbed_clone)],
+        check=True,
+    )
+    # Copy sources into the app
+    for src in src_paths:
+        if src.is_dir():
+            shutil.copytree(src, target / src.name, dirs_exist_ok=True)
+        else:
+            shutil.copy(src, target / src.name)
+
+
+def run_testbed(
+    work_path: Path,
+    args: list[str],
+    simulator: str | None,
+    verbose: int,
+    **kwargs,
+) -> int:
+    """Run the testbed project inside the iOS Simulator.
+
+    :param work_path: The working directory to clone the testbed into (as
+        `work_path / "testbed"`).
+    :param args: Arguments to pass to the testbed.
+    :param simulator: The name of the iOS simulator to use, or `None` to
+        use the testbed driver's own default.
+    :param verbose: Verbosity level; > 0 forwards `-v` to the driver's
+        `run` subcommand.
+    :returns: The exit code of the testbed driver's `run` subcommand.
+    """
+    if args and (args[0] != "-m" or len(args) < 2):
+        raise ValueError("iOS requires -m <module> as the first two arguments after --")
+
+    testbed_clone = testbed_path(work_path)
+
+    run_command = [sys.executable, str(testbed_clone), "run"]
+    if simulator is not None:
+        run_command.extend(["--simulator", simulator])
+    if verbose > 0:
+        run_command.append("-v")
+
+    run_command.extend(["--", *args[1:]])
+
+    result = subprocess.run(run_command, check=False)
+    return result.returncode

@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+import os
+import shlex
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 from xvenv import versions
@@ -161,3 +168,160 @@ def extend_context(context, build_details):
         )
 
 """
+
+
+def prepare_env(config) -> dict[str, str]:
+    """Prepare CC/AR/CXX/etc. environment variables for compiling Android
+    native code.
+
+    This runs the archive's own `android.py env` subcommand to establish
+    environment overrides and ensure the required NDK is installed.
+
+    :param config: The resolved `xvenv.convert.CrossVenvConfig`.
+    :returns: A dict of environment variables (AR, AS, CC, CXX, LD, NM,
+        RANLIB, READELF, STRIP, CFLAGS, LDFLAGS, CXXFLAGS, CPU_COUNT,
+        and -- if a prefix/ directory exists in the archive --
+        PKG_CONFIG/PKG_CONFIG_LIBDIR).
+    :raises ValueError: if ANDROID_HOME isn't set, the archive's
+        `android.py` can't be found, or `android.py env` exits with an
+        error (e.g. a toolchain binary is missing).
+    """
+    if not os.environ.get("ANDROID_HOME"):
+        raise ValueError(
+            "ANDROID_HOME environment variable is not set. It must "
+            "point at an installed Android SDK."
+        )
+
+    android_py = config.archive_path / "android.py"
+    if not android_py.is_file():
+        raise ValueError(f"Could not find {android_py}")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(android_py), "env"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"{android_py} env failed:\n{e.stdout}{e.stderr}") from e
+
+    android_env: dict[str, str] = {}
+    for i, token in enumerate(shlex.split(result.stdout)):
+        if i % 2 == 0:
+            if token != "export":
+                raise ValueError(
+                    f"Unexpected output from {android_py} env: expected "
+                    f"'export', got {token!r}"
+                )
+        else:
+            key, sep, value = token.partition("=")
+            if sep != "=":
+                raise ValueError(
+                    f"Unexpected output from {android_py} env: expected "
+                    f"'key=value', got {token!r}"
+                )
+            android_env[key] = value
+
+    return android_env
+
+
+def packages_path(work_path):
+    return work_path / "site-packages"
+
+
+def setup_testbed(
+    archive_path: Path,
+    work_path: Path,
+    src_paths: list[Path],
+):
+    """Clone the Android testbed, and stage source files into it.
+
+    :param archive_path: The extracted Android Python archive directory
+        (contains a `testbed/` subdirectory with the testbed driver
+        script).
+    :param work_path: The working directory to clone the testbed into.
+    :param src_paths: Paths to copy into the cloned testbed's src directory.
+    :raises RuntimeError: if running on GitHub actions on a macOS runner.
+    """
+    if sys.platform == "darwin" and "GITHUB_ACTIONS" in os.environ:
+        raise RuntimeError(
+            "GitHub Actions can't start an Android emulator on a macOS runner."
+        )
+
+    src_path = work_path / "src"
+    src_path.mkdir(parents=True, exist_ok=True)
+
+    shutil.copy(archive_path / "android.py", work_path / "android.py")
+    shutil.copytree(archive_path / "testbed", work_path / "testbed", dirs_exist_ok=True)
+    (work_path / "prefix").symlink_to(archive_path / "prefix")
+    (work_path / "android-env.sh").symlink_to(archive_path / "android-env.sh")
+
+    for src in src_paths:
+        if src.is_dir():
+            shutil.copytree(src, src_path / src.name, dirs_exist_ok=True)
+        else:
+            shutil.copy(src, src_path / src.name)
+
+
+def run_testbed(
+    work_path: Path,
+    args: list[str],
+    managed: str | None,
+    connected: str | None,
+    verbose: int,
+    **kwargs,
+) -> int:
+    """Run the testbed project on an Android emulator/device..
+
+    :param work_path: The working directory to build staging directories
+        in (`work_path / "site-packages"`, `work_path / "cwd"`).
+    :param args: Arguments to pass to the testbed process. Accepts any
+        argument list starting with `-c`/`-m`; defaults to `-m test`
+        if `args` is empty.
+    :param managed: The name of a Gradle-managed device to use, or `None`.
+    :param connected: The serial of an already-connected device to use, or
+        `None`. Mutually exclusive with `managed`; if both are `None`,
+        defaults to `--managed maxVersion`.
+    :param verbose: Verbosity level; > 0 forwards `-v` to `android.py`.
+    :returns: The exit code of the `android.py test` subprocess.
+    """
+    if "GITHUB_ACTIONS" in os.environ and sys.platform == "linux":
+        # Enable emulator hardware acceleration on GitHub Actions.
+        # (https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/).
+        print("Enabling GitHub Actions hardware acceleration...")
+        subprocess.run(
+            ["sudo", "tee", "/etc/udev/rules.d/99-kvm4all.rules"],
+            input=(
+                'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"\n'
+            ),
+            text=True,
+            check=True,
+        )
+        subprocess.run(
+            ["sudo", "udevadm", "control", "--reload-rules"],
+            check=True,
+        )
+        subprocess.run(
+            ["sudo", "udevadm", "trigger", "--name-match=kvm"],
+            check=True,
+        )
+
+    command = [
+        str(work_path / "android.py"),
+        "test",
+        "--site-packages",
+        str(packages_path(work_path)),
+        "--cwd",
+        str(work_path / "src"),
+    ]
+    if connected is not None:
+        command.extend(["--connected", connected])
+    else:
+        command.extend(["--managed", managed or "maxVersion"])
+    if verbose > 0:
+        command.append("-v")
+    command.extend(["--", *args])
+
+    result = subprocess.run(command, check=False)
+    return result.returncode

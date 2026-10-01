@@ -1,6 +1,6 @@
 import pytest
 
-from xvenv.platforms.emscripten import config_path, download_url
+from xvenv.platforms.emscripten import config_path, download_url, prepare_env
 
 from ...utils import VersionInfo
 
@@ -73,3 +73,11 @@ def test_config_path(tmp_path, version_details, path):
         actual_config_path = config_path(tmp_path, version_info, "wasm32")  # noqa: F841
 
     # assert actual_config_path == tmp_path / path
+
+
+def test_prepare_env_not_implemented():
+    """prepare_env() raises NotImplementedError, matching the existing
+    pattern for download_url()/archive_path()/config_path() in this
+    module."""
+    with pytest.raises(NotImplementedError):
+        prepare_env(None)
