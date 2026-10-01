@@ -5,9 +5,7 @@ a test suite for that binary wheel.
 Drives the real `xbuild` CLI (no mocking) against a real downloaded target
 Python build, for the default/host-native architecture of each supported
 platform. Requires network access (downloads real Python builds on first
-run per platform/Python-version combination; cached afterwards via the
-existing XBUILD_CACHE/platformdirs resolution in
-xvenv.fetch.resolve_cache_path()).
+run per platform/Python-version combination).
 
 Unlike tests/live/test_xvenv.py (which only exercises xvenv's venv
 metadata patching), this test performs a *real compilation* of a C
@@ -20,22 +18,17 @@ preconditions beyond just "downloaded Python build available":
   already be installed under $ANDROID_HOME/ndk/<version>. No auto-install
   is attempted.
 
-If a required precondition is missing, the test fails loudly via
-pytest.fail() with a specific, actionable message - it does not skip
-silently.
+If a required precondition is missing, the test fails.
 """
 
 import os
 import re
-import runpy
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-
-from xvenv.fetch import fetch_python, resolve_arch, resolve_cache_path
 
 SAMPLE_PROJECTS = [
     pytest.param(Path(__file__).parents[1] / "samples" / "test1", id="test1"),
@@ -110,117 +103,6 @@ def _check_preconditions_android():
         )
 
 
-def _build_env(platform_name, config_path, arch):
-    if platform_name == "ios":
-        return _build_env_ios(config_path)
-    elif platform_name == "android":
-        return _build_env_android(config_path, arch)
-    else:
-        raise AssertionError(f"no environment builder for {platform_name!r}")
-
-
-def _build_env_ios(config_path):
-    # config_path is e.g.
-    # .../Python.xcframework/ios-arm64_x86_64-simulator/lib-arm64/python3.13/
-    #     _sysconfigdata__ios_arm64-iphonesimulator.py
-    # or, for Python >= 3.14:
-    # .../Python.xcframework/ios-arm64_x86_64-simulator/lib-arm64/python3.14/
-    #     build-details.json
-    # In both cases, the slice's own `bin/` directory (containing the
-    # `arm64-apple-ios-*-clang` etc. shims) is 2 levels up from config_path's
-    # parent.
-    slice_bin_dir = config_path.parents[2] / "bin"
-    venv_bin_dir = Path(sys.executable).parent
-
-    return {
-        "PATH": os.pathsep.join(
-            [
-                str(venv_bin_dir),
-                str(slice_bin_dir),
-                "/usr/bin",
-                "/bin",
-                "/usr/sbin",
-                "/sbin",
-                "/Library/Apple/usr/bin",
-            ]
-        ),
-    }
-
-
-def _build_env_android(config_path, arch):
-    # config_path is e.g.
-    # <cache_dir>/python-3.13.15-aarch64-linux-android/prefix/lib/
-    #     python3.13/_sysconfigdata__android_aarch64-linux-android.py
-    # or, for Python >= 3.14:
-    # <cache_dir>/python-3.14.7-aarch64-linux-android/prefix/lib/
-    #     python3.14/build-details.json
-    # In both cases:
-    #   prefix_dir      = config_path.parents[2]   (".../prefix")
-    #   extracted_dir   = config_path.parents[3]
-    #                     (".../python-3.13.15-aarch64-linux-android")
-    try:
-        host = _ANDROID_HOST_TRIPLETS[arch]
-    except KeyError:
-        raise AssertionError(f"unknown Android arch: {arch!r}") from None
-
-    prefix_dir = config_path.parents[2]
-    extracted_dir = config_path.parents[3]
-
-    sysconfigdata_matches = list(
-        prefix_dir.glob("lib/python*/_sysconfigdata__android_*.py")
-    )
-    if not sysconfigdata_matches:
-        pytest.fail(
-            f"Could not find a _sysconfigdata__android_*.py file under {prefix_dir}"
-        )
-    sysconfigdata_path = sysconfigdata_matches[0]
-    api_level = runpy.run_path(str(sysconfigdata_path))["build_time_vars"][
-        "ANDROID_API_LEVEL"
-    ]
-
-    env_script = extracted_dir / "android-env.sh"
-    ndk_match = _NDK_VERSION_RE.search(env_script.read_text())
-    if not ndk_match:
-        pytest.fail(f"Could not find ndk_version= in {env_script}")
-    ndk_version = ndk_match[1]
-
-    ndk_dir = Path(os.environ["ANDROID_HOME"]) / "ndk" / ndk_version
-    if not ndk_dir.is_dir():
-        pytest.fail(
-            f"Android NDK {ndk_version} is required (as specified by "
-            f"{env_script}), but was not found at {ndk_dir}. Install it "
-            f'with `sdkmanager "ndk;{ndk_version}"`, or use '
-            "`ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager` to list "
-            "available versions."
-        )
-
-    bash_command = (
-        f'set -eu; HOST="{host}"; PREFIX="{prefix_dir}"; '
-        f'ANDROID_API_LEVEL="{api_level}"; . "{env_script}"; export'
-    )
-    result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            bash_command,
-        ],
-        env=os.environ,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-
-    sourced = {}
-    for line in result.stdout.splitlines():
-        match = _EXPORT_LINE_RE.search(line)
-        if match:
-            key, value = match[1], match[2]
-            if os.environ.get(key) != value:
-                sourced[key] = value
-
-    return {**os.environ, **sourced}
-
-
 @pytest.mark.live
 @pytest.mark.parametrize("platform_name", CASES)
 @pytest.mark.parametrize("sample_project", SAMPLE_PROJECTS)
@@ -230,15 +112,9 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
     # Fail fast on preconditions that don't require a download first.
     _check_preconditions(platform_name)
 
-    arch = resolve_arch(platform_name, None)
-    cache_dir = resolve_cache_path(None)
-    config_path, _ = fetch_python(platform_name, arch, cache_dir)
-
     project_dir = tmp_path / sample_project.name
     shutil.copytree(sample_project, project_dir)
     out_dir = tmp_path / "dist"
-
-    env = _build_env(platform_name, config_path, arch)
 
     subprocess.run(
         [
@@ -251,7 +127,6 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
             "-o",
             out_dir,
         ],
-        env=env,
         check=True,
     )
 
@@ -284,7 +159,6 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
                 "pytest",
                 "tests",
             ],
-            env=env,
             check=True,
         )
         assert result.returncode == 0

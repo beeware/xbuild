@@ -23,7 +23,7 @@ from build._util import _format_dep_chain
 import xbuild
 from xbuild._builder import ProjectXBuilder
 from xbuild.env import XBuildIsolatedEnv
-from xvenv.convert import CrossVenvConfig, prepare_env, resolve_cross_venv_config
+from xvenv.convert import CrossVenvConfig
 
 
 def _build(
@@ -34,7 +34,7 @@ def _build(
     config_settings: ConfigSettings | None,
     skip_dependency_check: bool,
     installer: _env.Installer,
-    cross_venv_config: CrossVenvConfig,
+    cross_venv: CrossVenvConfig,
 ) -> str:
     if isolation:
         return _build_in_isolated_env(
@@ -43,7 +43,7 @@ def _build(
             distribution,
             config_settings,
             installer,
-            cross_venv_config,
+            cross_venv,
         )
     else:
         return _build_in_current_env(
@@ -61,11 +61,11 @@ def _build_in_isolated_env(
     distribution: Distribution,
     config_settings: ConfigSettings | None,
     installer: _env.Installer,
-    cross_venv_config: CrossVenvConfig,
+    cross_venv: CrossVenvConfig,
 ) -> str:
     with XBuildIsolatedEnv(
         installer=installer,
-        cross_venv_config=cross_venv_config,
+        cross_venv=cross_venv,
     ) as env:
         builder = ProjectXBuilder.from_isolated_env(env, srcdir)
 
@@ -315,15 +315,15 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     config_settings = {}
 
     try:
-        cross_venv_config = resolve_cross_venv_config(
+        cross_venv = CrossVenvConfig(
             platform=args.platform,
             arch=args.arch,
+            archive_path=args.archive,
             build_details_path=args.build_details_path,
             sysconfigdata_path=args.sysconfigdata_path,
             cache_path=args.cache,
-            archive_path=args.archive,
         )
-        os.environ.update(prepare_env(cross_venv_config))
+        os.environ.update(cross_venv.prepare_env())
     except (ValueError, NotImplementedError) as e:
         _error(e)
         sys.exit(1)
@@ -365,7 +365,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
                 config_settings,
                 args.skip_dependency_check,
                 args.installer,
-                cross_venv_config,
+                cross_venv,
             )
         ]
         artifact_list = _natural_language_list(

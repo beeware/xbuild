@@ -63,7 +63,7 @@ from xbuild.__main__ import main
         ),
     ],
 )
-def test_invalid_args(args, error, tmp_path, capsys):
+def test_invalid_args(args, error, capsys):
     """Invalid flag combinations raise errors."""
     with pytest.raises(SystemExit) as excinfo:
         main([*args])
@@ -73,14 +73,11 @@ def test_invalid_args(args, error, tmp_path, capsys):
 
 
 def test_main_resolves_config_and_calls_build(tmp_path, monkeypatch):
-    """main() resolves a CrossVenvConfig via resolve_cross_venv_config()
-    and passes it through to _build() (regression coverage for the
-    previous inline --platform resolution block, now removed in favor of
-    the shared resolver)."""
+    """main() resolves a CrossVenvConfig and passes it through to _build()."""
     calls = {}
-    fake_config = Mock()
+    mock_config = Mock()
 
-    def fake_build(
+    def mock_build(
         isolation,
         srcdir,
         outdir,
@@ -93,26 +90,25 @@ def test_main_resolves_config_and_calls_build(tmp_path, monkeypatch):
         calls["cross_venv_config"] = cross_venv_config
         return "fake-wheel-0.1.0-py3-none-any.whl"
 
-    monkeypatch.setattr(
-        "xbuild.__main__.resolve_cross_venv_config",
-        Mock(return_value=fake_config),
-    )
-    monkeypatch.setattr("xbuild.__main__.prepare_env", Mock(return_value={}))
-    monkeypatch.setattr("xbuild.__main__._build", fake_build)
+    mock_config = Mock()
+    mock_config.prepare_env = Mock(return_value={"MY_TEST_VAR": "hello"})
+    mock_CrossVenvConfig = Mock(return_value=mock_config)
+
+    monkeypatch.setattr("xbuild.__main__.CrossVenvConfig", mock_CrossVenvConfig)
+    monkeypatch.setattr("xbuild.__main__._build", mock_build)
 
     main(["--platform", "ios", str(tmp_path)])
 
-    assert calls["cross_venv_config"] is fake_config
+    assert calls["cross_venv_config"] is mock_config
 
 
 def test_main_forwards_archive_arg_to_resolver(tmp_path, monkeypatch):
-    """--archive is forwarded to resolve_cross_venv_config() as
-    archive_path, alongside platform/arch/cache."""
-    fake_config = Mock()
-    resolve_mock = Mock(return_value=fake_config)
+    """A cross environment can be created pointing at an existing archive."""
+    mock_config = Mock()
+    mock_config.prepare_env = Mock(return_value={"MY_TEST_VAR": "hello"})
+    mock_CrossVenvConfig = Mock(return_value=mock_config)
 
-    monkeypatch.setattr("xbuild.__main__.resolve_cross_venv_config", resolve_mock)
-    monkeypatch.setattr("xbuild.__main__.prepare_env", Mock(return_value={}))
+    monkeypatch.setattr("xbuild.__main__.CrossVenvConfig", mock_CrossVenvConfig)
     monkeypatch.setattr(
         "xbuild.__main__._build", Mock(return_value="fake-wheel-0.1.0-py3-none-any.whl")
     )
@@ -127,26 +123,23 @@ def test_main_forwards_archive_arg_to_resolver(tmp_path, monkeypatch):
         ]
     )
 
-    resolve_mock.assert_called_once_with(
+    mock_CrossVenvConfig.assert_called_once_with(
         platform="ios",
         arch=None,
+        archive_path=tmp_path / "my-archive",
         build_details_path=None,
         sysconfigdata_path=None,
         cache_path=None,
-        archive_path=tmp_path / "my-archive",
     )
 
 
 def test_main_merges_prepare_env_into_os_environ(tmp_path, monkeypatch):
-    """main() merges prepare_env()'s result into os.environ before
-    calling _build()."""
-    fake_config = Mock()
+    """xbuild merges platform environment details into the running environment."""
+    mock_config = Mock()
+    mock_config.prepare_env = Mock(return_value={"MY_TEST_VAR": "hello"})
 
     monkeypatch.setattr(
-        "xbuild.__main__.resolve_cross_venv_config", Mock(return_value=fake_config)
-    )
-    monkeypatch.setattr(
-        "xbuild.__main__.prepare_env", Mock(return_value={"MY_TEST_VAR": "hello"})
+        "xbuild.__main__.CrossVenvConfig", Mock(return_value=mock_config)
     )
     monkeypatch.setattr(
         "xbuild.__main__._build", Mock(return_value="fake-wheel-0.1.0-py3-none-any.whl")
@@ -156,14 +149,12 @@ def test_main_merges_prepare_env_into_os_environ(tmp_path, monkeypatch):
     main(["--platform", "ios", str(tmp_path)])
 
     assert os.environ["MY_TEST_VAR"] == "hello"
-    del os.environ["MY_TEST_VAR"]
 
 
-def test_main_reports_resolve_cross_venv_config_error(tmp_path, monkeypatch, capsys):
-    """A ValueError from resolve_cross_venv_config() is surfaced via
-    _error()/SystemExit(1), matching the existing error-handling pattern."""
+def test_main_reports_config_error(tmp_path, monkeypatch, capsys):
+    """An error when configuring the environment is surfaced."""
     monkeypatch.setattr(
-        "xbuild.__main__.resolve_cross_venv_config",
+        "xbuild.__main__.CrossVenvConfig",
         Mock(side_effect=ValueError("boom")),
     )
 

@@ -8,7 +8,7 @@ from pathlib import Path
 from build.__main__ import _error, _setup_cli
 
 import xvenv
-from xvenv.convert import create_cross_venv
+from xvenv.convert import CrossVenvConfig
 
 
 def main_parser():
@@ -133,16 +133,15 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     venv_path = Path(args.venv).resolve()
 
     try:
-        create_cross_venv(
-            venv_path,
+        cross_venv = CrossVenvConfig(
             platform=args.platform,
             arch=args.arch,
             build_details_path=args.build_details_path,
             sysconfigdata_path=args.sysconfigdata_path,
             cache_path=args.cache,
             archive_path=args.archive,
-            with_pip=args.with_pip,
         )
+        cross_venv.create(venv_path, with_pip=args.with_pip)
     except (ValueError, NotImplementedError) as e:
         _error(e)
         sys.exit(1)

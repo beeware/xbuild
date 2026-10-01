@@ -11,10 +11,7 @@ from build.__main__ import _cprint, _error, _setup_cli
 
 import xpython
 from xpython.deps import install_requirements, resolve_requirements
-from xpython.platforms import android as android_platform
-from xpython.platforms import emscripten as emscripten_platform
-from xpython.platforms import ios as ios_platform
-from xvenv.convert import create_cross_venv
+from xvenv.convert import CrossVenvConfig
 
 
 def main_parser() -> argparse.ArgumentParser:
@@ -282,26 +279,18 @@ def _run(args: argparse.Namespace) -> int:
     """
     _cprint("{bold}Creating cross-venv...{reset}")
     venv_path = args.work_path / "venv"
-    result = create_cross_venv(
-        venv_path,
+    cross_venv = CrossVenvConfig(
         platform=args.platform,
         arch=args.arch,
+        archive_path=args.archive,
         build_details_path=args.build_details_path,
         sysconfigdata_path=args.sysconfigdata_path,
         cache_path=args.cache,
-        archive_path=args.archive,
-        with_pip=True,
     )
-
-    platform_module = {
-        "android": android_platform,
-        "ios": ios_platform,
-        "emscripten": emscripten_platform,
-    }[result.platform]
+    cross_venv.create(venv_path, with_pip=True)
 
     _cprint("{bold}Creating testbed project...{reset}")
-    platform_module.setup(
-        archive_path=result.archive_path,
+    cross_venv.setup_testbed(
         work_path=args.work_path,
         src_paths=args.src,
     )
@@ -310,14 +299,14 @@ def _run(args: argparse.Namespace) -> int:
     requirements = resolve_requirements(
         args.dependencies, args.groups, Path("pyproject.toml")
     )
-    packages_path = platform_module.packages_path(args.work_path)
+    packages_path = cross_venv.packages_path(args.work_path)
     packages_path.mkdir(parents=True, exist_ok=True)
     if requirements:
         venv_python = venv_path / "bin" / "python3"
         install_requirements(venv_python, requirements, packages_path, args.find_links)
 
     _cprint("{bold}Running testbed...{reset}")
-    return platform_module.run(
+    return cross_venv.run_testbed(
         work_path=args.work_path,
         args=args.forwarded_args,
         simulator=args.simulator,

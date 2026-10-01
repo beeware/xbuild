@@ -1,20 +1,10 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
 import tomllib
 from pathlib import Path
 
 from dependency_groups import resolve as resolve_dependency_groups
-
-
-def copy_into(src: Path, dst: Path) -> None:
-    """Copy `src` (file or directory) into `dst / src.name`."""
-    target = dst / src.name
-    if src.is_dir():
-        shutil.copytree(src, target, dirs_exist_ok=True)
-    else:
-        shutil.copy(src, target)
 
 
 def resolve_requirements(
@@ -85,6 +75,3 @@ def install_requirements(
     command.extend(requirements)
 
     subprocess.run(command, check=True)
-
-
-__all__ = ["install_requirements", "resolve_requirements"]

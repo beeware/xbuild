@@ -13,8 +13,6 @@ from build import _ctx
 from build import env as build_env
 from build.env import DefaultIsolatedEnv, _PipBackend
 
-from xvenv.convert import convert_venv
-
 
 ###########################################################################
 # Patch `build.env._PipBackend` to disable the cross-build environment
@@ -60,12 +58,12 @@ build_env._PipBackend = _XPipBackend
 # and can handle both build and target dependency installs.
 ###########################################################################
 class XBuildIsolatedEnv(DefaultIsolatedEnv):
-    def __init__(self, *, installer, cross_venv_config):
+    def __init__(self, *, installer, cross_venv):
         if installer == "uv":
             raise RuntimeError("Can't support uv (for now)")
 
         super().__init__()
-        self.cross_venv_config = cross_venv_config
+        self.cross_venv = cross_venv
 
     def __enter__(self) -> Self:
         super().__enter__()
@@ -77,7 +75,7 @@ class XBuildIsolatedEnv(DefaultIsolatedEnv):
         if not getattr(sys, "cross_compiling", False):
             # We're in a local environment.
             # Make the isolated environment a cross environment.
-            convert_venv(Path(self._path), self.cross_venv_config)
+            self.cross_venv.convert(Path(self._path))
         else:
             # We're already in a cross environment.
             # Copy any _cross_*.pth or _cross_*.py file, plus the cross-platform

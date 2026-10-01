@@ -4,6 +4,30 @@ from unittest.mock import Mock
 import pytest
 
 from xpython.__main__ import _parse_args, _run
+from xvenv.convert import CrossVenvConfig
+
+
+@pytest.fixture
+def mock_config(tmp_path):
+    config = Mock(
+        spec=CrossVenvConfig,
+        platform="android",
+        arch="arm64",
+        archive_path=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+    )
+    config = Mock()
+    config.packages_path.return_value = tmp_path / "site-packages"
+    config.run_testbed.return_value = 0
+    return config
+
+
+@pytest.fixture
+def mock_CrossVenvConfig(monkeypatch, mock_config):
+    CrossVenvConfig = Mock(return_value=mock_config)
+    monkeypatch.setattr("xpython.__main__.CrossVenvConfig", CrossVenvConfig)
+    return CrossVenvConfig
 
 
 @pytest.mark.parametrize(
@@ -213,33 +237,6 @@ def test_forwarded_args(input_args, forwarded_args):
 
 
 @pytest.fixture
-def mock_create_cross_venv(monkeypatch, tmp_path):
-    create_cross_venv = Mock()
-    create_cross_venv.return_value = Mock(
-        platform="android",
-        archive_path=tmp_path / "archive",
-    )
-    monkeypatch.setattr("xpython.__main__.create_cross_venv", create_cross_venv)
-    return create_cross_venv
-
-
-@pytest.fixture
-def mock_android_platform(monkeypatch, tmp_path):
-    """Mock out the android platform module's setup/packages_path/run, so
-    `_run()` can proceed past `create_cross_venv()` without doing any real
-    testbed setup, dependency install, or subprocess work."""
-    setup = Mock()
-    packages_path = Mock(return_value=tmp_path / "site-packages")
-    run = Mock(return_value=0)
-    monkeypatch.setattr("xpython.__main__.android_platform.setup", setup)
-    monkeypatch.setattr(
-        "xpython.__main__.android_platform.packages_path", packages_path
-    )
-    monkeypatch.setattr("xpython.__main__.android_platform.run", run)
-    return {"setup": setup, "packages_path": packages_path, "run": run}
-
-
-@pytest.fixture
 def mock_resolve_requirements(monkeypatch):
     resolve_requirements = Mock(return_value=[])
     monkeypatch.setattr("xpython.__main__.resolve_requirements", resolve_requirements)
@@ -261,30 +258,40 @@ def mock_resolve_requirements(monkeypatch):
         ),
     ],
 )
-def test_run_passes_archive_path_to_create_cross_venv(
+def test_run(
     archive_args,
     expected_archive_path,
     tmp_path,
-    mock_create_cross_venv,
-    mock_android_platform,
+    mock_CrossVenvConfig,
+    mock_config,
     mock_resolve_requirements,
 ):
-    """`_run()` forwards `args.archive` to `create_cross_venv()` as
-    `archive_path`, along with the other create-venv-related arguments."""
+    """Environment config arguments are passed to run."""
     args = _parse_args(["--platform", "android", *archive_args, "--", "-m", "pytest"])
     args.work_path = tmp_path / "work"
     args.work_path.mkdir()
 
     exit_code = _run(args)
 
-    mock_create_cross_venv.assert_called_once_with(
-        args.work_path / "venv",
+    mock_CrossVenvConfig.assert_called_once_with(
         platform="android",
         arch=None,
+        archive_path=expected_archive_path,
         build_details_path=None,
         sysconfigdata_path=None,
         cache_path=None,
-        archive_path=expected_archive_path,
-        with_pip=True,
+    )
+    mock_config.create.assert_called_once_with(args.work_path / "venv", with_pip=True)
+    mock_config.setup_testbed.assert_called_once_with(
+        work_path=args.work_path,
+        src_paths=[],
+    )
+    mock_config.run_testbed.assert_called_once_with(
+        work_path=args.work_path,
+        args=["-m", "pytest"],
+        simulator=None,
+        managed=None,
+        connected=None,
+        verbose=0,
     )
     assert exit_code == 0
