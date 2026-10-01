@@ -6,6 +6,8 @@
 
 ## Usage
 
+`xbuild` will ensure that any environment preparation that is required for a successful build (e.g., modifying the `PATH`, or setting other environment variables) has been applied.
+
 Run `xbuild` from the root directory of the project you want to build, specifying the source of the target platform's Python configuration with exactly one of `--build-details`, `--sysconfig`, or `--platform`:
 
 ```console
