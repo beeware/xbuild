@@ -34,12 +34,12 @@ When [`xbuild`](../reference/commands/xbuild.md) creates its isolated build envi
 
 ## Automatic build-environment preparation
 
-In addition to converting a venv into a cross-platform environment, `xbuild` also prepares the compiler/toolchain environment variables needed to actually compile native code for the target platform, before running the build - in both isolated and `--no-isolation` modes:
+In addition to converting a virtual environment into a cross-platform environment, `xbuild` also prepares the compiler/tool chain environment variables needed to actually compile native code for the target platform, before running the build - in both isolated and `--no-isolation` modes:
 
-- **Android**: `CC`, `AR`, `AS`, `CXX`, `LD`, `NM`, `RANLIB`, `READELF`, `STRIP`, `CFLAGS`, `LDFLAGS`, `CXXFLAGS`, `CPU_COUNT`, and (if available) `PKG_CONFIG`/`PKG_CONFIG_LIBDIR` are set based on the exact NDK version the target Android Python build was compiled with. This requires `ANDROID_HOME` to already be set, and that exact NDK version to already be installed under `$ANDROID_HOME/ndk/` - see [Platform setup: Android](../how-to/platform-setup/android.md).
-- **iOS**: `PATH` is replaced with the venv's own `bin/` directory, followed by the target-platform `Python.xcframework` slice's `bin/` directory (containing the `clang`/`ar`/`strip` shims for the target architecture), followed by a fixed, minimal set of system directories, ensuring no build-machine-native tools leak into the build - see [Platform setup: iOS](../how-to/platform-setup/ios.md).
+- **Android**: `CC`, `AR`, `AS`, `CXX`, `LD`, `NM`, `RANLIB`, `READELF`, `STRIP`, `CFLAGS`, `LDFLAGS`, `CXXFLAGS`, `CPU_COUNT`, and (if available) `PKG_CONFIG`/`PKG_CONFIG_LIBDIR` are set by running the target Android Python build's own bundled `android.py env` command (which installs the exact required NDK version under `$ANDROID_HOME/ndk/` if it isn't already present). This requires `ANDROID_HOME` to already be set - see [Platform setup: Android](../how-to/platform-setup/android.md).
+- **iOS**: `PATH` is replaced with the cross-platform environment's own `bin/` directory, followed by the target-platform `Python.xcframework` slice's `bin/` directory (containing the `clang`/`ar`/`strip` shims for the target architecture), followed by a fixed, minimal set of system directories, ensuring no build-machine-native tools leak into the build - see [Platform setup: iOS](../how-to/platform-setup/ios.md).
 
-This preparation is `xbuild`-specific; it does not apply to a cross-platform venv created by `xvenv` and used directly outside of `xbuild`.
+This preparation is `xbuild`-specific; it does not apply to a cross-platform environment created by `xvenv` and used directly outside of `xbuild`.
 
 ## `target-requires` vs `requires`
 

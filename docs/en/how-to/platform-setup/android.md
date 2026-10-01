@@ -4,7 +4,6 @@ To build for Android, you must:
 
 - Have Android Studio or the Android Command-line Tools installed
 - Have `ANDROID_HOME` configured in your environment to point at your Android tools
-- Have the exact NDK version required by the target Android Python build already installed under `$ANDROID_HOME/ndk/` (see below)
 - Have a Java SDK installed
 - Have `JAVA_HOME` defined in your environment
 
@@ -12,4 +11,4 @@ To build for Android, you must:
 
 ## Compiler configuration is automatic
 
-`xbuild` automatically configures the Android NDK compiler toolchain (`CC`, `AR`, `CFLAGS`, `LDFLAGS`, and related environment variables) before running a build - there is no need to manually source an `android-env.sh` script yourself. If the exact NDK version required by the target Android Python build is not already installed under `$ANDROID_HOME/ndk/<version>`, `xbuild` fails with an error naming the exact version required and how to install it (via `sdkmanager`) - it does not install the NDK for you.
+`xbuild` automatically configures the Android NDK compiler tool chain (`CC`, `AR`, `CFLAGS`, `LDFLAGS`, and related environment variables) before running a build - there is no need to do this manually yourself. If the exact NDK version required by the target Android Python build is not already installed under `$ANDROID_HOME/ndk/<version>`, it is installed automatically via `sdkmanager`, which may take several minutes and requires network access the first time a given NDK version is needed.

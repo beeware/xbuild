@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-import json
 import os
-import re
+import shlex
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 from xvenv import versions
-from xvenv.fetch import parse_sysconfigdata
-
-_NDK_VERSION_RE = re.compile(r"^ndk_version=(\S+)", re.MULTILINE)
 
 VALID_ARCHES = ["aarch64", "x86_64"]
 DEFAULT_ARCH = {
@@ -174,23 +170,12 @@ def extend_context(context, build_details):
 """
 
 
-def _api_level(config) -> int:
-    """Read the minimum Android API level directly from whichever config
-    source is present, without going through the generic
-    build_details_from_sysconfigdata()/extend_context() machinery (that
-    machinery exists for convert_venv()'s templating needs, and
-    reconstructs far more than prepare_env() actually needs here)."""
-    if config.build_details_path:
-        with open(config.build_details_path) as fp:
-            build_details = json.load(fp)
-        return int(build_details["platform"].split("-")[1])
-    sysconfigdata = parse_sysconfigdata(config.sysconfigdata_path)
-    return sysconfigdata.build_time_vars["ANDROID_API_LEVEL"]
-
-
 def prepare_env(config) -> dict[str, str]:
     """Prepare CC/AR/CXX/etc. environment variables for compiling Android
-    native code, equivalent to sourcing the bundled android-env.sh.
+    native code.
+
+    This runs the archive's own `android.py env` subcommand to establish
+    environment overrides and ensure the required NDK is installed.
 
     :param config: The resolved `xvenv.convert.CrossVenvConfig`.
     :returns: A dict of environment variables (AR, AS, CC, CXX, LD, NM,
@@ -198,95 +183,47 @@ def prepare_env(config) -> dict[str, str]:
         and -- if a prefix/ directory exists in the archive --
         PKG_CONFIG/PKG_CONFIG_LIBDIR).
     :raises ValueError: if ANDROID_HOME isn't set, the archive's
-        android-env.sh can't be found/parsed, or the required NDK
-        version isn't already installed under
-        $ANDROID_HOME/ndk/<version>.
+        `android.py` can't be found, or `android.py env` exits with an
+        error (e.g. a toolchain binary is missing).
     """
-    host = config.arch
-
-    android_home = os.environ.get("ANDROID_HOME")
-    if not android_home:
+    if not os.environ.get("ANDROID_HOME"):
         raise ValueError(
             "ANDROID_HOME environment variable is not set. It must "
             "point at an installed Android SDK."
         )
 
-    api_level = _api_level(config)
-
-    env_script = config.archive_path / "android-env.sh"
-    if not env_script.is_file():
-        raise ValueError(f"Could not find {env_script}")
-    match = _NDK_VERSION_RE.search(env_script.read_text())
-    if not match:
-        raise ValueError(f"Could not find ndk_version= in {env_script}")
-    ndk_version = match[1]
-
-    ndk_dir = Path(android_home) / "ndk" / ndk_version
-    if not ndk_dir.is_dir():
-        raise ValueError(
-            f"Android NDK {ndk_version} is required (as specified by "
-            f"{env_script}), but was not found at {ndk_dir}. Install "
-            f'it with `sdkmanager "ndk;{ndk_version}"`, or use '
-            "`$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager` to "
-            "list available versions."
-        )
-
-    clang_triplet = (
-        "armv7a-linux-androideabi" if host == "arm-linux-androideabi" else host
-    )
+    android_py = config.archive_path / "android.py"
+    if not android_py.is_file():
+        raise ValueError(f"Could not find {android_py}")
 
     try:
-        toolchain = next((ndk_dir / "toolchains" / "llvm" / "prebuilt").glob("*"))
-    except StopIteration:
-        raise ValueError(
-            f"Could not find a prebuilt toolchain under "
-            f"{ndk_dir}/toolchains/llvm/prebuilt"
-        ) from None
+        result = subprocess.run(
+            [sys.executable, str(android_py), "env"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"{android_py} env failed:\n{e.stdout}{e.stderr}") from e
 
-    def tool(name: str) -> str:
-        return str(toolchain / "bin" / name)
+    android_env: dict[str, str] = {}
+    for i, token in enumerate(shlex.split(result.stdout)):
+        if i % 2 == 0:
+            if token != "export":
+                raise ValueError(
+                    f"Unexpected output from {android_py} env: expected "
+                    f"'export', got {token!r}"
+                )
+        else:
+            key, sep, value = token.partition("=")
+            if sep != "=":
+                raise ValueError(
+                    f"Unexpected output from {android_py} env: expected "
+                    f"'key=value', got {token!r}"
+                )
+            android_env[key] = value
 
-    cc = tool(f"{clang_triplet}{api_level}-clang")
-    env = {
-        "AR": tool("llvm-ar"),
-        "AS": tool("llvm-as"),
-        "CC": cc,
-        "CXX": f"{cc}++",
-        "LD": tool("ld"),
-        "NM": tool("llvm-nm"),
-        "RANLIB": tool("llvm-ranlib"),
-        "READELF": tool("llvm-readelf"),
-        "STRIP": tool("llvm-strip"),
-    }
-    for path in env.values():
-        if not Path(path).exists():
-            raise ValueError(f"{path} does not exist")
-
-    cflags = "-D__BIONIC_NO_PAGE_SIZE_MACRO"
-    ldflags = (
-        "-Wl,--build-id=sha1 -Wl,--no-rosegment -Wl,-z,max-page-size=16384 "
-        "-Wl,--no-undefined -lm"
-    )
-    if host == "arm-linux-androideabi":
-        cflags += " -march=armv7-a -mthumb"
-
-    prefix = config.archive_path / "prefix"
-    if prefix.exists():
-        abs_prefix = str(prefix.resolve())
-        cflags += f" -I{abs_prefix}/include"
-        ldflags += f" -L{abs_prefix}/lib"
-        env["PKG_CONFIG"] = "pkg-config --define-prefix"
-        env["PKG_CONFIG_LIBDIR"] = f"{abs_prefix}/lib/pkgconfig"
-
-    env.update(
-        {
-            "CFLAGS": cflags,
-            "LDFLAGS": ldflags,
-            "CXXFLAGS": cflags,
-            "CPU_COUNT": str(os.cpu_count() or 1),
-        }
-    )
-    return env
+    return android_env
 
 
 def packages_path(work_path):

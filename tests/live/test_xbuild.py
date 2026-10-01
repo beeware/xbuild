@@ -13,10 +13,10 @@ extension module for the target platform, and therefore has platform
 preconditions beyond just "downloaded Python build available":
 
 - iOS: requires Xcode command-line tools to be installed and selected.
-- Android: requires ANDROID_HOME and JAVA_HOME to already be set, and the
-  exact NDK version required by the downloaded Android Python build to
-  already be installed under $ANDROID_HOME/ndk/<version>. No auto-install
-  is attempted.
+- Android: requires ANDROID_HOME and JAVA_HOME to already be set. The
+  exact NDK version required by the downloaded Android Python build is
+  installed automatically (via `sdkmanager`) if it isn't already present
+  under $ANDROID_HOME/ndk/<version>.
 
 If a required precondition is missing, the test fails.
 """
