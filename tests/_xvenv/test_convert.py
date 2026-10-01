@@ -357,7 +357,7 @@ def test_config_missing_build_details_file(tmp_path):
     """A build_details_path that doesn't exist raises a clear ValueError."""
     missing = tmp_path / "does-not-exist.json"
 
-    with pytest.raises(ValueError, match=rf"Could not find {missing}"):
+    with pytest.raises(ValueError, match=r"Could not find .*does-not-exist\.json"):
         CrossVenvConfig(
             platform=None,
             arch=None,
@@ -371,7 +371,7 @@ def test_config_missing_sysconfigdata_file(tmp_path):
     """A sysconfigdata_path that doesn't exist raises a clear ValueError."""
     missing = tmp_path / "sysconfigdata.py"
 
-    with pytest.raises(ValueError, match=rf"Could not find {missing}"):
+    with pytest.raises(ValueError, match=r"Could not find .*sysconfigdata\.py"):
         CrossVenvConfig(
             platform=None,
             arch=None,
