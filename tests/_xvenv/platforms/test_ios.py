@@ -322,10 +322,10 @@ def _ios_config(arch, archive_path):
     )
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS-specific test")
 def test_prepare_env_simulator_slice(tmp_path, monkeypatch):
     """prepare_env() selects the simulator slice's bin/ dir for an
     -iphonesimulator arch, and replaces PATH entirely."""
-    monkeypatch.setattr(sys, "platform", "darwin")
     monkeypatch.setattr(
         "xvenv.platforms.ios.shutil.which", Mock(return_value="/usr/bin/xcrun")
     )
@@ -351,10 +351,10 @@ def test_prepare_env_simulator_slice(tmp_path, monkeypatch):
     )
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS-specific test")
 def test_prepare_env_device_slice(tmp_path, monkeypatch):
     """prepare_env() selects the device slice's bin/ dir for an
     -iphoneos arch."""
-    monkeypatch.setattr(sys, "platform", "darwin")
     monkeypatch.setattr(
         "xvenv.platforms.ios.shutil.which", Mock(return_value="/usr/bin/xcrun")
     )
@@ -368,9 +368,9 @@ def test_prepare_env_device_slice(tmp_path, monkeypatch):
     assert str(expected_slice_bin) in env["PATH"]
 
 
+@pytest.mark.skipif(sys.platform == "darwin", reason="non-macOS-specific test")
 def test_prepare_env_requires_macos(tmp_path, monkeypatch):
     """prepare_env() raises ValueError when not running on macOS."""
-    monkeypatch.setattr(sys, "platform", "linux")
 
     config = _ios_config("arm64-iphonesimulator", tmp_path)
 
