@@ -17,6 +17,52 @@ from xvenv.fetch import (
     use_archive_path,
 )
 
+# Keys written to a cross venv's pyvenv.cfg, recording the configuration
+# file that was used to create it. This allows the configuration of an
+# existing cross venv to be reconstructed (see `CrossVenvConfig.from_venv()`).
+PYVENV_BUILD_DETAILS_KEY = "xvenv-build-details"
+PYVENV_SYSCONFIG_KEY = "xvenv-sysconfig"
+_PYVENV_KEYS = {PYVENV_BUILD_DETAILS_KEY, PYVENV_SYSCONFIG_KEY}
+
+
+def in_cross_env() -> bool:
+    """Is the running interpreter in an active cross-platform environment?"""
+    return bool(getattr(sys, "cross_compiling", False))
+
+
+def _read_pyvenv_cfg(venv_path: Path) -> dict[str, str]:
+    """Parse a venv's pyvenv.cfg into a dict. Returns `{}` if missing."""
+    cfg_path = venv_path / "pyvenv.cfg"
+    if not cfg_path.is_file():
+        return {}
+
+    values = {}
+    for line in cfg_path.read_text().splitlines():
+        key, sep, value = line.partition("=")
+        if sep:
+            values[key.strip()] = value.strip()
+    return values
+
+
+def _record_source(
+    venv_path: Path,
+    build_details_path: Path | None,
+    sysconfigdata_path: Path | None,
+) -> None:
+    """Record the configuration file used to create a cross venv in its
+    pyvenv.cfg, replacing any previously recorded value."""
+    cfg_path = venv_path / "pyvenv.cfg"
+    lines = [
+        line
+        for line in cfg_path.read_text().splitlines()
+        if line.partition("=")[0].strip() not in _PYVENV_KEYS
+    ]
+    if build_details_path:
+        lines.append(f"{PYVENV_BUILD_DETAILS_KEY} = {build_details_path}")
+    else:
+        lines.append(f"{PYVENV_SYSCONFIG_KEY} = {sysconfigdata_path}")
+    cfg_path.write_text("\n".join(lines) + "\n")
+
 
 class CrossVenvConfig:
     platform: str
@@ -117,6 +163,49 @@ class CrossVenvConfig:
             ) from None
 
         self.archive_path = self.platform_module.archive_path(source_path)
+
+    @classmethod
+    def from_venv(cls, venv_path: Path) -> CrossVenvConfig:
+        """Reconstruct the configuration of an existing cross-platform venv.
+
+        :param venv_path: The root of a venv previously converted by `convert()`.
+        :returns: The resolved `CrossVenvConfig`.
+        :raises ValueError: if the venv doesn't record the configuration that
+            was used to create it (e.g., it was created by xvenv 0.4.0 or
+            earlier), or the recorded configuration file no longer exists.
+        """
+        values = _read_pyvenv_cfg(venv_path)
+        build_details_path = values.get(PYVENV_BUILD_DETAILS_KEY)
+        sysconfigdata_path = values.get(PYVENV_SYSCONFIG_KEY)
+        if build_details_path is None and sysconfigdata_path is None:
+            raise ValueError(
+                f"{venv_path} does not record the cross-platform configuration "
+                "that was used to create it. Recreate the environment with "
+                "xvenv, or specify --platform, --build-details or --sysconfig."
+            )
+
+        return cls(
+            platform=None,
+            arch=None,
+            build_details_path=Path(build_details_path) if build_details_path else None,
+            sysconfigdata_path=Path(sysconfigdata_path) if sysconfigdata_path else None,
+            cache_path=None,
+        )
+
+    @classmethod
+    def from_current_env(cls) -> CrossVenvConfig:
+        """Reconstruct the configuration of the active cross-platform venv.
+
+        :returns: The resolved `CrossVenvConfig`.
+        :raises ValueError: if not running in a cross-platform environment,
+            or the configuration can't be determined (see `from_venv()`).
+        """
+        if not in_cross_env():
+            raise ValueError(
+                "Not running in a cross-platform environment. Specify "
+                "--platform, --build-details or --sysconfig."
+            )
+        return cls.from_venv(Path(sys.prefix))
 
     @property
     def description(self) -> str:
@@ -231,6 +320,10 @@ class CrossVenvConfig:
         (venv_site_packages_path / "_cross_venv.pth").write_text(
             f"import {cross_multiarch}\n"
         )
+
+        # Record the configuration source, so that the configuration of this
+        # environment can be reconstructed later (see `from_venv()`).
+        _record_source(venv_path, self.build_details_path, self.sysconfigdata_path)
 
     def create(self, venv_path: Path, with_pip: bool = True):
         """Create (if `venv_path` doesn't already exist) and convert a virtual
