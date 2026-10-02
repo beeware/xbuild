@@ -619,6 +619,23 @@ def test_from_current_env_uses_sys_prefix(monkeypatch):
     from_venv.assert_called_once_with(Path(sys.prefix))
 
 
+def test_convert_uses_host_venv_layout(tmp_path, monkeypatch):
+    """Inside a cross env, convert() finds the venv layout of the *host*
+    platform, not of the (patched) sys.platform."""
+    sysconfigdata_path = _android_sysconfigdata(tmp_path)
+    venv_path = tmp_path / "venv"
+    # Build the fake venv with the real host's layout before patching.
+    site_packages = _fake_venv(venv_path, "3.13.5")
+    host = sys.platform
+    # Patch sys.platform to a value whose venv layout differs from the host's.
+    monkeypatch.setattr(sys, "_xvenv_host_platform", host, raising=False)
+    monkeypatch.setattr(sys, "platform", "android" if host == "win32" else "win32")
+
+    _sysconfig_config(sysconfigdata_path).convert(venv_path)
+
+    assert (site_packages / "_cross_android_aarch64_linux_android.py").is_file()
+
+
 def test_convert_records_host_platform(tmp_path):
     """The generated cross-target module records the host platform before
     patching sys.platform."""

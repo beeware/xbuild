@@ -16,6 +16,7 @@ from xvenv.fetch import (
     resolve_cache_path,
     use_archive_path,
 )
+from xvenv.platforms import host_platform
 
 # Keys written to a cross venv's pyvenv.cfg, recording the configuration
 # file that was used to create it. This allows the configuration of an
@@ -222,7 +223,9 @@ class CrossVenvConfig:
         if not venv_path.exists():
             raise ValueError(f"Virtual environment {venv_path} does not exist.")
 
-        if sys.platform == "win32":
+        # Inside a cross env, sys.platform is the target; the venv layout
+        # is determined by the host.
+        if host_platform() == "win32":
             bin_path = "Scripts/python.exe"
             lib_glob = "Lib/site-packages"
         else:
