@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
-import sys
-import sysconfig
 from collections.abc import Collection
 from contextlib import contextmanager
 from pathlib import Path
@@ -68,37 +65,10 @@ class XBuildIsolatedEnv(DefaultIsolatedEnv):
     def __enter__(self) -> Self:
         super().__enter__()
 
-        # If we're not in a cross-compiling environment, the isolated environment
-        # that we create must become a cross-compiling environment. Otherwise,
-        # transfer the currently active cross-compilation environment to the
-        # isolated environment.
-        if not getattr(sys, "cross_compiling", False):
-            # We're in a local environment.
-            # Make the isolated environment a cross environment.
-            self.cross_venv.convert(Path(self._path))
-        else:
-            # We're already in a cross environment.
-            # Copy any _cross_*.pth or _cross_*.py file, plus the cross-platform
-            # sysconfig data to the new environment.
-            data_name = sysconfig._get_sysconfigdata_name()
-            if sys.version_info < (3, 14):
-                vars_files = []
-            else:
-                vars_files = [sysconfig._get_json_data_name()]
-
-            multiarch = sys.implementation._multiarch.replace("-", "_")
-            SRC_SITE_PACKAGES = Path(sysconfig.get_path("platlib"))
-            for filename in [
-                "_cross_venv.pth",
-                f"_cross_{sys.platform}_{multiarch}.py",
-                f"{data_name}.py",
-            ] + vars_files:
-                src = SRC_SITE_PACKAGES / filename
-                target = Path(self._path) / src.relative_to(
-                    SRC_SITE_PACKAGES.parent.parent.parent
-                )
-                if not target.exists():
-                    shutil.copy(src, target)
+        # Make the isolated environment a cross environment. The cross venv
+        # configuration has already been resolved, either from explicit
+        # arguments, or from the active cross-platform environment.
+        self.cross_venv.convert(Path(self._path))
 
         return self
 

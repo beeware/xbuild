@@ -11,7 +11,7 @@ from build.__main__ import _cprint, _error, _setup_cli
 
 import xpython
 from xpython.deps import install_requirements, resolve_requirements
-from xvenv.convert import CrossVenvConfig
+from xvenv.convert import CrossVenvConfig, in_cross_env
 
 
 def main_parser() -> argparse.ArgumentParser:
@@ -38,8 +38,10 @@ def main_parser() -> argparse.ArgumentParser:
     )
 
     # Create mutually exclusive group for --build-details, --sysconfig and
-    # --platform. Exactly one of these arguments must be provided.
-    config_group = parser.add_mutually_exclusive_group(required=True)
+    # --platform. One of these arguments must be provided, unless xpython is
+    # running in a cross-platform environment, in which case the configuration
+    # of the current environment is used by default.
+    config_group = parser.add_mutually_exclusive_group()
     config_group.add_argument(
         "--build-details",
         dest="build_details_path",
@@ -190,11 +192,15 @@ def _parse_args(cli_args: Sequence[str], prog: str | None = None) -> argparse.Na
 
     Everything before the first literal `"--"` in `cli_args` is parsed as
     `xpython`'s own flags. Everything after it is treated as a raw,
-    unparsed list of forwarded arguments: for `--platform ios`, the first
+    unparsed list of forwarded arguments: for an iOS target, the first
     forwarded argument must be `-m` (stripped, then split into
-    `args.module`/`args.module_args`); for `--platform android`, the
+    `args.module`/`args.module_args`); for an Android target, the
     forwarded arguments are stored verbatim as `args.forwarded_args`, with
     no validation.
+
+    If none of `--platform`/`--build-details`/`--sysconfig` is given, the
+    current cross-platform environment is used (`args.use_current_env` is
+    `True`); this is an error if not running in a cross-platform environment.
 
     If `"--"` is absent from `cli_args` entirely, the forwarded-argument
     list is treated as empty (not an error).
@@ -227,11 +233,26 @@ def _parse_args(cli_args: Sequence[str], prog: str | None = None) -> argparse.Na
     if args.archive is not None and args.platform is None:
         parser.error("--archive requires --platform")
 
-    if args.simulator is not None and args.platform != "ios":
+    args.use_current_env = all(
+        value is None
+        for value in (args.platform, args.build_details_path, args.sysconfigdata_path)
+    )
+    if args.use_current_env:
+        if not in_cross_env():
+            parser.error(
+                "one of the arguments --build-details --sysconfig --platform "
+                "is required"
+            )
+        # In a cross-platform environment, sys.platform is the target platform.
+        target_platform = sys.platform
+    else:
+        target_platform = args.platform
+
+    if args.simulator is not None and target_platform != "ios":
         parser.error("--simulator requires --platform ios")
-    if args.managed is not None and args.platform != "android":
+    if args.managed is not None and target_platform != "android":
         parser.error("--managed requires --platform android")
-    if args.connected is not None and args.platform != "android":
+    if args.connected is not None and target_platform != "android":
         parser.error("--connected requires --platform android")
 
     args.forwarded_args = forwarded_args
@@ -269,6 +290,27 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     sys.exit(exit_code)
 
 
+def _resolve_config(args: argparse.Namespace) -> CrossVenvConfig:
+    """Resolve the cross-platform configuration to use, either from explicit
+    arguments, or from the current cross-platform environment.
+
+    :param args: The parsed CLI namespace (see `_parse_args()`).
+    :returns: The resolved `CrossVenvConfig`.
+    :raises ValueError: if the configuration can't be resolved.
+    """
+    if args.use_current_env:
+        return CrossVenvConfig.from_current_env()
+
+    return CrossVenvConfig(
+        platform=args.platform,
+        arch=args.arch,
+        archive_path=args.archive,
+        build_details_path=args.build_details_path,
+        sysconfigdata_path=args.sysconfigdata_path,
+        cache_path=args.cache,
+    )
+
+
 def _run(args: argparse.Namespace) -> int:
     """Run the full create-venv/create/install-deps/run pipeline for an
     already-validated, already-parsed set of arguments.
@@ -279,14 +321,7 @@ def _run(args: argparse.Namespace) -> int:
     """
     _cprint("{bold}Creating cross-venv...{reset}")
     venv_path = args.work_path / "venv"
-    cross_venv = CrossVenvConfig(
-        platform=args.platform,
-        arch=args.arch,
-        archive_path=args.archive,
-        build_details_path=args.build_details_path,
-        sysconfigdata_path=args.sysconfigdata_path,
-        cache_path=args.cache,
-    )
+    cross_venv = _resolve_config(args)
     cross_venv.create(venv_path, with_pip=True)
 
     _cprint("{bold}Creating testbed project...{reset}")

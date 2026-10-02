@@ -86,6 +86,25 @@ def venv_python_exe(venv_path: Path) -> Path:
     return venv_python
 
 
+REPO_ROOT = _HERE.parents[1]
+
+
+def _install_xbuild(venv_python: Path) -> None:
+    """Install this checkout of xbuild into a (cross-)venv, so its xvenv/
+    xbuild/xpython commands can be run from inside that environment."""
+    result = subprocess.run(
+        [str(venv_python), "-m", "pip", "install", str(REPO_ROOT)],
+        env={**os.environ, "XBUILD_ENV": "off"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"Failed to install xbuild into {venv_python}:\n"
+        f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
+    )
+
+
 def _verify_patched(
     venv_path: Path,
     expected_path: Path,
@@ -165,3 +184,39 @@ def test_create_xvenv(tmp_path, platform_name, arch):
         INNER_DISABLED_DIR,
         {"XBUILD_ENV": "off"},
     )
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 13),
+    reason="Android tests require Python 3.13+",
+)
+@pytest.mark.live
+def test_create_xvenv_from_current_env(tmp_path):
+    """Inside a cross-venv, xvenv with no configuration arguments creates a
+    new cross-venv matching the current one (#94)."""
+    expected_path = _expected_values_path()
+
+    outer_path = tmp_path / "outer-venv"
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "xvenv",
+            "--platform",
+            "android",
+            "--arch",
+            "aarch64",
+            str(outer_path),
+        ],
+        check=True,
+    )
+    outer_python = venv_python_exe(outer_path)
+    _install_xbuild(outer_python)
+
+    inner_path = tmp_path / "inner-venv"
+    subprocess.run(
+        [str(outer_python), "-m", "xvenv", str(inner_path)],
+        check=True,
+    )
+
+    _verify_patched(inner_path, expected_path, platform_name="android", arch="aarch64")

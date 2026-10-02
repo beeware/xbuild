@@ -8,7 +8,7 @@ When [`xvenv`](../reference/commands/xvenv.md) converts a virtual environment in
 
 That generated module patches:
 
-- **`sys`** - `sys.cross_compiling` is set to `True`; `sys.platform`, `sys.implementation._multiarch`, and `sys.abiflags` are set to the target platform's values; `sys.base_prefix`/`sys.base_exec_prefix` are set from the target's `sysconfig` data.
+- **`sys`** - `sys.cross_compiling` is set to `True`; `sys.platform`, `sys.implementation._multiarch`, and `sys.abiflags` are set to the target platform's values; `sys.base_prefix`/`sys.base_exec_prefix` are set from the target's `sysconfig` data. The original (build platform) value of `sys.platform` is preserved as `sys._host_platform`.
 - **`os.uname()`** - returns target-platform-shaped values.
 - **`platform`** - `platform.uname()` and platform-specific version functions (`platform.ios_ver()` for iOS, `platform.android_ver()` for Android) return target-platform-shaped values.
 - **`subprocess`** - `subprocess._can_fork_exec` is forced to `True`, since the build-platform binary genuinely can fork/exec even though it's pretending to be a different platform.
@@ -16,19 +16,18 @@ That generated module patches:
 
 ## Three ways to point at a target Python
 
-`xvenv` and `xbuild` both accept exactly one of `--platform`, `--build-details`, or `--sysconfig`. All three resolve to the same underlying "localized `sysconfigdata`" that actually drives the monkeypatch:
+`xvenv`, `xbuild` and `xpython` all accept exactly one of `--platform`, `--build-details`, or `--sysconfig`. All three resolve to the same underlying "localized `sysconfigdata`" that actually drives the monkeypatch:
 
 - `--build-details PATH` and `--sysconfig PATH` point directly at a pre-existing target-platform Python build's own configuration file (the Python 3.14+ `build-details.json` format, or the legacy `_sysconfigdata__*.py` format for Python ≤3.13, respectively).
 - `--platform {ios,android,emscripten}` adds a download-and-cache step in front: it downloads (or reuses a cached copy of) a matching target-platform Python build, then locates that same kind of configuration file inside it, and proceeds identically to `--build-details`/`--sysconfig` from that point on.
 
 In both cases, the configuration file is "localized" before being used to generate the monkeypatch module described above: path references to the *original* build machine's install prefix are rewritten to point at the new virtual environment's own location, and absolute paths to the original build machine's tools (e.g. `CC`, `AR`) are stripped down to bare tool names, to be resolved via `PATH` on whatever machine actually uses the environment.
 
+When `xvenv` converts an environment, it also records the absolute path of the `build-details.json` or `_sysconfigdata__*.py` file it used in the environment's `pyvenv.cfg` (as `xvenv-build-details` or `xvenv-sysconfig`). If `xvenv`, `xbuild` or `xpython` is run from inside a cross-platform environment without any of the three options, it reads this value to reconstruct the configuration of the current environment.
+
 ## Isolated build environments
 
-When [`xbuild`](../reference/commands/xbuild.md) creates its isolated build environment (the default, unless `--no-isolation` is given), it checks whether the *current* environment is already a cross-compiling environment (`sys.cross_compiling`):
-
-- If not, the fresh isolated virtual environment is converted into a cross-platform environment directly, using whichever of `--platform`/`--build-details`/`--sysconfig` was provided.
-- If it is (i.e. you're already inside an active cross-environment created by `xvenv`), the *active* environment's own cross-platform configuration and patch files are copied into the new isolated virtual environment instead, so the isolated build environment matches the one you're already in.
+When [`xbuild`](../reference/commands/xbuild.md) creates its isolated build environment (the default, unless `--no-isolation` is given), it converts the fresh isolated virtual environment into a cross-platform environment, using the resolved configuration: either whichever of `--platform`/`--build-details`/`--sysconfig` was provided, or (if none was provided, and `xbuild` is running inside a cross-platform environment) the configuration of the current environment.
 
 `--no-isolation` skips creating a separate isolated virtual environment altogether - the build runs directly in whatever environment `xbuild` itself was invoked from.
 
@@ -38,6 +37,8 @@ In addition to converting a virtual environment into a cross-platform environmen
 
 - **Android**: `CC`, `AR`, `AS`, `CXX`, `LD`, `NM`, `RANLIB`, `READELF`, `STRIP`, `CFLAGS`, `LDFLAGS`, `CXXFLAGS`, `CPU_COUNT`, and (if available) `PKG_CONFIG`/`PKG_CONFIG_LIBDIR` are set by running the target Android Python build's own bundled `android.py env` command (which installs the exact required NDK version under `$ANDROID_HOME/ndk/` if it isn't already present). This requires `ANDROID_HOME` to already be set - see [Platform setup: Android](../how-to/platform-setup/android.md).
 - **iOS**: `PATH` is replaced with the cross-platform environment's own `bin/` directory, followed by the target-platform `Python.xcframework` slice's `bin/` directory (containing the `clang`/`ar`/`strip` shims for the target architecture), followed by a fixed, minimal set of system directories, ensuring no build-machine-native tools leak into the build.
+
+Build-platform tools (e.g. Android's `android.py`, or the iOS testbed driver) are always run with `XBUILD_ENV=off`, so that they behave correctly even when `xbuild` or `xpython` is itself running inside a cross-platform environment.
 
 This preparation is `xbuild`-specific; it does not apply to a cross-platform environment created by `xvenv` and used directly outside of `xbuild`.
 

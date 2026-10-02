@@ -14,6 +14,12 @@ Run `xbuild` from the root directory of the project you want to build, specifyin
 (venv) $ xbuild --platform ios --arch arm64-iphonesimulator
 ```
 
+If you run `xbuild` from inside an active cross-platform environment, you can omit these options; `xbuild` will build for the platform of the current environment (see [Specifying the target platform](./index.md#target-platform)):
+
+```console
+(x-venv) $ xbuild
+```
+
 You can also specify an explicit source directory:
 
 ```console

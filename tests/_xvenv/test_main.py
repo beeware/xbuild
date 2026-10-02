@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -19,6 +20,7 @@ def mock_config():
 @pytest.fixture
 def mock_CrossVenvConfig(monkeypatch, mock_config):
     CrossVenvConfig = Mock(return_value=mock_config)
+    CrossVenvConfig.from_current_env.return_value = mock_config
     monkeypatch.setattr("xvenv.__main__.CrossVenvConfig", CrossVenvConfig)
     return CrossVenvConfig
 
@@ -171,3 +173,66 @@ def test_valid_args(
     kwargs.update(config_kwargs)
     mock_CrossVenvConfig.assert_called_once_with(**kwargs)
     mock_config.create.assert_called_once_with(venv_path, with_pip=with_pip)
+
+
+@pytest.fixture
+def native_env(monkeypatch):
+    monkeypatch.delattr(sys, "cross_compiling", raising=False)
+
+
+@pytest.fixture
+def cross_env(monkeypatch):
+    monkeypatch.setattr(sys, "cross_compiling", True, raising=False)
+
+
+def test_no_config_outside_cross_env(native_env, venv_path, capsys):
+    """Outside a cross env, a configuration source is required."""
+    with pytest.raises(SystemExit) as excinfo:
+        main([str(venv_path)])
+
+    assert excinfo.value.code == 2
+    assert (
+        "one of the arguments --build-details --sysconfig --platform is required"
+        in capsys.readouterr().err
+    )
+
+
+def test_no_config_in_cross_env(
+    cross_env, venv_path, mock_CrossVenvConfig, mock_config
+):
+    """Inside a cross env, the current environment's config is used if no
+    configuration source is given."""
+    main([str(venv_path)])
+
+    mock_CrossVenvConfig.assert_not_called()
+    mock_CrossVenvConfig.from_current_env.assert_called_once_with()
+    mock_config.create.assert_called_once_with(venv_path, with_pip=True)
+
+
+def test_explicit_config_in_cross_env(
+    cross_env, venv_path, mock_CrossVenvConfig, mock_config
+):
+    """Inside a cross env, an explicit configuration source takes precedence."""
+    main(["--platform", "ios", str(venv_path)])
+
+    mock_CrossVenvConfig.from_current_env.assert_not_called()
+    mock_CrossVenvConfig.assert_called_once_with(
+        platform="ios",
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+        archive_path=None,
+    )
+    mock_config.create.assert_called_once_with(venv_path, with_pip=True)
+
+
+def test_current_env_error(cross_env, venv_path, mock_CrossVenvConfig, capsys):
+    """An error determining the current env's configuration is surfaced."""
+    mock_CrossVenvConfig.from_current_env.side_effect = ValueError("no record")
+
+    with pytest.raises(SystemExit) as excinfo:
+        main([str(venv_path)])
+
+    assert excinfo.value.code == 1
+    assert "no record" in capsys.readouterr().err
