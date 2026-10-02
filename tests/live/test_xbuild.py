@@ -206,3 +206,7 @@ def test_build_wheel_from_current_env(tmp_path, platform_name, sample_project):
     assert not wheels[0].name.endswith("-none-any.whl"), (
         f"{wheels[0].name} is not a binary wheel"
     )
+    # e.g. test1-0.1.0-cp314-cp314-ios_13_0_arm64_iphonesimulator.whl
+    assert f"-{platform_name}_" in wheels[0].name, (
+        f"{wheels[0].name} is not a {platform_name} wheel"
+    )
