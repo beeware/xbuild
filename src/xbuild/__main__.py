@@ -23,7 +23,7 @@ from build._util import _format_dep_chain
 import xbuild
 from xbuild._builder import ProjectXBuilder
 from xbuild.env import XBuildIsolatedEnv
-from xvenv.convert import CrossVenvConfig
+from xvenv.convert import CrossVenvConfig, in_cross_env
 
 
 def _build(
@@ -203,12 +203,14 @@ def main_parser() -> argparse.ArgumentParser:
         help="Python package installer to use (defaults to pip)",
     )
 
-    # This is only a required argument if the current environment isn't
-    # cross-compiling. If/when this project is merged into `build`, the
-    # existence of `--platform/--build-details/--sysconfig` as an argument will
-    # be the trigger for "this is a cross platform build". These arguments are
-    # all mutually exclusive.
-    pyconfig_group = parser.add_mutually_exclusive_group(required=True)
+    # One of these arguments is required, unless the current environment is
+    # already a cross-platform environment (in which case the configuration of
+    # the current environment is used by default). If/when this project is
+    # merged into `build`, the existence of
+    # `--platform/--build-details/--sysconfig` as an argument will be the
+    # trigger for "this is a cross platform build". These arguments are all
+    # mutually exclusive.
+    pyconfig_group = parser.add_mutually_exclusive_group()
     pyconfig_group.add_argument(
         "--build-details",
         dest="build_details_path",
@@ -310,19 +312,31 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     if args.archive is not None and args.platform is None:
         parser.error("--archive requires --platform")
 
+    explicit_config = any(
+        value is not None
+        for value in (args.platform, args.build_details_path, args.sysconfigdata_path)
+    )
+    if not explicit_config and not in_cross_env():
+        parser.error(
+            "one of the arguments --build-details --sysconfig --platform is required"
+        )
+
     _setup_cli(verbosity=args.verbosity)
 
     config_settings = {}
 
     try:
-        cross_venv = CrossVenvConfig(
-            platform=args.platform,
-            arch=args.arch,
-            archive_path=args.archive,
-            build_details_path=args.build_details_path,
-            sysconfigdata_path=args.sysconfigdata_path,
-            cache_path=args.cache,
-        )
+        if explicit_config:
+            cross_venv = CrossVenvConfig(
+                platform=args.platform,
+                arch=args.arch,
+                archive_path=args.archive,
+                build_details_path=args.build_details_path,
+                sysconfigdata_path=args.sysconfigdata_path,
+                cache_path=args.cache,
+            )
+        else:
+            cross_venv = CrossVenvConfig.from_current_env()
         os.environ.update(cross_venv.prepare_env())
     except (ValueError, NotImplementedError) as e:
         _error(e)
