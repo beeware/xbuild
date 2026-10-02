@@ -390,6 +390,22 @@ def test_prepare_env_requires_xcrun(tmp_path, monkeypatch):
         prepare_env(config)
 
 
+def test_prepare_env_in_cross_env(tmp_path, monkeypatch):
+    """prepare_env() checks the host platform, not the patched sys.platform,
+    so it works from inside an iOS cross env on macOS."""
+    monkeypatch.setattr(sys, "platform", "ios")
+    monkeypatch.setattr(sys, "_xvenv_host_platform", "darwin", raising=False)
+    monkeypatch.setattr(
+        "xvenv.platforms.ios.shutil.which", Mock(return_value="/usr/bin/xcrun")
+    )
+
+    config = _ios_config("arm64-iphonesimulator", tmp_path)
+
+    env = prepare_env(config)
+
+    assert "PATH" in env
+
+
 @pytest.fixture
 def mock_run(monkeypatch):
     mock = Mock()
@@ -451,6 +467,7 @@ def test_testbed_clone_macOS(mock_run, tmp_path):
     assert args[:2] == [sys.executable, str(archive_path / "testbed")]
     assert args[2] == "clone"
     assert args[3] == str(work_path / "testbed")
+    assert clone_call.kwargs["env"]["XBUILD_ENV"] == "off"
 
     # The *leaf* folders have been preserved in the final location.
     for path in ["tests", "other"]:
@@ -472,6 +489,23 @@ def test_testbed_clone_non_macOS(tmp_path):
             work_path=tmp_path / "work",
             src_paths=[],
         )
+
+
+def test_testbed_clone_in_cross_env(mock_run, tmp_path, monkeypatch):
+    """setup_testbed() works from inside an iOS cross env on macOS, and
+    runs the testbed driver with cross env patches disabled."""
+    monkeypatch.setattr(sys, "platform", "ios")
+    monkeypatch.setattr(sys, "_xvenv_host_platform", "darwin", raising=False)
+    archive_path = tmp_path / "archive"
+    (archive_path / "testbed").mkdir(parents=True)
+
+    setup_testbed(
+        archive_path=archive_path,
+        work_path=tmp_path / "work",
+        src_paths=[],
+    )
+
+    assert mock_run.call_args.kwargs["env"]["XBUILD_ENV"] == "off"
 
 
 def test_run_with_module_and_args(mock_run, testbed_layout):
@@ -497,6 +531,7 @@ def test_run_with_module_and_args(mock_run, testbed_layout):
             "-v",
         ],
         check=False,
+        env={**os.environ, "XBUILD_ENV": "off"},
     )
 
     # Return code of the testbed is the result
@@ -520,6 +555,7 @@ def test_args_empty(mock_run, testbed_layout):
             "--",
         ],
         check=False,
+        env={**os.environ, "XBUILD_ENV": "off"},
     )
 
 
@@ -543,6 +579,7 @@ def test_forwards_simulator_flag(mock_run, testbed_layout):
             "pytest",
         ],
         check=False,
+        env={**os.environ, "XBUILD_ENV": "off"},
     )
 
 
@@ -565,6 +602,7 @@ def test_forwards_verbose_flag(mock_run, testbed_layout, tmp_path):
             "pytest",
         ],
         check=False,
+        env={**os.environ, "XBUILD_ENV": "off"},
     )
 
 

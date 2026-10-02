@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from xvenv import versions
+from xvenv.platforms import build_platform_env, host_platform
 
 VALID_ARCHES = ["arm64-iphonesimulator", "x86_64-iphonesimulator", "arm64-iphoneos"]
 DEFAULT_ARCH = {
@@ -138,7 +139,7 @@ def prepare_env(config) -> dict[str, str]:
     :raises ValueError: if not running on macOS, or Xcode command-line
         tools are not installed/selected.
     """
-    if sys.platform != "darwin":
+    if host_platform() != "darwin":
         raise ValueError("Building for iOS requires macOS.")
     if shutil.which("xcrun") is None:
         raise ValueError(
@@ -187,7 +188,7 @@ def setup_testbed(archive_path: Path, work_path: Path, src_paths: list[Path]):
         `iOSTestbed/app/` directory.
     :raises RuntimeError: If not on a macOS machine.
     """
-    if sys.platform != "darwin":
+    if host_platform() != "darwin":
         raise RuntimeError("Can't run an iOS project on non-macOS hardware.")
 
     testbed_source = archive_path / "testbed"
@@ -197,6 +198,7 @@ def setup_testbed(archive_path: Path, work_path: Path, src_paths: list[Path]):
     subprocess.run(
         [sys.executable, str(testbed_source), "clone", str(testbed_clone)],
         check=True,
+        env=build_platform_env(),
     )
     # Copy sources into the app
     for src in src_paths:
@@ -237,5 +239,5 @@ def run_testbed(
 
     run_command.extend(["--", *args[1:]])
 
-    result = subprocess.run(run_command, check=False)
+    result = subprocess.run(run_command, check=False, env=build_platform_env())
     return result.returncode

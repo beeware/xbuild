@@ -617,3 +617,19 @@ def test_from_current_env_uses_sys_prefix(monkeypatch):
 
     assert CrossVenvConfig.from_current_env() is sentinel
     from_venv.assert_called_once_with(Path(sys.prefix))
+
+
+def test_convert_records_host_platform(tmp_path):
+    """The generated cross-target module records the host platform before
+    patching sys.platform."""
+    sysconfigdata_path = _android_sysconfigdata(tmp_path)
+    venv_path = tmp_path / "venv"
+    site_packages = _fake_venv(venv_path, "3.13.5")
+
+    _sysconfig_config(sysconfigdata_path).convert(venv_path)
+
+    source = (site_packages / "_cross_android_aarch64_linux_android.py").read_text()
+    record = "sys._xvenv_host_platform = sys.platform"
+    patch = 'sys.platform = "android"'
+    assert record in source
+    assert source.index(record) < source.index(patch)
