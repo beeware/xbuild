@@ -30,6 +30,8 @@ from pathlib import Path
 
 import pytest
 
+from .test_xvenv import _install_xbuild, venv_python_exe
+
 SAMPLE_PROJECTS = [
     pytest.param(Path(__file__).parents[1] / "samples" / "test1", id="test1"),
 ]
@@ -172,3 +174,35 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
             print("Running on GitHub Actions; Android xpython test aborted.")
         else:
             raise
+
+
+@pytest.mark.live
+@pytest.mark.parametrize("platform_name", CASES)
+@pytest.mark.parametrize("sample_project", SAMPLE_PROJECTS)
+def test_build_wheel_from_current_env(tmp_path, platform_name, sample_project):
+    """Inside a cross-venv, xbuild with no configuration arguments builds a
+    binary wheel for the current environment's platform (#94)."""
+    _check_preconditions(platform_name)
+
+    venv_path = tmp_path / "x-venv"
+    subprocess.run(
+        [sys.executable, "-m", "xvenv", "--platform", platform_name, str(venv_path)],
+        check=True,
+    )
+    venv_python = venv_python_exe(venv_path)
+    _install_xbuild(venv_python)
+
+    project_dir = tmp_path / sample_project.name
+    shutil.copytree(sample_project, project_dir)
+    out_dir = tmp_path / "dist"
+
+    subprocess.run(
+        [str(venv_python), "-m", "xbuild", project_dir, "-o", out_dir],
+        check=True,
+    )
+
+    wheels = list(out_dir.glob("*.whl"))
+    assert len(wheels) == 1, f"expected exactly one wheel, got {wheels}"
+    assert not wheels[0].name.endswith("-none-any.whl"), (
+        f"{wheels[0].name} is not a binary wheel"
+    )

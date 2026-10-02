@@ -39,6 +39,11 @@ def test_sys_cross_compiling():
     assert sys.cross_compiling is True
 
 
+def test_sys_host_platform():
+    """The real host platform is recorded before sys.platform is patched."""
+    assert sys._xvenv_host_platform in {"darwin", "linux", "win32"}
+
+
 def test_sys_multiarch():
     """The multiarch string is as expected."""
     assert sys.implementation._multiarch == EXPECTED["multiarch"]
