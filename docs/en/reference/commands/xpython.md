@@ -18,6 +18,8 @@
 5. Run the project on a simulator/emulator
 6. Exit with the exit code produced by the test code (or by the testbed driver itself, if it failed to build/launch before the test code could run).
 
+If you run `xpython` from inside an active cross-platform environment, you can omit `--platform`/`--build-details`/`--sysconfig`; `xpython` will target the platform of the current environment (see [Specifying the target platform](./index.md#target-platform)). In that case, `--simulator` is valid inside an iOS environment, and `--managed`/`--connected` are valid inside an Android environment.
+
 /// note | `xpython` in CI environments
 
 `xpython` is able to run Android projects on macOS; but the macOS GitHub Actions environment isn't able to start an Android emulator. `xpython` will raise an error if it detects it is in a GitHub Actions environment and you try to run an Android project.
