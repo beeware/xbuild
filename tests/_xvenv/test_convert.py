@@ -1,3 +1,4 @@
+import io
 import json
 import sys
 from pathlib import Path
@@ -5,7 +6,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from xvenv.convert import CrossVenvConfig, in_cross_env, localized_vars
+from xvenv.convert import (
+    CrossVenvConfig,
+    _record_source,
+    in_cross_env,
+    localized_vars,
+)
 
 
 @pytest.fixture
@@ -585,8 +591,88 @@ def test_from_venv_recorded_file_missing(tmp_path):
     missing = tmp_path / "gone" / "_sysconfigdata__android_aarch64-linux-android.py"
     cfg_path.write_text(cfg_path.read_text() + f"xvenv-sysconfig = {missing}\n")
 
-    with pytest.raises(ValueError, match="Could not find"):
+    with pytest.raises(ValueError, match="Could not find") as exc_info:
         CrossVenvConfig.from_venv(venv_path)
+
+    message = str(exc_info.value)
+    assert str(cfg_path) in message
+    assert str(missing) in message
+    assert "Recreate the environment with xvenv" in message
+    assert "--platform, --build-details or --sysconfig" in message
+
+
+@pytest.fixture
+def non_utf8_locale(monkeypatch):
+    """Simulate a platform (e.g. Windows without UTF-8 mode) whose locale
+    encoding isn't UTF-8, by making text I/O that doesn't specify an
+    explicit encoding use cp1252."""
+    real_text_encoding = io.text_encoding
+
+    def text_encoding(encoding, stacklevel=2):
+        if encoding is None:
+            return "cp1252"
+        return real_text_encoding(encoding, stacklevel)
+
+    monkeypatch.setattr(io, "text_encoding", text_encoding)
+
+
+def test_convert_records_non_ascii_source_as_utf8(tmp_path, non_utf8_locale):
+    """A non-ASCII source path is written to pyvenv.cfg as UTF-8 (which is
+    how CPython's site module reads it), regardless of the locale, and can be
+    read back."""
+    root = tmp_path / "J\u00fcrgen"
+    sysconfigdata_path = _android_sysconfigdata(root)
+    venv_path = tmp_path / "venv"
+    _fake_venv(venv_path, "3.13.5")
+
+    _sysconfig_config(sysconfigdata_path).convert(venv_path)
+
+    content = (venv_path / "pyvenv.cfg").read_bytes().decode("utf-8")
+    assert f"xvenv-sysconfig = {sysconfigdata_path.resolve()}" in content.splitlines()
+
+    config = CrossVenvConfig.from_venv(venv_path)
+    assert config.sysconfigdata_path == sysconfigdata_path.resolve()
+
+
+def test_convert_writes_non_ascii_sysconfigdata_as_utf8(tmp_path, non_utf8_locale):
+    """The localized sysconfigdata module (which Python imports as UTF-8
+    source) is written as UTF-8 when it contains non-ASCII paths."""
+    root = tmp_path / "J\u00fcrgen"
+    sysconfigdata_path = _android_sysconfigdata(root)
+    venv_path = tmp_path / "venv"
+    site_packages = _fake_venv(venv_path, "3.13.5")
+
+    _sysconfig_config(sysconfigdata_path).convert(venv_path)
+
+    localized = site_packages / sysconfigdata_path.name
+    assert "J\u00fcrgen" in localized.read_bytes().decode("utf-8")
+
+
+def test_platform_config_relative_path_is_absolute(tmp_path, monkeypatch, mock_deps):
+    """If the cache path is relative (e.g. `--cache ./cache`), the resolved
+    configuration path, and the path recorded in pyvenv.cfg, are absolute."""
+    monkeypatch.chdir(tmp_path)
+    relative = mock_deps["config_path"].relative_to(tmp_path)
+    mock_deps["fetch_python"].return_value = (relative, True)
+    mock_deps["resolve_cache_path"].return_value = Path("cache")
+
+    config = CrossVenvConfig(
+        platform="android",
+        arch=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=Path("cache"),
+    )
+
+    assert config.build_details_path.is_absolute()
+    assert config.build_details_path == mock_deps["config_path"].resolve()
+    assert config.archive_path.is_absolute()
+
+    venv_path = tmp_path / "venv"
+    _fake_venv(venv_path, "3.14.7")
+    _record_source(venv_path, config.build_details_path, config.sysconfigdata_path)
+    lines = (venv_path / "pyvenv.cfg").read_text(encoding="utf-8").splitlines()
+    assert f"xvenv-build-details = {mock_deps['config_path'].resolve()}" in lines
 
 
 @pytest.mark.parametrize(("value", "expected"), [(True, True), (None, False)])
