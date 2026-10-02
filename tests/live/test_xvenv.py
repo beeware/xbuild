@@ -92,12 +92,16 @@ REPO_ROOT = _HERE.parents[1]
 def _install_xbuild(venv_python: Path) -> None:
     """Install this checkout of xbuild into a (cross-)venv, so its xvenv/
     xbuild/xpython commands can be run from inside that environment."""
-    subprocess.run(
+    result = subprocess.run(
         [str(venv_python), "-m", "pip", "install", str(REPO_ROOT)],
         env={**os.environ, "XBUILD_ENV": "off"},
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
+    )
+    assert result.returncode == 0, (
+        f"Failed to install xbuild into {venv_python}:\n"
+        f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
     )
 
 
