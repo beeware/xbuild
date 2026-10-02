@@ -394,7 +394,7 @@ def test_prepare_env_in_cross_env(tmp_path, monkeypatch):
     """prepare_env() checks the host platform, not the patched sys.platform,
     so it works from inside an iOS cross env on macOS."""
     monkeypatch.setattr(sys, "platform", "ios")
-    monkeypatch.setattr(sys, "_xvenv_host_platform", "darwin", raising=False)
+    monkeypatch.setattr(sys, "_host_platform", "darwin", raising=False)
     monkeypatch.setattr(
         "xvenv.platforms.ios.shutil.which", Mock(return_value="/usr/bin/xcrun")
     )
@@ -495,7 +495,7 @@ def test_testbed_clone_in_cross_env(mock_run, tmp_path, monkeypatch):
     """setup_testbed() works from inside an iOS cross env on macOS, and
     runs the testbed driver with cross env patches disabled."""
     monkeypatch.setattr(sys, "platform", "ios")
-    monkeypatch.setattr(sys, "_xvenv_host_platform", "darwin", raising=False)
+    monkeypatch.setattr(sys, "_host_platform", "darwin", raising=False)
     archive_path = tmp_path / "archive"
     (archive_path / "testbed").mkdir(parents=True)
 

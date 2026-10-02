@@ -24,7 +24,7 @@ def patch_cross_env():
     ###########################################################################
     sys.cross_compiling = True
     # Preserve the real host platform before patching it.
-    sys._xvenv_host_platform = sys.platform
+    sys._host_platform = sys.platform
     sys.platform = "{platform}"
     sys.implementation._multiarch = "{multiarch}"
     sys.abiflags = "{abiflags}"

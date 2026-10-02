@@ -18,7 +18,7 @@
 5. Run the project on a simulator/emulator
 6. Exit with the exit code produced by the test code (or by the testbed driver itself, if it failed to build/launch before the test code could run).
 
-If you run `xpython` from inside an active cross-platform environment, you can omit `--platform`/`--build-details`/`--sysconfig`; `xpython` will target the platform of the current environment (see [Specifying the target platform](./index.md#target-platform)). In that case, `--simulator` is valid inside an iOS environment, and `--managed`/`--connected` are valid inside an Android environment.
+If you run `xpython` from inside an active cross-platform environment, you can omit `--platform`/`--build-details`/`--sysconfig`; `xpython` will target the platform of the current environment (see [Specifying the target platform](./index.md#target-platform)).
 
 /// note | `xpython` in CI environments
 

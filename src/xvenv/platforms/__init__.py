@@ -9,9 +9,9 @@ def host_platform() -> str:
 
     Inside a cross-platform environment, `sys.platform` reports the *target*
     platform. The generated cross-target module records the original value
-    as `sys._xvenv_host_platform` before patching it.
+    as `sys._host_platform` before patching it.
     """
-    return getattr(sys, "_xvenv_host_platform", sys.platform)
+    return getattr(sys, "_host_platform", sys.platform)
 
 
 def build_platform_env() -> dict[str, str]:

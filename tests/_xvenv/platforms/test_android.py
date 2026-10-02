@@ -424,7 +424,7 @@ def test_testbed_clone_macOS_ci_in_cross_env(monkeypatch, tmp_path):
     sys.platform."""
     monkeypatch.setenv("GITHUB_ACTIONS", "1")
     monkeypatch.setattr(sys, "platform", "android")
-    monkeypatch.setattr(sys, "_xvenv_host_platform", "darwin", raising=False)
+    monkeypatch.setattr(sys, "_host_platform", "darwin", raising=False)
 
     with pytest.raises(
         RuntimeError,

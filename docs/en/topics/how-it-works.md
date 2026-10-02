@@ -8,7 +8,7 @@ When [`xvenv`](../reference/commands/xvenv.md) converts a virtual environment in
 
 That generated module patches:
 
-- **`sys`** - `sys.cross_compiling` is set to `True`; `sys.platform`, `sys.implementation._multiarch`, and `sys.abiflags` are set to the target platform's values; `sys.base_prefix`/`sys.base_exec_prefix` are set from the target's `sysconfig` data. The original (build platform) value of `sys.platform` is preserved as `sys._xvenv_host_platform`.
+- **`sys`** - `sys.cross_compiling` is set to `True`; `sys.platform`, `sys.implementation._multiarch`, and `sys.abiflags` are set to the target platform's values; `sys.base_prefix`/`sys.base_exec_prefix` are set from the target's `sysconfig` data. The original (build platform) value of `sys.platform` is preserved as `sys._host_platform`.
 - **`os.uname()`** - returns target-platform-shaped values.
 - **`platform`** - `platform.uname()` and platform-specific version functions (`platform.ios_ver()` for iOS, `platform.android_ver()` for Android) return target-platform-shaped values.
 - **`subprocess`** - `subprocess._can_fork_exec` is forced to `True`, since the build-platform binary genuinely can fork/exec even though it's pretending to be a different platform.
