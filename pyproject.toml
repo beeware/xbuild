@@ -1,7 +1,7 @@
 [build-system]
 requires = [
     "setuptools==84.0.0",
-    "setuptools_scm==10.2.1",
+    "setuptools_scm==10.3.4",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -76,10 +76,10 @@ pre-commit = [
     "pre-commit == 4.6.2",
 ]
 towncrier = [
-    "towncrier==25.8.0",
+    "towncrier==26.9.0",
 ]
 tox = [
-    "tox-uv == 1.35.2",
+    "tox-uv == 1.36.0",
 ]
 test = [
     "pytest == 9.1.1",
