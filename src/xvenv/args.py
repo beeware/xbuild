@@ -4,6 +4,8 @@ from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 
+from build.__main__ import _setup_cli
+
 from xvenv.convert import in_cross_env
 
 
@@ -118,12 +120,14 @@ def parse_common_args(
     """
     args = parser.parse_args(cli_args)
 
+    _setup_cli(verbosity=args.verbosity)
+
     if args.arch is not None and args.platform is None:
-        parser.error("--arch requires --platform")
+        parser.error("The --arch option also requires --platform")
     if args.cache is not None and args.platform is None:
-        parser.error("--cache requires --platform")
+        parser.error("The --cache option also requires --platform")
     if args.archive is not None and args.platform is None:
-        parser.error("--archive requires --platform")
+        parser.error("The --archive option also requires --platform")
 
     args.use_current_env = all(
         value is None
@@ -131,7 +135,8 @@ def parse_common_args(
     )
     if args.use_current_env and not in_cross_env():
         parser.error(
-            "one of the arguments --build-details --sysconfig --platform is required"
+            "One of the arguments --build-details, --sysconfig, "
+            "or --platform is required"
         )
 
     return args

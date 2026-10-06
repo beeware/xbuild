@@ -7,7 +7,7 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
-from build.__main__ import _cprint, _error, _setup_cli
+from build.__main__ import _cprint, _error
 
 import xpython
 from xpython.deps import install_requirements, resolve_requirements
@@ -162,11 +162,11 @@ def _parse_args(
         target_platform = args.platform
 
     if args.simulator is not None and target_platform != "ios":
-        parser.error("--simulator requires --platform ios")
+        parser.error("--simulator option also requires --platform ios")
     if args.managed is not None and target_platform != "android":
-        parser.error("--managed requires --platform android")
+        parser.error("--managed option also requires --platform android")
     if args.connected is not None and target_platform != "android":
-        parser.error("--connected requires --platform android")
+        parser.error("--connected option also requires --platform android")
 
     args.forwarded_args = forwarded_args
 
@@ -180,8 +180,6 @@ def main(cli_args: Sequence[str]) -> None:
     """
     parser = main_parser()
     args = _parse_args(parser, cli_args)
-
-    _setup_cli(verbosity=args.verbosity)
 
     try:
         if args.work_path is not None:

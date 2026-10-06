@@ -12,7 +12,6 @@ from build.__main__ import (
     _error,
     _handle_build_error,
     _natural_language_list,
-    _setup_cli,
     _styles,
 )
 from build._types import ConfigSettings, Distribution, StrPath
@@ -221,8 +220,6 @@ def main(cli_args: Sequence[str]) -> None:
     """
     parser = main_parser()
     args = parse_common_args(parser, cli_args)
-
-    _setup_cli(verbosity=args.verbosity)
 
     try:
         if args.use_current_env:

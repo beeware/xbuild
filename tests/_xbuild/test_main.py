@@ -32,12 +32,12 @@ from xbuild.__main__ import main
         ),
         pytest.param(
             ("--sysconfig", "/path/to/sysconfig.py", "--arch", "arm64"),
-            "--arch requires --platform",
+            "--arch option also requires --platform",
             id="sysconfig-and-arch",
         ),
         pytest.param(
             ("--cache", "/path/to/cache", "--sysconfig", "/path/to/sysconfig.py"),
-            "--cache requires --platform",
+            "--cache option also requires --platform",
             id="sysconfig-and-cache",
         ),
         pytest.param(
@@ -59,7 +59,7 @@ from xbuild.__main__ import main
         ),
         pytest.param(
             ("--archive", "/path/to/archive", "--sysconfig", "/path/to/sysconfig.py"),
-            "--archive requires --platform",
+            "--archive option also requires --platform",
             id="sysconfig-and-archive",
         ),
     ],
@@ -192,7 +192,7 @@ def test_no_config_outside_cross_env(monkeypatch, tmp_path, capsys):
 
     assert excinfo.value.code == 2
     assert (
-        "one of the arguments --build-details --sysconfig --platform is required"
+        "One of the arguments --build-details, --sysconfig, or --platform is required"
         in capsys.readouterr().err
     )
 

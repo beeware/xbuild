@@ -215,7 +215,7 @@ class CrossVenvConfig:
         if not in_cross_env():
             raise ValueError(
                 "Not running in a cross-platform environment. Specify "
-                "--platform, --build-details or --sysconfig."
+                "--platform, --build-details, or --sysconfig."
             )
         return cls.from_venv(Path(sys.prefix))
 

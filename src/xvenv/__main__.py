@@ -4,7 +4,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from build.__main__ import _error, _setup_cli
+from build.__main__ import _error
 
 import xvenv
 from xvenv.args import make_common_parser, parse_common_args
@@ -47,8 +47,6 @@ def main(cli_args: Sequence[str]) -> None:
     """
     parser = main_parser()
     args = parse_common_args(parser, cli_args)
-
-    _setup_cli(verbosity=args.verbosity)
 
     venv_path = Path(args.venv).resolve()
 
