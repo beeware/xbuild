@@ -10,10 +10,10 @@ from importlib import import_module
 from importlib import util as importlib_util
 from pathlib import Path
 
-import platformdirs
 from filelock import FileLock
 
 from xvenv import versions
+from xvenv.platforms import host_platform
 
 
 def resolve_cache_path(cache_arg: Path | None) -> Path:
@@ -35,7 +35,17 @@ def resolve_cache_path(cache_arg: Path | None) -> Path:
     elif (env_cache := os.environ.get("XBUILD_CACHE")) is not None:
         cache_path = Path(env_cache)
     else:
-        cache_path = Path(platformdirs.user_cache_dir("xbuild"))
+        try:
+            # platformdirs needs to be evaluated on the *host* platform.
+            # This means it needs to be imported in an unmodified environment.
+            original_sys_platform = sys.platform
+            sys.platform = host_platform()
+
+            import platformdirs
+
+            cache_path = Path(platformdirs.user_cache_dir("xbuild"))
+        finally:
+            sys.platform = original_sys_platform
 
     cache_path.mkdir(parents=True, exist_ok=True)
     return cache_path

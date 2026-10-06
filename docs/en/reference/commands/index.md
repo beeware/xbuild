@@ -51,3 +51,9 @@ The directory to use for caching downloaded Python builds, for use with [`--plat
 ### `--archive PATH`
 
 Use an already-extracted Python build at `PATH` instead of downloading one, for use with [`--platform`][opt-platform]. `PATH` must be laid out the same way an archive downloaded via `--platform` would have been unpacked. Mutually exclusive with `--cache`. Only valid in combination with [`--platform`][opt-platform].
+
+## Specifying the target platform { #target-platform }
+
+Every command needs to be provided with a target platform; the resulting environment used by that command will present as that target platform. The target platform can be specified explicitly with [`--platform`][opt-platform], [`--build-details`][opt-build-details], or [`--sysconfig`][opt-sysconfig].
+
+If you run `xbuild`, `xpython` or `xvenv` from *inside* an active cross-platform environment (one created by `xvenv`), these options can be omitted, and the target platform will be inferred from the platform that is active inside the current cross-platform environment. If an explicit target platform is provided when inside an active cross-platform environment, the explicit platform will take precedence over the current environment.

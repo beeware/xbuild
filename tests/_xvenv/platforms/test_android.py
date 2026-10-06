@@ -330,6 +330,21 @@ def test_prepare_env_malformed_output(tmp_path, monkeypatch, stdout):
         prepare_env(config)
 
 
+def test_prepare_env_disables_cross_env(tmp_path, monkeypatch):
+    """android.py env is run with cross env patches disabled, so it works
+    from inside an Android cross env."""
+    archive_path = tmp_path / "archive"
+    archive_path.mkdir()
+    (archive_path / "android.py").write_text("")
+    monkeypatch.setenv("ANDROID_HOME", str(tmp_path / "android-sdk"))
+    run = Mock(return_value=Mock(stdout=""))
+    monkeypatch.setattr("xvenv.platforms.android.subprocess.run", run)
+
+    prepare_env(_android_config(archive_path))
+
+    assert run.call_args.kwargs["env"]["XBUILD_ENV"] == "off"
+
+
 @pytest.fixture
 def mock_run(monkeypatch):
     mock = Mock()
@@ -404,6 +419,24 @@ def test_testbed_clone_macOS_ci(monkeypatch, tmp_path):
         )
 
 
+def test_testbed_clone_macOS_ci_in_cross_env(monkeypatch, tmp_path):
+    """The macOS CI check uses the host platform, not the patched
+    sys.platform."""
+    monkeypatch.setenv("GITHUB_ACTIONS", "1")
+    monkeypatch.setattr(sys, "platform", "android")
+    monkeypatch.setattr(sys, "_host_platform", "darwin", raising=False)
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"GitHub Actions can't start an Android emulator on a macOS runner.",
+    ):
+        setup_testbed(
+            archive_path=tmp_path / "archive",
+            work_path=tmp_path / "work",
+            src_paths=[],
+        )
+
+
 def test_run_with_module_and_args(mock_run, work_path):
     """The run subcommand is invoked with -- <module> <module_args>."""
     mock_run.return_value = Mock(returncode=3)
@@ -428,6 +461,7 @@ def test_run_with_module_and_args(mock_run, work_path):
     assert args[args.index("--managed") + 1] == "maxVersion"
     assert "--connected" not in args
     assert args[-5:] == ["--", "-m", "pytest", "tests", "-v"]
+    assert mock_run.call_args.kwargs["env"]["XBUILD_ENV"] == "off"
 
     # Return code of the testbed is the result
     assert result == 3

@@ -10,6 +10,12 @@
 
 If `x-venv` doesn't already exist, `xvenv` creates it first (equivalent to running `python -m venv x-venv`, with pip installed), then converts it into a cross environment. If `x-venv` already exists, it is converted into a cross-platform environment matching the platform/arch you specify.
 
+If you run `xvenv` from inside an active cross-platform environment, you can omit `--platform`/`--build-details`/`--sysconfig`; the new environment will use the same target platform as the current one (see [Specifying the target platform](./index.md#target-platform)):
+
+```console
+(x-venv) $ xvenv other-x-venv
+```
+
 See the [Common options](./index.md#common-options) page for options shared with `xbuild`.
 
 ## Options

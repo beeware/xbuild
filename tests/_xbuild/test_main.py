@@ -1,4 +1,5 @@
 import os
+import sys
 from unittest.mock import Mock
 
 import pytest
@@ -31,12 +32,12 @@ from xbuild.__main__ import main
         ),
         pytest.param(
             ("--sysconfig", "/path/to/sysconfig.py", "--arch", "arm64"),
-            "--arch requires --platform",
+            "--arch option also requires --platform",
             id="sysconfig-and-arch",
         ),
         pytest.param(
             ("--cache", "/path/to/cache", "--sysconfig", "/path/to/sysconfig.py"),
-            "--cache requires --platform",
+            "--cache option also requires --platform",
             id="sysconfig-and-cache",
         ),
         pytest.param(
@@ -58,7 +59,7 @@ from xbuild.__main__ import main
         ),
         pytest.param(
             ("--archive", "/path/to/archive", "--sysconfig", "/path/to/sysconfig.py"),
-            "--archive requires --platform",
+            "--archive option also requires --platform",
             id="sysconfig-and-archive",
         ),
     ],
@@ -163,3 +164,82 @@ def test_main_reports_config_error(tmp_path, monkeypatch, capsys):
 
     assert excinfo.value.code == 1
     assert "boom" in capsys.readouterr().err
+
+
+@pytest.fixture
+def mock_CrossVenvConfig(monkeypatch):
+    mock_config = Mock()
+    mock_config.prepare_env = Mock(return_value={})
+    CrossVenvConfig = Mock(return_value=mock_config)
+    CrossVenvConfig.from_current_env.return_value = mock_config
+    monkeypatch.setattr("xbuild.__main__.CrossVenvConfig", CrossVenvConfig)
+    return CrossVenvConfig
+
+
+@pytest.fixture
+def mock_build(monkeypatch):
+    build = Mock(return_value="fake-wheel-0.1.0-py3-none-any.whl")
+    monkeypatch.setattr("xbuild.__main__._build", build)
+    return build
+
+
+def test_no_config_outside_cross_env(monkeypatch, tmp_path, capsys):
+    """Outside a cross env, a configuration source is required."""
+    monkeypatch.delattr(sys, "cross_compiling", raising=False)
+
+    with pytest.raises(SystemExit) as excinfo:
+        main([str(tmp_path)])
+
+    assert excinfo.value.code == 2
+    assert (
+        "One of the arguments --build-details, --sysconfig, or --platform is required"
+        in capsys.readouterr().err
+    )
+
+
+def test_no_config_in_cross_env(
+    monkeypatch, tmp_path, mock_CrossVenvConfig, mock_build
+):
+    """Inside a cross env, the current environment's config is used if no
+    configuration source is given."""
+    monkeypatch.setattr(sys, "cross_compiling", True, raising=False)
+
+    main([str(tmp_path)])
+
+    mock_CrossVenvConfig.assert_not_called()
+    mock_CrossVenvConfig.from_current_env.assert_called_once_with()
+    current_config = mock_CrossVenvConfig.from_current_env.return_value
+    current_config.prepare_env.assert_called_once_with()
+    # The resolved config is the last positional argument to _build()
+    assert mock_build.call_args.args[-1] is current_config
+
+
+def test_explicit_config_in_cross_env(
+    monkeypatch, tmp_path, mock_CrossVenvConfig, mock_build
+):
+    """Inside a cross env, an explicit configuration source takes precedence."""
+    monkeypatch.setattr(sys, "cross_compiling", True, raising=False)
+
+    main(["--platform", "ios", str(tmp_path)])
+
+    mock_CrossVenvConfig.from_current_env.assert_not_called()
+    mock_CrossVenvConfig.assert_called_once_with(
+        platform="ios",
+        arch=None,
+        archive_path=None,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=None,
+    )
+
+
+def test_current_env_error(monkeypatch, tmp_path, mock_CrossVenvConfig, capsys):
+    """An error determining the current env's configuration is surfaced."""
+    monkeypatch.setattr(sys, "cross_compiling", True, raising=False)
+    mock_CrossVenvConfig.from_current_env.side_effect = ValueError("no record")
+
+    with pytest.raises(SystemExit) as excinfo:
+        main([str(tmp_path)])
+
+    assert excinfo.value.code == 1
+    assert "no record" in capsys.readouterr().err

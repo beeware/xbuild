@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from xvenv import versions
+from xvenv.platforms import build_platform_env, host_platform
 
 VALID_ARCHES = ["aarch64", "x86_64"]
 DEFAULT_ARCH = {
@@ -202,6 +203,7 @@ def prepare_env(config) -> dict[str, str]:
             capture_output=True,
             text=True,
             check=True,
+            env=build_platform_env(),
         )
     except subprocess.CalledProcessError as e:
         raise ValueError(f"{android_py} env failed:\n{e.stdout}{e.stderr}") from e
@@ -244,7 +246,7 @@ def setup_testbed(
     :param src_paths: Paths to copy into the cloned testbed's src directory.
     :raises RuntimeError: if running on GitHub actions on a macOS runner.
     """
-    if sys.platform == "darwin" and "GITHUB_ACTIONS" in os.environ:
+    if host_platform() == "darwin" and "GITHUB_ACTIONS" in os.environ:
         raise RuntimeError(
             "GitHub Actions can't start an Android emulator on a macOS runner."
         )
@@ -286,7 +288,7 @@ def run_testbed(
     :param verbose: Verbosity level; > 0 forwards `-v` to `android.py`.
     :returns: The exit code of the `android.py test` subprocess.
     """
-    if "GITHUB_ACTIONS" in os.environ and sys.platform == "linux":
+    if "GITHUB_ACTIONS" in os.environ and host_platform() == "linux":
         # Enable emulator hardware acceleration on GitHub Actions.
         # (https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/).
         print("Enabling GitHub Actions hardware acceleration...")
@@ -323,5 +325,5 @@ def run_testbed(
         command.append("-v")
     command.extend(["--", *args])
 
-    result = subprocess.run(command, check=False)
+    result = subprocess.run(command, check=False, env=build_platform_env())
     return result.returncode

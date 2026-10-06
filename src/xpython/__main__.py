@@ -7,93 +7,24 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
-from build.__main__ import _cprint, _error, _setup_cli
+from build.__main__ import _cprint, _error
 
 import xpython
 from xpython.deps import install_requirements, resolve_requirements
+from xvenv.args import make_common_parser, parse_common_args
 from xvenv.convert import CrossVenvConfig
 
 
 def main_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = make_common_parser(
         "xpython",
         description=(
             "Run a Python module inside an iOS Simulator or Android "
             "emulator/device testbed, without needing to build a wheel."
         ),
-    )
-    parser.add_argument(
-        "--version",
-        "-V",
-        action="version",
         version=f"xpython {xpython.__version__}",
     )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        dest="verbosity",
-        action="count",
-        default=0,
-        help="increase verbosity",
-    )
 
-    # Create mutually exclusive group for --build-details, --sysconfig and
-    # --platform. Exactly one of these arguments must be provided.
-    config_group = parser.add_mutually_exclusive_group(required=True)
-    config_group.add_argument(
-        "--build-details",
-        dest="build_details_path",
-        type=Path,
-        help="The path to a build-details.json file.",
-    )
-    config_group.add_argument(
-        "--sysconfig",
-        dest="sysconfigdata_path",
-        type=Path,
-        help="The path to a sysconfigdata python file.",
-    )
-    config_group.add_argument(
-        "--platform",
-        dest="platform",
-        choices=["ios", "android", "emscripten"],
-        help=(
-            "Download (or reuse a cached copy of) a Python build for this "
-            "target platform, matching the Python version currently "
-            "running xvenv."
-        ),
-    )
-
-    parser.add_argument(
-        "--arch",
-        dest="arch",
-        help=(
-            "The target architecture. Defaults to a useful value based on "
-            "the host machine's architecture."
-        ),
-    )
-    source_group = parser.add_mutually_exclusive_group()
-    source_group.add_argument(
-        "--cache",
-        dest="cache",
-        type=Path,
-        help=(
-            "The directory to use for caching downloaded Python builds, "
-            "for use with --platform. Defaults to the XBUILD_CACHE "
-            "environment variable, or a platform-appropriate cache "
-            "directory."
-        ),
-    )
-    source_group.add_argument(
-        "--archive",
-        dest="archive",
-        type=Path,
-        help=(
-            "Use an already-extracted Python build at this location "
-            "instead of downloading one, for use with --platform. Must be "
-            "laid out the same way an archive downloaded via --platform "
-            "would have been unpacked."
-        ),
-    )
     parser.add_argument(
         "--dependency",
         "-d",
@@ -184,21 +115,29 @@ def main_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _parse_args(cli_args: Sequence[str], prog: str | None = None) -> argparse.Namespace:
+def _parse_args(
+    parser: argparse.ArgumentParser,
+    cli_args: Sequence[str],
+) -> argparse.Namespace:
     """Parse and validate CLI arguments, including the `--` separator
     split and platform-specific forwarded-argument handling.
 
     Everything before the first literal `"--"` in `cli_args` is parsed as
     `xpython`'s own flags. Everything after it is treated as a raw,
-    unparsed list of forwarded arguments: for `--platform ios`, the first
+    unparsed list of forwarded arguments: for an iOS target, the first
     forwarded argument must be `-m` (stripped, then split into
-    `args.module`/`args.module_args`); for `--platform android`, the
+    `args.module`/`args.module_args`); for an Android target, the
     forwarded arguments are stored verbatim as `args.forwarded_args`, with
     no validation.
+
+    If none of `--platform`/`--build-details`/`--sysconfig` is given, the
+    current cross-platform environment is used (`args.use_current_env` is
+    `True`); this is an error if not running in a cross-platform environment.
 
     If `"--"` is absent from `cli_args` entirely, the forwarded-argument
     list is treated as empty (not an error).
 
+    :param parser: The full argument parser
     :param cli_args: CLI arguments
     :param prog: Program name to show in help text
     :returns: The parsed, validated, and platform-annotated namespace.
@@ -206,10 +145,6 @@ def _parse_args(cli_args: Sequence[str], prog: str | None = None) -> argparse.Na
         invalid flag combination, including a non-`-m` first forwarded
         argument on iOS.
     """
-    parser = main_parser()
-    if prog:
-        parser.prog = prog
-
     try:
         separator_index = cli_args.index("--")
         xpython_args = cli_args[:separator_index]
@@ -218,41 +153,39 @@ def _parse_args(cli_args: Sequence[str], prog: str | None = None) -> argparse.Na
         xpython_args = cli_args
         forwarded_args = []
 
-    args = parser.parse_args(xpython_args)
+    args = parse_common_args(parser, xpython_args)
 
-    if args.arch is not None and args.platform is None:
-        parser.error("--arch requires --platform")
-    if args.cache is not None and args.platform is None:
-        parser.error("--cache requires --platform")
-    if args.archive is not None and args.platform is None:
-        parser.error("--archive requires --platform")
+    if args.use_current_env:
+        # In a cross-platform environment, sys.platform is the target platform.
+        target_platform = sys.platform
+    else:
+        target_platform = args.platform
 
-    if args.simulator is not None and args.platform != "ios":
-        parser.error("--simulator requires --platform ios")
-    if args.managed is not None and args.platform != "android":
-        parser.error("--managed requires --platform android")
-    if args.connected is not None and args.platform != "android":
-        parser.error("--connected requires --platform android")
+    if args.simulator is not None and target_platform != "ios":
+        parser.error("--simulator option also requires --platform ios")
+    if args.managed is not None and target_platform != "android":
+        parser.error("--managed option also requires --platform android")
+    if args.connected is not None and target_platform != "android":
+        parser.error("--connected option also requires --platform android")
 
     args.forwarded_args = forwarded_args
 
     return args
 
 
-def main(cli_args: Sequence[str], prog: str | None = None) -> None:
+def main(cli_args: Sequence[str]) -> None:
     """Parse the CLI arguments and run the module in the target testbed.
 
     :param cli_args: CLI arguments
-    :param prog: Program name to show in help text
     """
-    args = _parse_args(cli_args, prog)
-
-    _setup_cli(verbosity=args.verbosity)
+    parser = main_parser()
+    args = _parse_args(parser, cli_args)
 
     try:
         if args.work_path is not None:
             if args.work_path.exists():
                 _error(f"Working directory `{args.work_path}` already exists.")
+
             args.work_path.mkdir(parents=True, exist_ok=True)
             exit_code = _run(args)
         else:
@@ -279,14 +212,18 @@ def _run(args: argparse.Namespace) -> int:
     """
     _cprint("{bold}Creating cross-venv...{reset}")
     venv_path = args.work_path / "venv"
-    cross_venv = CrossVenvConfig(
-        platform=args.platform,
-        arch=args.arch,
-        archive_path=args.archive,
-        build_details_path=args.build_details_path,
-        sysconfigdata_path=args.sysconfigdata_path,
-        cache_path=args.cache,
-    )
+    if args.use_current_env:
+        cross_venv = CrossVenvConfig.from_current_env()
+    else:
+        cross_venv = CrossVenvConfig(
+            platform=args.platform,
+            arch=args.arch,
+            archive_path=args.archive,
+            build_details_path=args.build_details_path,
+            sysconfigdata_path=args.sysconfigdata_path,
+            cache_path=args.cache,
+        )
+
     cross_venv.create(venv_path, with_pip=True)
 
     _cprint("{bold}Creating testbed project...{reset}")
@@ -321,10 +258,4 @@ def entrypoint() -> None:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main(sys.argv[1:], "python -m xpython")
-
-
-__all__ = [
-    "main",
-    "main_parser",
-]
+    main(sys.argv[1:])
