@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import sys
 from pathlib import Path
 from unittest.mock import Mock
@@ -389,17 +390,58 @@ def test_config_missing_sysconfigdata_file(tmp_path):
         )
 
 
-def test_prepare_env_dispatches_to_platform_module(tmp_path, mock_config):
-    """`prepare_env()` delegates to the platform module."""
+@pytest.mark.parametrize(
+    ("orig_path", "xbuild_path", "final_path"),
+    [
+        # XBUILD_PATH isn't defined
+        (
+            ["/venv/bin", "/usr/bin"],
+            None,
+            ["/venv/bin", "/usr/bin"],
+        ),
+        # XBUILD_PATH defined, but empty
+        (
+            ["/venv/bin", "/usr/bin"],
+            "",
+            ["/venv/bin", "/usr/bin"],
+        ),
+        # XBUILD_PATH with actual values
+        (
+            ["/venv/bin", "/usr/bin"],
+            "/local/bin",
+            ["/local/bin", "/venv/bin", "/usr/bin"],
+        ),
+        (
+            ["/venv/bin", "/usr/bin"],
+            ["/other/bin", "/local/bin"],
+            ["/other/bin", "/local/bin", "/venv/bin", "/usr/bin"],
+        ),
+    ],
+)
+def test_prepare_env(mock_config, orig_path, xbuild_path, final_path, monkeypatch):
+    """`prepare_env()` delegates to the platform module and handles `XBUILD_PATH`."""
+    if xbuild_path is None:
+        monkeypatch.delenv("XBUILD_PATH", raising=False)
+    else:
+        if isinstance(xbuild_path, list):
+            xbuild_path = os.pathsep.join(xbuild_path)
+        monkeypatch.setenv("XBUILD_PATH", xbuild_path)
+
     fake_platform_module = Mock()
-    fake_platform_module.prepare_env.return_value = {"CC": "fake-clang"}
+    fake_platform_module.prepare_env.return_value = {
+        "CC": "fake-clang",
+        "PATH": os.pathsep.join(orig_path),
+    }
 
     mock_config.platform_module = fake_platform_module
 
     result = mock_config.prepare_env()
 
     fake_platform_module.prepare_env.assert_called_once_with(mock_config)
-    assert result == {"CC": "fake-clang"}
+    assert result == {
+        "CC": "fake-clang",
+        "PATH": os.pathsep.join(final_path),
+    }
 
 
 def _fake_venv(venv_path, version):

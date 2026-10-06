@@ -38,6 +38,8 @@ In addition to converting a virtual environment into a cross-platform environmen
 - **Android**: `CC`, `AR`, `AS`, `CXX`, `LD`, `NM`, `RANLIB`, `READELF`, `STRIP`, `CFLAGS`, `LDFLAGS`, `CXXFLAGS`, `CPU_COUNT`, and (if available) `PKG_CONFIG`/`PKG_CONFIG_LIBDIR` are set by running the target Android Python build's own bundled `android.py env` command (which installs the exact required NDK version under `$ANDROID_HOME/ndk/` if it isn't already present). This requires `ANDROID_HOME` to already be set - see [Platform setup: Android](../how-to/platform-setup/android.md).
 - **iOS**: `PATH` is replaced with the cross-platform environment's own `bin/` directory, followed by the target-platform `Python.xcframework` slice's `bin/` directory (containing the `clang`/`ar`/`strip` shims for the target architecture), followed by a fixed, minimal set of system directories, ensuring no build-machine-native tools leak into the build.
 
+On all platforms, if the [`XBUILD_PATH`](../reference/environment-variables.md#xbuild_path) environment variable is set, its contents are prepended to `PATH`. This allows specific build-machine tools to be made available to the build, even on platforms (such as iOS) where `PATH` is otherwise replaced.
+
 Build-platform tools (e.g. Android's `android.py`, or the iOS testbed driver) are always run with `XBUILD_ENV=off`, so that they behave correctly even when `xbuild` or `xpython` is itself running inside a cross-platform environment.
 
 This preparation is `xbuild`-specific; it does not apply to a cross-platform environment created by `xvenv` and used directly outside of `xbuild`.
