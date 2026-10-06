@@ -90,7 +90,7 @@ from ...utils import VersionInfo
             "arm64-iphonesimulator",
             (
                 "https://github.com/beeware/Python-Apple-support/releases/download/"
-                "3.14-b11/Python-3.14-iOS-support.b11.tar.gz"
+                "3.14-b12/Python-3.14-iOS-support.b12.tar.gz"
             ),
             id="3.14.10-arm64-iphonesimulator",
         ),
@@ -105,7 +105,7 @@ from ...utils import VersionInfo
             "arm64-iphonesimulator",
             (
                 "https://github.com/beeware/Python-Apple-support/releases/download/"
-                "3.13-b15/Python-3.13-iOS-support.b15.tar.gz"
+                "3.13-b16/Python-3.13-iOS-support.b16.tar.gz"
             ),
             id="3.13.10-arm64-iphonesimulator",
         ),
@@ -120,7 +120,7 @@ from ...utils import VersionInfo
             "arm64-iphonesimulator",
             (
                 "https://github.com/beeware/Python-Apple-support/releases/download/"
-                "3.12-b10/Python-3.12-iOS-support.b10.tar.gz"
+                "3.12-b11/Python-3.12-iOS-support.b11.tar.gz"
             ),
             id="3.12.10-arm64-iphonesimulator",
         ),
@@ -135,7 +135,7 @@ from ...utils import VersionInfo
             "arm64-iphonesimulator",
             (
                 "https://github.com/beeware/Python-Apple-support/releases/download/"
-                "3.11-b10/Python-3.11-iOS-support.b10.tar.gz"
+                "3.11-b11/Python-3.11-iOS-support.b11.tar.gz"
             ),
             id="3.11.10-arm64-iphonesimulator",
         ),

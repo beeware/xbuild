@@ -32,10 +32,10 @@ def download_url(version_info: tuple, arch: str) -> str:
         raise ValueError(f"xbuild doesn't support Python {series} on iOS")
     elif version_info[:2] < (3, 15):
         build = {
-            "3.11": "b10",
-            "3.12": "b10",
-            "3.13": "b15",
-            "3.14": "b11",
+            "3.11": "b11",
+            "3.12": "b11",
+            "3.13": "b16",
+            "3.14": "b12",
         }[series]
         return (
             "https://github.com/beeware/Python-Apple-support/releases/download/"
