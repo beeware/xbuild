@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from xpython.__main__ import _parse_args, _resolve_config, _run
+from xpython.__main__ import _parse_args, _run, main_parser
 from xvenv.convert import CrossVenvConfig
 
 
@@ -135,8 +135,9 @@ def mock_CrossVenvConfig(monkeypatch, mock_config):
 )
 def test_invalid_args(args, error, capsys):
     """Invalid flag combinations raise a usage error."""
+    parser = main_parser()
     with pytest.raises(SystemExit) as excinfo:
-        _parse_args(args)
+        _parse_args(parser, args)
 
     assert excinfo.value.code == 2
     assert error in capsys.readouterr().err
@@ -144,7 +145,8 @@ def test_invalid_args(args, error, capsys):
 
 def test_defaults():
     """Default values are set correctly when only required args are given."""
-    args = _parse_args(["--platform", "android"])
+    parser = main_parser()
+    args = _parse_args(parser, ["--platform", "android"])
 
     assert args.platform == "android"
     assert args.arch is None
@@ -165,7 +167,9 @@ def test_defaults():
 
 def test_repeatable_flags():
     """-d/--dependency, --group, --find-links, --src can be repeated."""
+    parser = main_parser()
     args = _parse_args(
+        parser,
         [
             "--platform",
             "ios",
@@ -186,7 +190,7 @@ def test_repeatable_flags():
             "--",
             "-m",
             "pytest",
-        ]
+        ],
     )
 
     assert args.dependencies == ["requests", "attrs>=23"]
@@ -234,7 +238,8 @@ def test_repeatable_flags():
 def test_forwarded_args(input_args, forwarded_args):
     """Android: forwarded args starting with -c (not -m) are accepted with
     no xpython-side validation error, and stored verbatim."""
-    args = _parse_args(input_args)
+    parser = main_parser()
+    args = _parse_args(parser, input_args)
 
     assert args.forwarded_args == forwarded_args
 
@@ -270,7 +275,12 @@ def test_run(
     mock_resolve_requirements,
 ):
     """Environment config arguments are passed to run."""
-    args = _parse_args(["--platform", "android", *archive_args, "--", "-m", "pytest"])
+    parser = main_parser()
+    args = _parse_args(
+        parser,
+        ["--platform", "android", *archive_args, "--", "-m", "pytest"],
+    )
+
     args.work_path = tmp_path / "work"
     args.work_path.mkdir()
 
@@ -311,8 +321,9 @@ def test_no_config_outside_cross_env(monkeypatch, capsys):
     """Outside a cross env, a configuration source is required."""
     monkeypatch.delattr(sys, "cross_compiling", raising=False)
 
+    parser = main_parser()
     with pytest.raises(SystemExit) as excinfo:
-        _parse_args(["--", "-m", "pytest"])
+        _parse_args(parser, ["--", "-m", "pytest"])
 
     assert excinfo.value.code == 2
     assert (
@@ -324,7 +335,8 @@ def test_no_config_outside_cross_env(monkeypatch, capsys):
 def test_no_config_in_cross_env(cross_env):
     """Inside a cross env, no configuration source is needed, and
     platform-specific options are validated against the current platform."""
-    args = _parse_args(["--simulator", "iPhone 16e", "--", "-m", "pytest"])
+    parser = main_parser()
+    args = _parse_args(parser, ["--simulator", "iPhone 16e", "--", "-m", "pytest"])
 
     assert args.use_current_env is True
     assert args.platform is None
@@ -333,8 +345,9 @@ def test_no_config_in_cross_env(cross_env):
 
 def test_no_config_in_cross_env_wrong_platform_option(cross_env, capsys):
     """Inside an iOS cross env, Android-only options are rejected."""
+    parser = main_parser()
     with pytest.raises(SystemExit) as excinfo:
-        _parse_args(["--managed", "maxVersion", "--", "-m", "pytest"])
+        _parse_args(parser, ["--managed", "maxVersion", "--", "-m", "pytest"])
 
     assert excinfo.value.code == 2
     assert "--managed requires --platform android" in capsys.readouterr().err
@@ -342,19 +355,11 @@ def test_no_config_in_cross_env_wrong_platform_option(cross_env, capsys):
 
 def test_explicit_config_in_cross_env(cross_env):
     """Inside a cross env, an explicit configuration source takes precedence."""
-    args = _parse_args(["--platform", "android", "--managed", "maxVersion"])
+    parser = main_parser()
+    args = _parse_args(parser, ["--platform", "android", "--managed", "maxVersion"])
 
     assert args.use_current_env is False
     assert args.platform == "android"
-
-
-def test_resolve_config_current_env(cross_env, mock_CrossVenvConfig, mock_config):
-    """With no configuration source, the current env's config is used."""
-    args = _parse_args(["--", "-m", "pytest"])
-
-    assert _resolve_config(args) is mock_config
-    mock_CrossVenvConfig.assert_not_called()
-    mock_CrossVenvConfig.from_current_env.assert_called_once_with()
 
 
 def test_run_current_env(
@@ -365,7 +370,8 @@ def test_run_current_env(
     mock_resolve_requirements,
 ):
     """_run() uses the current env's config when no source is given."""
-    args = _parse_args(["--", "-m", "pytest"])
+    parser = main_parser()
+    args = _parse_args(parser, ["--", "-m", "pytest"])
     args.work_path = tmp_path / "work"
     args.work_path.mkdir()
 
