@@ -20,16 +20,14 @@ Clearing the variable, or setting it (case-insensitively) to `1` or `on`, leaves
 
 ## `XBUILD_PATH`
 
-Additional directories to *prepend* to `PATH` when `xbuild` prepares the build environment for the target platform. Separate multiple directories with `:`.
+Additional directories to *prepend* to `PATH` when `xbuild` prepares the build environment for the target platform. Uses the same syntax as the platform's `PATH` variable.
 
-This is most useful when building for iOS. `xbuild` replaces `PATH` with a minimal, clean value so that no build-machine tools leak into the build, but some builds still need specific build-machine tools (e.g. `cmake` or `ninja`). Directories in `XBUILD_PATH` are added ahead of that clean `PATH`:
+This variable is honored on all platforms, but it is most useful when building for iOS. When building for iOS, `xbuild` replaces `PATH` with a minimal, clean value so that no build-machine tools leak into the build, but some builds still need specific build-machine tools (e.g. `cmake` or `ninja`). Directories in `XBUILD_PATH` are added ahead of that clean `PATH`:
 
 ```console
 (venv) $ XBUILD_PATH=/opt/homebrew/opt/cmake/bin xbuild --platform ios --arch arm64-iphonesimulator
 ```
 
 Directories in `XBUILD_PATH` take precedence over the tools `xbuild` provides for the target platform. Point `XBUILD_PATH` at directories that contain only the specific tools you need, rather than at a general directory like `/opt/homebrew/bin`, which could shadow the target-platform compiler or Python interpreter.
-
-On other platforms, `XBUILD_PATH` is prepended to the inherited `PATH`. If `XBUILD_PATH` is unset or empty, `PATH` is not modified.
 
 `XBUILD_PATH` only applies to builds performed by `xbuild`. It has no effect on a cross-platform environment that is activated and used directly.

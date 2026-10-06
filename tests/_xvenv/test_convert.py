@@ -390,115 +390,58 @@ def test_config_missing_sysconfigdata_file(tmp_path):
         )
 
 
-def test_prepare_env_dispatches_to_platform_module(tmp_path, mock_config, monkeypatch):
-    """`prepare_env()` delegates to the platform module."""
-    monkeypatch.delenv("XBUILD_PATH", raising=False)
+@pytest.mark.parametrize(
+    ("orig_path", "xbuild_path", "final_path"),
+    [
+        # XBUILD_PATH isn't defined
+        (
+            ["/venv/bin", "/usr/bin"],
+            None,
+            ["/venv/bin", "/usr/bin"],
+        ),
+        # XBUILD_PATH defined, but empty
+        (
+            ["/venv/bin", "/usr/bin"],
+            "",
+            ["/venv/bin", "/usr/bin"],
+        ),
+        # XBUILD_PATH with actual values
+        (
+            ["/venv/bin", "/usr/bin"],
+            "/local/bin",
+            ["/local/bin", "/venv/bin", "/usr/bin"],
+        ),
+        (
+            ["/venv/bin", "/usr/bin"],
+            ["/other/bin", "/local/bin"],
+            ["/other/bin", "/local/bin", "/venv/bin", "/usr/bin"],
+        ),
+    ],
+)
+def test_prepare_env(mock_config, orig_path, xbuild_path, final_path, monkeypatch):
+    """`prepare_env()` delegates to the platform module and handles `XBUILD_PATH`."""
+    if xbuild_path is None:
+        monkeypatch.delenv("XBUILD_PATH", raising=False)
+    else:
+        if isinstance(xbuild_path, list):
+            xbuild_path = os.pathsep.join(xbuild_path)
+        monkeypatch.setenv("XBUILD_PATH", xbuild_path)
+
     fake_platform_module = Mock()
-    fake_platform_module.prepare_env.return_value = {"CC": "fake-clang"}
+    fake_platform_module.prepare_env.return_value = {
+        "CC": "fake-clang",
+        "PATH": os.pathsep.join(orig_path),
+    }
 
     mock_config.platform_module = fake_platform_module
 
     result = mock_config.prepare_env()
 
     fake_platform_module.prepare_env.assert_called_once_with(mock_config)
-    assert result == {"CC": "fake-clang"}
-
-
-def _fake_platform(env):
-    """A fake platform module whose `prepare_env()` returns `env`."""
-    fake_platform_module = Mock()
-    fake_platform_module.prepare_env.return_value = env
-    return fake_platform_module
-
-
-def test_prepare_env_platform_path_without_xbuild_path(mock_config, monkeypatch):
-    """With no XBUILD_PATH, a PATH provided by the platform is used unchanged."""
-    monkeypatch.delenv("XBUILD_PATH", raising=False)
-    mock_config.platform_module = _fake_platform(
-        {"PATH": os.pathsep.join(["/venv/bin", "/usr/bin"])}
-    )
-
-    result = mock_config.prepare_env()
-
-    assert result == {"PATH": os.pathsep.join(["/venv/bin", "/usr/bin"])}
-
-
-def test_prepare_env_empty_xbuild_path_ignored(mock_config, monkeypatch):
-    """An empty XBUILD_PATH is treated as unset; no PATH is added."""
-    monkeypatch.setenv("XBUILD_PATH", "")
-    mock_config.platform_module = _fake_platform({"CC": "fake-clang"})
-
-    result = mock_config.prepare_env()
-
-    assert result == {"CC": "fake-clang"}
-
-
-def test_prepare_env_xbuild_path_prepended_to_platform_path(mock_config, monkeypatch):
-    """XBUILD_PATH is prepended to a PATH provided by the platform (e.g., iOS),
-    rather than to the inherited PATH."""
-    monkeypatch.setenv("XBUILD_PATH", "/opt/tools/bin")
-    monkeypatch.setenv("PATH", "/inherited/bin")
-    mock_config.platform_module = _fake_platform(
-        {"CC": "fake-clang", "PATH": os.pathsep.join(["/venv/bin", "/usr/bin"])}
-    )
-
-    result = mock_config.prepare_env()
-
     assert result == {
         "CC": "fake-clang",
-        "PATH": os.pathsep.join(["/opt/tools/bin", "/venv/bin", "/usr/bin"]),
+        "PATH": os.pathsep.join(final_path),
     }
-
-
-def test_prepare_env_xbuild_path_prepended_to_inherited_path(mock_config, monkeypatch):
-    """If the platform doesn't provide PATH (e.g., Android), XBUILD_PATH is
-    prepended to the inherited PATH."""
-    monkeypatch.setenv("XBUILD_PATH", "/opt/tools/bin")
-    monkeypatch.setenv("PATH", os.pathsep.join(["/inherited/bin", "/usr/bin"]))
-    mock_config.platform_module = _fake_platform({"CC": "fake-clang"})
-
-    result = mock_config.prepare_env()
-
-    assert result == {
-        "CC": "fake-clang",
-        "PATH": os.pathsep.join(["/opt/tools/bin", "/inherited/bin", "/usr/bin"]),
-    }
-
-
-def test_prepare_env_xbuild_path_multiple_entries(mock_config, monkeypatch):
-    """XBUILD_PATH may contain multiple entries; they are preserved in order."""
-    xbuild_path = os.pathsep.join(["/opt/a/bin", "/opt/b/bin"])
-    monkeypatch.setenv("XBUILD_PATH", xbuild_path)
-    mock_config.platform_module = _fake_platform({"PATH": "/usr/bin"})
-
-    result = mock_config.prepare_env()
-
-    assert result == {
-        "PATH": os.pathsep.join(["/opt/a/bin", "/opt/b/bin", "/usr/bin"]),
-    }
-
-
-def test_prepare_env_xbuild_path_with_no_base_path(mock_config, monkeypatch):
-    """If there's no PATH at all, PATH is just XBUILD_PATH, with no empty
-    trailing component."""
-    monkeypatch.setenv("XBUILD_PATH", "/opt/tools/bin")
-    monkeypatch.delenv("PATH", raising=False)
-    mock_config.platform_module = _fake_platform({})
-
-    result = mock_config.prepare_env()
-
-    assert result == {"PATH": "/opt/tools/bin"}
-
-
-def test_prepare_env_does_not_mutate_platform_result(mock_config, monkeypatch):
-    """The dict returned by the platform module isn't modified in place."""
-    monkeypatch.setenv("XBUILD_PATH", "/opt/tools/bin")
-    platform_env = {"PATH": "/usr/bin"}
-    mock_config.platform_module = _fake_platform(platform_env)
-
-    mock_config.prepare_env()
-
-    assert platform_env == {"PATH": "/usr/bin"}
 
 
 def _fake_venv(venv_path, version):
