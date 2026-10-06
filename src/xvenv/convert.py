@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pprint
 import re
 import sys
@@ -361,6 +362,11 @@ class CrossVenvConfig:
     def prepare_env(self) -> dict[str, str]:
         """Prepare the environment variables needed to build for this cross environment.
 
+        If the `XBUILD_PATH` environment variable is set (and non-empty), it is
+        prepended to `PATH`. If the platform module provides a `PATH` (e.g., iOS,
+        which replaces `PATH` entirely), `XBUILD_PATH` is prepended to that value;
+        otherwise, it is prepended to the inherited `PATH`.
+
         :returns: A dict of environment variables to merge into `os.environ`
             for the duration of the build.
         :raises ValueError: if the platform module's own `prepare_env()`
@@ -369,7 +375,15 @@ class CrossVenvConfig:
         :raises NotImplementedError: for platforms that don't support
             environment preparation yet (currently: emscripten).
         """
-        return self.platform_module.prepare_env(self)
+        env = dict(self.platform_module.prepare_env(self))
+
+        if xbuild_path := os.environ.get("XBUILD_PATH"):
+            base_path = env.get("PATH", os.environ.get("PATH", ""))
+            env["PATH"] = os.pathsep.join(
+                part for part in [xbuild_path, base_path] if part
+            )
+
+        return env
 
     def packages_path(self, work_path: Path) -> Path:
         """Return the location, relative to the provided path, where the
