@@ -2,6 +2,21 @@
 
 <!-- towncrier release notes start -->
 
+## 0.4.1 (2026-10-07)
+
+### Features
+
+* `xbuild` now automatically configures the build environment (compiler paths and flags) required for the target platform, removing the need to manually source `android-env.sh` or configure `PATH` before running a build. ([#95](https://github.com/beeware/xbuild/issues/95))
+* If the `XBUILD_PATH` environment variable is set, its contents are now prepended to the `PATH` used by `xbuild` when building for a target platform. ([#101](https://github.com/beeware/xbuild/issues/101))
+
+### Bugfixes
+
+* When run inside an active cross-platform environment, `xbuild`, `xvenv` and `xpython` no longer require `--platform`, `--build-details` or `--sysconfig`; they default to the configuration of the current environment. ([#94](https://github.com/beeware/xbuild/issues/94))
+
+### Misc
+
+* [#99](https://github.com/beeware/xbuild/issues/99), [#100](https://github.com/beeware/xbuild/issues/100)
+
 ## 0.4.0 (2026-09-25)
 
 ### Features
