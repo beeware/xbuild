@@ -42,8 +42,8 @@ def run_testbed(
     """Run an already-configured testbed project for a platform.
 
     This only requires the platform name, not a full `CrossVenvConfig`, so it
-    can be used to re-run a testbed even if the Python build that was used to
-    create it is no longer available.
+    can be used to re-run an existing testbed without re-resolving the Python
+    build configuration.
 
     :param platform: The target platform name (e.g., "ios", "android").
     :param work_path: The working directory containing the testbed.

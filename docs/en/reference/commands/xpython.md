@@ -18,7 +18,7 @@
 5. Run the project on a simulator/emulator
 6. Exit with the exit code produced by the test code (or by the testbed driver itself, if it failed to build/launch before the test code could run).
 
-If you use `--work-dir` to name a directory that was set up by a previous `xpython` invocation, steps 1-3 are skipped, and the existing testbed project is reused (see [`--work-dir`](#-work-dir-dir) below).
+If you use `--work-dir` to name a directory that was set up by a previous `xpython` invocation, steps 1-3 are skipped, and the existing testbed project is reused (see [`--work-dir`](#xpython-work-dir) below).
 
 If you run `xpython` from inside an active cross-platform environment, you can omit `--platform`/`--build-details`/`--sysconfig`; `xpython` will target the platform of the current environment (see [Specifying the target platform](./index.md#target-platform)).
 
@@ -62,13 +62,13 @@ The name of a Gradle-managed Android device to use. Defaults to `maxVersion` if 
 
 The serial number of an already-connected Android device to use. Only valid with `--platform android`. Mutually exclusive with `--managed`.
 
-### `--work-dir DIR`
+### `--work-dir DIR` { #xpython-work-dir }
 
 Use this directory to store the cross-environment, installed dependencies, and testbed project, instead of a temporary directory. Unlike a temporary directory, this directory is **not** deleted when `xpython` exits.
 
 If `DIR` doesn't exist, `xpython` creates it and sets up the testbed project in it. Once setup has completed successfully, `xpython` records the configuration of the project in `DIR/xpython.toml`.
 
-If `DIR` already exists and was set up by a previous `xpython` invocation, the existing testbed project is reused. The cross-environment isn't recreated, the testbed isn't cloned again, and no sources or dependencies are installed. Only the run options (the arguments after `--`, `--simulator`, `--managed`, `--connected` and `--verbose`) are used. Setup options (`--platform`, `--arch`, `--cache`, `--archive`, `--build-details`, `--sysconfig`, `--dependency`, `--group`, `--find-links` and `--src`) can be omitted. If you do provide them and they differ from the options used to set up `DIR`, `xpython` prints a warning and ignores them.
+If `DIR` already exists and was set up by a previous `xpython` invocation, the existing testbed project is reused. The cross-environment isn't recreated, the testbed isn't cloned again, and no sources are copied, and no dependencies are installed. Only the run options (the arguments after `--`, `--simulator`, `--managed`, `--connected` and `--verbose`) are used. Setup options (`--platform`, `--arch`, `--cache`, `--archive`, `--build-details`, `--sysconfig`, `--dependency`, `--group`, `--find-links` and `--src`) can be omitted. If you do provide them and they differ from the options used to set up `DIR`, `xpython` prints a warning and ignores them.
 
 ```console
 (venv) $ xpython --platform android --src tests --group test --work-dir build/android -- -m pytest tests
