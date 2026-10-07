@@ -5,8 +5,14 @@ from unittest.mock import Mock
 
 import pytest
 
-from xpython.__main__ import _parse_args, _run, main_parser
-from xpython.project import PROJECT_FILENAME, ProjectConfig, SetupOptions, read_project
+from xpython.__main__ import _parse_args, _run, main, main_parser
+from xpython.project import (
+    PROJECT_FILENAME,
+    ProjectConfig,
+    SetupOptions,
+    read_project,
+    write_project,
+)
 from xvenv.convert import CrossVenvConfig
 
 
@@ -161,6 +167,7 @@ def test_defaults():
     assert args.managed is None
     assert args.connected is None
     assert args.work_path is None
+    assert args.project is None
     assert args.verbosity == 0
     assert args.forwarded_args == []
     assert args.use_current_env is False
@@ -455,3 +462,222 @@ def test_run_install_failure_no_project(
 
     assert not (args.work_path / PROJECT_FILENAME).exists()
     mock_config.run_testbed.assert_not_called()
+
+
+@pytest.fixture
+def native_env(monkeypatch):
+    """Ensure we're not in a cross env."""
+    monkeypatch.delattr(sys, "cross_compiling", raising=False)
+
+
+@pytest.fixture
+def reusable_work_path(tmp_path):
+    """A work directory configured by a previous xpython run."""
+    work_path = tmp_path / "work"
+    work_path.mkdir()
+    write_project(
+        work_path,
+        ProjectConfig(
+            platform="android",
+            options=SetupOptions(dependencies=["pytest"], platform="android"),
+        ),
+    )
+    return work_path
+
+
+@pytest.fixture
+def mock_run_testbed(monkeypatch):
+    run_testbed = Mock(return_value=3)
+    monkeypatch.setattr("xpython.__main__.run_testbed", run_testbed)
+    return run_testbed
+
+
+def test_main_fresh_work_dir(
+    native_env,
+    tmp_path,
+    mock_CrossVenvConfig,
+    mock_config,
+    mock_resolve_requirements,
+):
+    """A non-existent work dir is created and fully set up."""
+    work_path = tmp_path / "work"
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(
+            [
+                "--platform",
+                "android",
+                "--work-dir",
+                str(work_path),
+                "--",
+                "-m",
+                "pytest",
+            ]
+        )
+
+    assert excinfo.value.code == 0
+    mock_config.create.assert_called_once_with(
+        work_path.resolve() / "venv", with_pip=True
+    )
+    mock_config.setup_testbed.assert_called_once()
+    assert (work_path / PROJECT_FILENAME).is_file()
+
+
+def test_main_reuse(
+    native_env,
+    reusable_work_path,
+    mock_CrossVenvConfig,
+    mock_config,
+    mock_resolve_requirements,
+    mock_run_testbed,
+    capsys,
+):
+    """An existing, configured work dir is reused without any setup, and
+    without requiring a platform."""
+    install_requirements = Mock()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("xpython.__main__.install_requirements", install_requirements)
+        with pytest.raises(SystemExit) as excinfo:
+            main(
+                [
+                    "--work-dir",
+                    str(reusable_work_path),
+                    "--connected",
+                    "emulator-5554",
+                    "--",
+                    "-m",
+                    "pytest",
+                    "-k",
+                    "widget",
+                ]
+            )
+
+    assert excinfo.value.code == 3
+    mock_CrossVenvConfig.assert_not_called()
+    mock_CrossVenvConfig.from_current_env.assert_not_called()
+    mock_resolve_requirements.assert_not_called()
+    install_requirements.assert_not_called()
+    mock_run_testbed.assert_called_once_with(
+        "android",
+        work_path=reusable_work_path.resolve(),
+        args=["-m", "pytest", "-k", "widget"],
+        simulator=None,
+        managed=None,
+        connected="emulator-5554",
+        verbose=0,
+    )
+    assert "WARNING" not in capsys.readouterr().err
+
+
+def test_main_reuse_in_cross_env(
+    cross_env,
+    reusable_work_path,
+    mock_CrossVenvConfig,
+    mock_run_testbed,
+):
+    """Inside a cross env, the recorded project wins over the current env."""
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--work-dir", str(reusable_work_path), "--managed", "maxVersion"])
+
+    assert excinfo.value.code == 3
+    mock_CrossVenvConfig.from_current_env.assert_not_called()
+    assert mock_run_testbed.call_args.args == ("android",)
+
+
+def test_main_reuse_warnings(
+    native_env,
+    reusable_work_path,
+    mock_CrossVenvConfig,
+    mock_run_testbed,
+    capsys,
+):
+    """Setup options that differ from the recorded ones produce warnings and
+    are ignored; matching options don't."""
+    with pytest.raises(SystemExit) as excinfo:
+        main(
+            [
+                "--platform",
+                "android",
+                "-d",
+                "requests",
+                "--group",
+                "test",
+                "--work-dir",
+                str(reusable_work_path),
+            ]
+        )
+
+    assert excinfo.value.code == 3
+    err = capsys.readouterr().err
+    assert "Ignoring --dependency [requests]" in err
+    assert "configured with --dependency [pytest]" in err
+    assert "Ignoring --group [test]" in err
+    assert "Ignoring --platform" not in err
+    mock_CrossVenvConfig.assert_not_called()
+    assert mock_run_testbed.call_args.args == ("android",)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param(None, id="empty-dir"),
+        pytest.param("not toml [", id="invalid-project"),
+    ],
+)
+def test_main_existing_invalid_work_dir(
+    native_env,
+    tmp_path,
+    content,
+    mock_CrossVenvConfig,
+    capsys,
+):
+    """An existing work dir without a valid project file is an error."""
+    work_path = tmp_path / "work"
+    work_path.mkdir()
+    if content is not None:
+        (work_path / PROJECT_FILENAME).write_text(content, encoding="utf-8")
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--platform", "android", "--work-dir", str(work_path)])
+
+    assert excinfo.value.code == 1
+    err = capsys.readouterr().err
+    assert "is not a valid xpython work directory" in err
+    assert "choose a different --work-dir" in err
+    mock_CrossVenvConfig.assert_not_called()
+
+
+def test_parse_missing_config_new_work_dir(native_env, tmp_path, capsys):
+    """Without a reusable work dir, a configuration source is still required."""
+    parser = main_parser()
+    with pytest.raises(SystemExit) as excinfo:
+        _parse_args(parser, ["--work-dir", str(tmp_path / "work")])
+
+    assert excinfo.value.code == 2
+    assert (
+        "One of the arguments --build-details, --sysconfig, or --platform is required"
+        in capsys.readouterr().err
+    )
+
+
+def test_parse_reuse(native_env, reusable_work_path, monkeypatch):
+    """On reuse, the work dir is resolved and the project is loaded."""
+    monkeypatch.chdir(reusable_work_path.parent)
+    parser = main_parser()
+    args = _parse_args(parser, ["--work-dir", "work"])
+
+    assert args.work_path == reusable_work_path.resolve()
+    assert args.project.platform == "android"
+
+
+def test_parse_reuse_wrong_platform_option(native_env, reusable_work_path, capsys):
+    """On reuse, device options are validated against the recorded platform."""
+    parser = main_parser()
+    with pytest.raises(SystemExit) as excinfo:
+        _parse_args(
+            parser,
+            ["--work-dir", str(reusable_work_path), "--simulator", "iPhone 16e"],
+        )
+
+    assert excinfo.value.code == 2
+    assert "--simulator option also requires --platform ios" in capsys.readouterr().err

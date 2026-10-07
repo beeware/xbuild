@@ -11,9 +11,16 @@ from build.__main__ import _cprint, _error
 
 import xpython
 from xpython.deps import install_requirements, resolve_requirements
-from xpython.project import ProjectConfig, SetupOptions, write_project
-from xvenv.args import make_common_parser, parse_common_args
-from xvenv.convert import CrossVenvConfig
+from xpython.project import (
+    InvalidProjectError,
+    ProjectConfig,
+    SetupOptions,
+    option_discrepancies,
+    read_project,
+    write_project,
+)
+from xvenv.args import MISSING_CONFIG_ERROR, make_common_parser, parse_common_args
+from xvenv.convert import CrossVenvConfig, in_cross_env, run_testbed
 
 
 def main_parser() -> argparse.ArgumentParser:
@@ -110,7 +117,8 @@ def main_parser() -> argparse.ArgumentParser:
             "Use this directory for the cross-venv, dependency install, "
             "and testbed staging, instead of a temporary directory. Unlike "
             "a temporary directory, this directory is NOT deleted when "
-            "xpython exits."
+            "xpython exits. If the directory was set up by a previous "
+            "xpython invocation, the existing testbed project is reused."
         ),
     )
     return parser
@@ -138,6 +146,11 @@ def _parse_args(
     If `"--"` is absent from `cli_args` entirely, the forwarded-argument
     list is treated as empty (not an error).
 
+    If `--work-dir` names an existing directory, it must contain a project
+    file written by a previous successful xpython invocation; the
+    recorded project is stored as `args.project`, and its platform is used
+    as the target platform. Otherwise, `args.project` is `None`.
+
     :param parser: The full argument parser
     :param cli_args: CLI arguments
     :param prog: Program name to show in help text
@@ -154,9 +167,27 @@ def _parse_args(
         xpython_args = cli_args
         forwarded_args = []
 
-    args = parse_common_args(parser, xpython_args)
+    args = parse_common_args(parser, xpython_args, require_config=False)
 
-    if args.use_current_env:
+    args.project = None
+    if args.work_path is not None:
+        args.work_path = args.work_path.resolve()
+        if args.work_path.exists():
+            try:
+                args.project = read_project(args.work_path)
+            except InvalidProjectError as e:
+                _error(
+                    f"Working directory `{args.work_path}` exists, but is not a "
+                    f"valid xpython work directory ({e}). Delete it, or choose a "
+                    "different --work-dir."
+                )
+
+    if args.project is not None:
+        # Reusing an existing project; the recorded platform is the target.
+        target_platform = args.project.platform
+    elif args.use_current_env:
+        if not in_cross_env():
+            parser.error(MISSING_CONFIG_ERROR)
         # In a cross-platform environment, sys.platform is the target platform.
         target_platform = sys.platform
     else:
@@ -183,11 +214,10 @@ def main(cli_args: Sequence[str]) -> None:
     args = _parse_args(parser, cli_args)
 
     try:
-        if args.work_path is not None:
-            if args.work_path.exists():
-                _error(f"Working directory `{args.work_path}` already exists.")
-
-            args.work_path.mkdir(parents=True, exist_ok=True)
+        if args.project is not None:
+            exit_code = _reuse(args)
+        elif args.work_path is not None:
+            args.work_path.mkdir(parents=True)
             exit_code = _run(args)
         else:
             with tempfile.TemporaryDirectory() as tmp:
@@ -255,6 +285,42 @@ def _run(args: argparse.Namespace) -> int:
 
     _cprint("{bold}Running testbed...{reset}")
     return cross_venv.run_testbed(
+        work_path=args.work_path,
+        args=args.forwarded_args,
+        simulator=args.simulator,
+        managed=args.managed,
+        connected=args.connected,
+        verbose=args.verbosity,
+    )
+
+
+def _reuse(args: argparse.Namespace) -> int:
+    """Run the testbed of an existing, already-configured work directory.
+
+    No setup is performed. Any setup options that were provided and differ
+    from the options used to configure the work directory are ignored, with
+    a warning.
+
+    :param args: The parsed CLI namespace, with `project` set to the
+        configuration recorded in `work_path`.
+    :returns: The exit code to propagate from `main()`.
+    """
+    project = args.project
+    _cprint("{bold}Reusing testbed project in {}...{reset}", str(args.work_path))
+
+    for flag, recorded, given in option_discrepancies(
+        project.options, SetupOptions.from_args(args)
+    ):
+        _cprint(
+            "{yellow}WARNING{reset} {}",
+            f"Ignoring {flag} {given}; {args.work_path} was configured with "
+            f"{flag} {recorded}.",
+            file=sys.stderr,
+        )
+
+    _cprint("{bold}Running testbed...{reset}")
+    return run_testbed(
+        project.platform,
         work_path=args.work_path,
         args=args.forwarded_args,
         simulator=args.simulator,
