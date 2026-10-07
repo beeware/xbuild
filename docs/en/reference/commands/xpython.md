@@ -11,12 +11,14 @@
 
 `xpython` will:
 
-1. Create (or reuses) a cross-platform virtual environment for the target `--platform`/`--arch`, downloading and caching the target Python build the same way `xvenv --platform ...` does.
-2. Resolve dependencies (`-d`/`--dependency` specs and/or `--group` names from `[dependency-groups]` in `./pyproject.toml`) and installs them using that environment's own `pip`.
+1. Create a cross-platform virtual environment for the target `--platform`/`--arch`, downloading and caching the target Python build the same way `xvenv --platform ...` does.
+2. Resolve dependencies (`-d`/`--dependency` specs and/or `--group` names from `[dependency-groups]` in `./pyproject.toml`) and install them using that environment's own `pip`.
 3. Copy each `--src` path into the testbed's working directory.
 4. Forward everything after `--` to the platform's testbed (see the `-- [args ...]` option below).
 5. Run the project on a simulator/emulator
 6. Exit with the exit code produced by the test code (or by the testbed driver itself, if it failed to build/launch before the test code could run).
+
+If you use `--work-dir` to name a directory that was set up by a previous `xpython` invocation, steps 1-3 are skipped, and the existing testbed project is reused (see [`--work-dir`](#-work-dir-dir) below).
 
 If you run `xpython` from inside an active cross-platform environment, you can omit `--platform`/`--build-details`/`--sysconfig`; `xpython` will target the platform of the current environment (see [Specifying the target platform](./index.md#target-platform)).
 
@@ -62,7 +64,20 @@ The serial number of an already-connected Android device to use. Only valid with
 
 ### `--work-dir DIR`
 
-Use this directory to store the cross-environment, dependency install, and testbed staging, instead of a temporary directory. Unlike a temporary directory, this directory is **not** deleted when `xpython` exits — useful for inspecting a failed run.
+Use this directory to store the cross-environment, installed dependencies, and testbed project, instead of a temporary directory. Unlike a temporary directory, this directory is **not** deleted when `xpython` exits.
+
+If `DIR` doesn't exist, `xpython` creates it and sets up the testbed project in it. Once setup has completed successfully, `xpython` records the configuration of the project in `DIR/xpython.toml`.
+
+If `DIR` already exists and was set up by a previous `xpython` invocation, the existing testbed project is reused. The cross-environment isn't recreated, the testbed isn't cloned again, and no sources or dependencies are installed. Only the run options (the arguments after `--`, `--simulator`, `--managed`, `--connected` and `--verbose`) are used. Setup options (`--platform`, `--arch`, `--cache`, `--archive`, `--build-details`, `--sysconfig`, `--dependency`, `--group`, `--find-links` and `--src`) can be omitted. If you do provide them and they differ from the options used to set up `DIR`, `xpython` prints a warning and ignores them.
+
+```console
+(venv) $ xpython --platform android --src tests --group test --work-dir build/android -- -m pytest tests
+(venv) $ xpython --work-dir build/android -- -m pytest tests -k test_widget
+```
+
+Sources are copied, and dependencies installed, only when `DIR` is first set up. To pick up changes to your sources or dependencies, delete `DIR` and run `xpython` again.
+
+If `DIR` exists but wasn't set up by `xpython` (or setup didn't complete successfully), `xpython` exits with an error.
 
 ### `-- [args ...]`
 
