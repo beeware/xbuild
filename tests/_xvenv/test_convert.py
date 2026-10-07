@@ -908,3 +908,52 @@ def test_convert_records_host_platform(tmp_path):
     patch = 'sys.platform = "android"'
     assert record in source
     assert source.index(record) < source.index(patch)
+
+
+def test_run_testbed_by_platform(monkeypatch, tmp_path):
+    """run_testbed() delegates to the named platform module."""
+    from xvenv.convert import run_testbed
+
+    platform_run_testbed = Mock(return_value=42)
+    monkeypatch.setattr("xvenv.platforms.android.run_testbed", platform_run_testbed)
+
+    result = run_testbed(
+        "android",
+        work_path=tmp_path,
+        args=["-m", "pytest"],
+        verbose=1,
+        managed="maxVersion",
+        connected=None,
+    )
+
+    assert result == 42
+    platform_run_testbed.assert_called_once_with(
+        work_path=tmp_path,
+        args=["-m", "pytest"],
+        verbose=1,
+        managed="maxVersion",
+        connected=None,
+    )
+
+
+def test_config_run_testbed_uses_platform(monkeypatch, tmp_path):
+    """CrossVenvConfig.run_testbed() delegates using its platform name."""
+    platform_run_testbed = Mock(return_value=0)
+    monkeypatch.setattr("xvenv.platforms.ios.run_testbed", platform_run_testbed)
+    config = Mock(spec=CrossVenvConfig, platform="ios")
+
+    result = CrossVenvConfig.run_testbed(
+        config,
+        work_path=tmp_path,
+        args=["-m", "pytest"],
+        verbose=0,
+        simulator="iPhone 16e",
+    )
+
+    assert result == 0
+    platform_run_testbed.assert_called_once_with(
+        work_path=tmp_path,
+        args=["-m", "pytest"],
+        verbose=0,
+        simulator="iPhone 16e",
+    )

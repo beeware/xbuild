@@ -32,6 +32,35 @@ def in_cross_env() -> bool:
     return bool(getattr(sys, "cross_compiling", False))
 
 
+def run_testbed(
+    platform: str,
+    work_path: Path,
+    args: list[str],
+    verbose: int,
+    **kwargs,
+) -> int:
+    """Run an already-configured testbed project for a platform.
+
+    This only requires the platform name, not a full `CrossVenvConfig`, so it
+    can be used to re-run a testbed even if the Python build that was used to
+    create it is no longer available.
+
+    :param platform: The target platform name (e.g., "ios", "android").
+    :param work_path: The working directory containing the testbed.
+    :param args: Arguments to pass to the testbed process.
+    :param verbose: Verbosity level.
+    :param kwargs: Any additional platform-specific arguments.
+    :returns: The exit code of the testbed subprocess.
+    """
+    platform_module = import_module(f"xvenv.platforms.{platform}")
+    return platform_module.run_testbed(
+        work_path=work_path,
+        args=args,
+        verbose=verbose,
+        **kwargs,
+    )
+
+
 def _read_pyvenv_cfg(venv_path: Path) -> dict[str, str]:
     """Parse a venv's pyvenv.cfg into a dict. Returns `{}` if missing."""
     if sys.version_info < (3, 13):
@@ -428,7 +457,8 @@ class CrossVenvConfig:
         :param kwargs: Any additional platform-specific arguments.
         :returns: The exit code of the testbed subprocess.
         """
-        return self.platform_module.run_testbed(
+        return run_testbed(
+            self.platform,
             work_path=work_path,
             args=args,
             verbose=verbose,
