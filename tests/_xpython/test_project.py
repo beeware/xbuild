@@ -124,6 +124,9 @@ def test_written_format(tmp_path):
         pytest.param(None, "xpython.toml not found", id="missing"),
         pytest.param("not toml [", "xpython.toml could not be parsed", id="bad-toml"),
         pytest.param(
+            b"\xff\xfe\x00", "xpython.toml could not be parsed", id="bad-encoding"
+        ),
+        pytest.param(
             'schema = 2\nplatform = "android"\n[options]\n',
             "unsupported xpython.toml schema 2",
             id="future-schema",
@@ -162,7 +165,9 @@ def test_written_format(tmp_path):
 )
 def test_read_invalid(tmp_path, content, message):
     """Invalid or missing project files raise InvalidProjectError."""
-    if content is not None:
+    if isinstance(content, bytes):
+        (tmp_path / PROJECT_FILENAME).write_bytes(content)
+    elif content is not None:
         (tmp_path / PROJECT_FILENAME).write_text(content, encoding="utf-8")
 
     with pytest.raises(InvalidProjectError, match=re.escape(message)):

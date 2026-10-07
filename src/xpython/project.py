@@ -161,7 +161,7 @@ def read_project(work_path: Path) -> ProjectConfig:
     try:
         with path.open("rb") as f:
             data = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError) as e:
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as e:
         raise InvalidProjectError(f"{PROJECT_FILENAME} could not be parsed: {e}") from e
 
     schema = data.get("schema")
