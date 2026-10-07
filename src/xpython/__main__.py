@@ -11,6 +11,7 @@ from build.__main__ import _cprint, _error
 
 import xpython
 from xpython.deps import install_requirements, resolve_requirements
+from xpython.project import ProjectConfig, SetupOptions, write_project
 from xvenv.args import make_common_parser, parse_common_args
 from xvenv.convert import CrossVenvConfig
 
@@ -241,6 +242,16 @@ def _run(args: argparse.Namespace) -> int:
     if requirements:
         venv_python = venv_path / "bin" / "python3"
         install_requirements(venv_python, requirements, packages_path, args.find_links)
+
+    # Record the project configuration only once setup has fully succeeded,
+    # so that a partially configured work directory can't be reused.
+    write_project(
+        args.work_path,
+        ProjectConfig(
+            platform=cross_venv.platform,
+            options=SetupOptions.from_args(args),
+        ),
+    )
 
     _cprint("{bold}Running testbed...{reset}")
     return cross_venv.run_testbed(

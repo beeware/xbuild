@@ -1,3 +1,4 @@
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import Mock
@@ -5,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from xpython.__main__ import _parse_args, _run, main_parser
+from xpython.project import PROJECT_FILENAME, ProjectConfig, SetupOptions, read_project
 from xvenv.convert import CrossVenvConfig
 
 
@@ -18,7 +20,6 @@ def mock_config(tmp_path):
         build_details_path=None,
         sysconfigdata_path=None,
     )
-    config = Mock()
     config.packages_path.return_value = tmp_path / "site-packages"
     config.run_testbed.return_value = 0
     return config
@@ -383,3 +384,74 @@ def test_run_current_env(
     mock_CrossVenvConfig.from_current_env.assert_called_once_with()
     mock_config.create.assert_called_once_with(args.work_path / "venv", with_pip=True)
     assert exit_code == 0
+
+
+def test_run_writes_project(
+    tmp_path,
+    monkeypatch,
+    mock_CrossVenvConfig,
+    mock_config,
+    mock_resolve_requirements,
+):
+    """After a successful setup, the project file is written before the
+    testbed is run."""
+    monkeypatch.chdir(tmp_path)
+    parser = main_parser()
+    args = _parse_args(
+        parser,
+        [
+            "--platform",
+            "android",
+            "-d",
+            "pytest",
+            "--src",
+            "tests",
+            "--",
+            "-m",
+            "pytest",
+        ],
+    )
+    args.work_path = tmp_path / "work"
+    args.work_path.mkdir()
+
+    def check_project_written(**kwargs):
+        assert (args.work_path / PROJECT_FILENAME).is_file()
+        return 0
+
+    mock_config.run_testbed.side_effect = check_project_written
+
+    assert _run(args) == 0
+
+    assert read_project(args.work_path) == ProjectConfig(
+        platform="android",
+        options=SetupOptions(
+            dependencies=["pytest"],
+            src=[tmp_path.resolve() / "tests"],
+            platform="android",
+        ),
+    )
+
+
+def test_run_install_failure_no_project(
+    tmp_path,
+    monkeypatch,
+    mock_CrossVenvConfig,
+    mock_config,
+    mock_resolve_requirements,
+):
+    """If dependency installation fails, no project file is written."""
+    mock_resolve_requirements.return_value = ["pytest"]
+    monkeypatch.setattr(
+        "xpython.__main__.install_requirements",
+        Mock(side_effect=subprocess.CalledProcessError(1, ["pip"])),
+    )
+    parser = main_parser()
+    args = _parse_args(parser, ["--platform", "android", "-d", "pytest"])
+    args.work_path = tmp_path / "work"
+    args.work_path.mkdir()
+
+    with pytest.raises(subprocess.CalledProcessError):
+        _run(args)
+
+    assert not (args.work_path / PROJECT_FILENAME).exists()
+    mock_config.run_testbed.assert_not_called()
