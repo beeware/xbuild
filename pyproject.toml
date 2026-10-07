@@ -43,6 +43,7 @@ dependencies = [
     "dependency-groups",
     "platformdirs",
     "filelock",
+    "tomli-w",
 ]
 
 [project.optional-dependencies]
