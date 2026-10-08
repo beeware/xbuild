@@ -161,6 +161,7 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
                 "pytest",
                 "tests",
             ],
+            cwd=project_dir,
             check=True,
         )
         assert result.returncode == 0

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import configparser
 import json
 import os
 import pprint
-import re
 import sys
 import venv
 from importlib import import_module
@@ -34,16 +34,12 @@ def in_cross_env() -> bool:
 
 def _read_pyvenv_cfg(venv_path: Path) -> dict[str, str]:
     """Parse a venv's pyvenv.cfg into a dict. Returns `{}` if missing."""
-    cfg_path = venv_path / "pyvenv.cfg"
-    if not cfg_path.is_file():
+    parser = configparser.ConfigParser(allow_unnamed_section=True, interpolation=None)
+    parser.read(venv_path / "pyvenv.cfg", encoding="utf-8")
+    try:
+        return parser[configparser.UNNAMED_SECTION]
+    except KeyError:
         return {}
-
-    values = {}
-    for line in cfg_path.read_text(encoding="utf-8").splitlines():
-        key, sep, value = line.partition("=")
-        if sep:
-            values[key.strip()] = value.strip()
-    return values
 
 
 def _record_source(
@@ -294,18 +290,15 @@ class CrossVenvConfig:
             build_details = None
 
         # Check the venv version matches the configuration file that has been provided
-        venv_config = (venv_path / "pyvenv.cfg").read_text(encoding="utf-8")
-
-        match = re.search("version = (.*)", venv_config)
-        if match:
-            venv_version = match.groups()[0]
-            if not venv_version.startswith(f"{version}."):
-                raise ValueError(
-                    f"target venv is Python {venv_version}; "
-                    f"build details file is for Python {version}"
-                )
-        else:
+        venv_config = _read_pyvenv_cfg(venv_path)
+        venv_version = venv_config.get("version", venv_config.get("version_info"))
+        if venv_version is None:
             raise ValueError("Could not determine Python version from target venv.")
+        if not venv_version.startswith(f"{version}."):
+            raise ValueError(
+                f"target venv is Python {venv_version}; "
+                f"build details file is for Python {version}"
+            )
 
         # Generate the context for the templated cross-target file
         arch, sdk = self.arch.split("-", 1)

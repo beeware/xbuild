@@ -153,6 +153,78 @@ def test_convert_existing_venv(tmp_path):
     _verify_patched(venv_path, expected_path, platform_name="android", arch="aarch64")
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 13),
+    reason="Android tests require Python 3.13+",
+)
+@pytest.mark.live
+def test_convert_existing_virtualenv(tmp_path):
+    """xvenv converts an already-existing venv created by the third-party
+    virtualenv package, rather than the stdlib venv module (#104)."""
+    expected_path = _expected_values_path()
+
+    venv_path = tmp_path / "x-venv"
+    subprocess.run([sys.executable, "-m", "virtualenv", str(venv_path)], check=True)
+    # Convert to an Android venv
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "xvenv",
+            "--platform",
+            "android",
+            "--arch",
+            "aarch64",
+            str(venv_path),
+        ],
+        check=True,
+    )
+
+    _verify_patched(venv_path, expected_path, platform_name="android", arch="aarch64")
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 13),
+    reason="Android tests require Python 3.13+",
+)
+@pytest.mark.live
+def test_convert_existing_uv_venv(tmp_path):
+    """xvenv converts an already-existing venv created by uv, rather than the
+    stdlib venv module."""
+    expected_path = _expected_values_path()
+
+    venv_path = tmp_path / "x-venv"
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "uv",
+            "venv",
+            "--seed",
+            "--python",
+            sys.executable,
+            str(venv_path),
+        ],
+        check=True,
+    )
+    # Convert to an Android venv
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "xvenv",
+            "--platform",
+            "android",
+            "--arch",
+            "aarch64",
+            str(venv_path),
+        ],
+        check=True,
+    )
+
+    _verify_patched(venv_path, expected_path, platform_name="android", arch="aarch64")
+
+
 @pytest.mark.parametrize(("platform_name", "arch"), CASES)
 @pytest.mark.live
 def test_create_xvenv(tmp_path, platform_name, arch):

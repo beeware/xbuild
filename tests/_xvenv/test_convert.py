@@ -9,6 +9,7 @@ import pytest
 
 from xvenv.convert import (
     CrossVenvConfig,
+    _read_pyvenv_cfg,
     _record_source,
     in_cross_env,
     localized_vars,
@@ -576,6 +577,135 @@ def test_convert_replaces_previous_source(tmp_path):
     assert [line for line in lines if line.startswith("xvenv-")] == [
         f"xvenv-sysconfig = {sysconfigdata_path.resolve()}"
     ]
+
+
+def test_read_pyvenv_cfg(tmp_path):
+    """pyvenv.cfg is parsed into a dict of stripped `key = value` pairs."""
+    (tmp_path / "pyvenv.cfg").write_text(
+        "home = /usr/bin\n"
+        "include-system-site-packages = false\n"
+        "version   =   3.13.5  \n"
+    )
+
+    assert _read_pyvenv_cfg(tmp_path) == {
+        "home": "/usr/bin",
+        "include-system-site-packages": "false",
+        "version": "3.13.5",
+    }
+
+
+def test_read_pyvenv_cfg_missing(tmp_path):
+    """A missing pyvenv.cfg is parsed as an empty dict."""
+    assert _read_pyvenv_cfg(tmp_path) == {}
+
+
+def test_read_pyvenv_cfg_literal_values(tmp_path):
+    """Values are read literally: `%` isn't interpolated, and `:` (e.g., in a
+    Windows path) isn't treated as a key/value delimiter."""
+    (tmp_path / "pyvenv.cfg").write_text(
+        "home = C:\\Program Files\\Python 100%\n"
+        "command = C:\\Python\\python.exe -m venv C:\\venv\n"
+    )
+
+    assert _read_pyvenv_cfg(tmp_path) == {
+        "home": "C:\\Program Files\\Python 100%",
+        "command": "C:\\Python\\python.exe -m venv C:\\venv",
+    }
+
+
+def test_convert_virtualenv_pyvenv_cfg(tmp_path):
+    """A venv created by the third-party virtualenv package can be converted.
+    virtualenv writes a `python-version` key (containing only the X.Y
+    version) *before* the `version` key; that shouldn't be mistaken for the
+    full venv version (#104)."""
+    sysconfigdata_path = _android_sysconfigdata(tmp_path)
+    venv_path = tmp_path / "venv"
+    _fake_venv(venv_path, "3.13.5")
+    (venv_path / "pyvenv.cfg").write_text(
+        "home = /usr/bin\n"
+        "implementation = CPython\n"
+        "python-version = 3.13\n"
+        "version_info = 3.13.5.final.0\n"
+        "version = 3.13.5\n"
+        "virtualenv = 21.14.5\n"
+        "include-system-site-packages = false\n"
+    )
+
+    _sysconfig_config(sysconfigdata_path).convert(venv_path)
+
+    lines = (venv_path / "pyvenv.cfg").read_text().splitlines()
+    assert f"xvenv-sysconfig = {sysconfigdata_path.resolve()}" in lines
+
+
+def test_convert_uv_pyvenv_cfg(tmp_path):
+    """A venv created by uv can be converted. uv records the full Python
+    version as `version_info`, and doesn't write a `version` key at all."""
+    sysconfigdata_path = _android_sysconfigdata(tmp_path)
+    venv_path = tmp_path / "venv"
+    _fake_venv(venv_path, "3.13.5")
+    (venv_path / "pyvenv.cfg").write_text(
+        "home = /usr/bin\n"
+        "implementation = CPython\n"
+        "uv = 0.11.12\n"
+        "version_info = 3.13.5\n"
+        "include-system-site-packages = false\n"
+    )
+
+    _sysconfig_config(sysconfigdata_path).convert(venv_path)
+
+    lines = (venv_path / "pyvenv.cfg").read_text().splitlines()
+    assert f"xvenv-sysconfig = {sysconfigdata_path.resolve()}" in lines
+
+
+def test_convert_uv_version_mismatch(tmp_path):
+    """A uv venv for a different Python version raises an error that reports
+    the full venv version."""
+    sysconfigdata_path = _android_sysconfigdata(tmp_path)
+    venv_path = tmp_path / "venv"
+    _fake_venv(venv_path, "3.14.7")
+    (venv_path / "pyvenv.cfg").write_text(
+        "home = /usr/bin\nuv = 0.11.12\nversion_info = 3.14.7\n"
+    )
+
+    with pytest.raises(ValueError, match=r"target venv is Python 3\.14\.7;"):
+        _sysconfig_config(sysconfigdata_path).convert(venv_path)
+
+
+def test_convert_version_mismatch(tmp_path):
+    """Converting a venv for a different Python version raises an error that
+    reports the full venv version."""
+    sysconfigdata_path = _android_sysconfigdata(tmp_path)
+    venv_path = tmp_path / "venv"
+    _fake_venv(venv_path, "3.14.7")
+
+    with pytest.raises(
+        ValueError,
+        match=r"target venv is Python 3\.14\.7; build details file is for Python 3\.13",
+    ):
+        _sysconfig_config(sysconfigdata_path).convert(venv_path)
+
+
+def test_convert_version_prefix_mismatch(tmp_path):
+    """A venv version that merely starts with the same characters as the
+    target version (e.g. 3.130 vs 3.13) is a mismatch."""
+    sysconfigdata_path = _android_sysconfigdata(tmp_path)
+    venv_path = tmp_path / "venv"
+    _fake_venv(venv_path, "3.130.1")
+
+    with pytest.raises(ValueError, match=r"target venv is Python 3\.130\.1"):
+        _sysconfig_config(sysconfigdata_path).convert(venv_path)
+
+
+def test_convert_no_version(tmp_path):
+    """A venv whose pyvenv.cfg doesn't record a version raises an error, even
+    if other keys end in `version`."""
+    sysconfigdata_path = _android_sysconfigdata(tmp_path)
+    venv_path = tmp_path / "venv"
+    _fake_venv(venv_path, "3.13.5")
+    (venv_path / "pyvenv.cfg").write_text("home = /usr/bin\npython-version = 3.13\n")
+
+    with pytest.raises(ValueError, match="Could not determine Python version"):
+        _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
 
 def test_from_venv_sysconfig(tmp_path):
