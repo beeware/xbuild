@@ -34,12 +34,25 @@ def in_cross_env() -> bool:
 
 def _read_pyvenv_cfg(venv_path: Path) -> dict[str, str]:
     """Parse a venv's pyvenv.cfg into a dict. Returns `{}` if missing."""
-    parser = configparser.ConfigParser(allow_unnamed_section=True, interpolation=None)
-    parser.read(venv_path / "pyvenv.cfg", encoding="utf-8")
-    try:
-        return parser[configparser.UNNAMED_SECTION]
-    except KeyError:
-        return {}
+    if sys.version_info < (3, 13):
+        # allow_unnamed_section wasn't added until 3.13.
+        parser = configparser.ConfigParser(interpolation=None)
+        try:
+            content = (venv_path / "pyvenv.cfg").read_text(encoding="utf-8")
+            parser.read_string("[UNNAMED]\n" + content)
+            return parser["UNNAMED"]
+        except FileNotFoundError:
+            return {}
+    else:
+        parser = configparser.ConfigParser(
+            allow_unnamed_section=True,
+            interpolation=None,
+        )
+        parser.read(venv_path / "pyvenv.cfg", encoding="utf-8")
+        try:
+            return parser[configparser.UNNAMED_SECTION]
+        except KeyError:
+            return {}
 
 
 def _record_source(
