@@ -10,7 +10,10 @@ from pathlib import Path
 from xvenv import versions
 from xvenv.platforms import build_platform_env, host_platform
 
-VALID_ARCHES = ["aarch64", "x86_64"]
+VALID_ARCHES = {
+    "aarch64": "aarch64-linux-android",
+    "x86_64": "x86_64-linux-android",
+}
 DEFAULT_ARCH = {
     # Linux architectures
     "aarch64": "aarch64",
@@ -23,12 +26,12 @@ DEFAULT_ARCH = {
 }
 
 
-def download_url(version_info: tuple, arch: str) -> str:
-    """Compute the python.org download URL for the iOS XCframework build.
+def download_url(version_info: tuple, multiarch: str) -> str:
+    """Compute the python.org download URL for the Android build.
 
     :param version: The `sys.version_info` tuple for the version being
         requested.
-    :param arch: The architecture build built.
+    :param multiarch: The mulit-architecture being requested.
     :returns: The download URL.
     """
     series = versions.series(version_info)
@@ -37,14 +40,14 @@ def download_url(version_info: tuple, arch: str) -> str:
     elif series == "3.13":
         return (
             "https://repo.maven.apache.org/maven2/com/chaquo/python/python/"
-            f"3.13.15/python-3.13.15-{arch}-linux-android.tar.gz"
+            f"3.13.15/python-3.13.15-{multiarch}.tar.gz"
         )
     else:
         version = versions.version(version_info)
         release = versions.release(version_info)
         return (
             f"https://www.python.org/ftp/python/{release}/"
-            f"python-{version}-{arch}-linux-android.tar.gz"
+            f"python-{version}-{multiarch}.tar.gz"
         )
 
 
@@ -54,14 +57,15 @@ def archive_path(path: Path) -> Path:
     return path.parents[3]
 
 
-def config_path(extracted_dir: Path, version_info, arch: str) -> Path:
+def config_path(extracted_dir: Path, version_info, multiarch: str) -> Path:
     """Locate the sysconfig/build-details file inside an extracted Android
     archive.
 
     :param extracted_dir: The root of the extracted archive.
     :param version_info: A `sys.version_info`-shaped value for the Python
         version the archive contains.
-    :param arch: One of the values in `VALID_ARCHES`, e.g. `"aarch64"`.
+    :param multiarch: One of the multiarch values from `VALID_ARCHES`,
+        e.g. `"aarch64-linux-android"`.
     :returns: The path to `build-details.json` (Python 3.14+) or the
         legacy `_sysconfigdata__android_*.py` module (Python <3.14).
     """
@@ -73,7 +77,7 @@ def config_path(extracted_dir: Path, version_info, arch: str) -> Path:
     )
     if version_info[:2] >= (3, 14):
         return py_dir / "build-details.json"
-    return py_dir / f"_sysconfigdata__android_{arch}-linux-android.py"
+    return py_dir / f"_sysconfigdata__android_{multiarch}.py"
 
 
 def build_details_from_sysconfigdata(sysconfigdata):

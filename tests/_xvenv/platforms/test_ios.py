@@ -311,11 +311,11 @@ def test_config_path(tmp_path, version_details, arch, path):
     assert actual_config_path == tmp_path / path
 
 
-def _ios_config(arch, archive_path):
+def _ios_config(multiarch, archive_path):
     return Mock(
         spec=CrossVenvConfig,
         platform="ios",
-        arch=arch,
+        multiarch=multiarch,
         archive_path=archive_path,
         build_details_path=None,
         sysconfigdata_path=archive_path / "fake-sysconfigdata.py",
