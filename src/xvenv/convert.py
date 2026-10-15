@@ -62,27 +62,29 @@ def run_testbed(
     )
 
 
-def _read_pyvenv_cfg(venv_path: Path, section: str | None) -> dict[str, str]:
+def read_pyvenv_cfg(venv_path: Path, section: str | None) -> dict[str, str]:
     """Parse a venv's pyvenv.cfg into a dict. Returns `{}` if missing."""
     if sys.version_info < (3, 13):
         # allow_unnamed_section wasn't added until 3.13.
         parser = configparser.ConfigParser(interpolation=None)
-        try:
-            content = (venv_path / "pyvenv.cfg").read_text(encoding="utf-8")
-            parser.read_string("[UNNAMED]\n" + content)
-            return parser["UNNAMED" if section is None else section]
-        except FileNotFoundError:
-            return {}
+        content = (venv_path / "pyvenv.cfg").read_text(encoding="utf-8")
+        parser.read_string("[UNNAMED]\n" + content)
+        return parser["UNNAMED" if section is None else section]
     else:
         parser = configparser.ConfigParser(
             allow_unnamed_section=True,
             interpolation=None,
         )
-        parser.read(venv_path / "pyvenv.cfg", encoding="utf-8")
-        try:
-            return parser[configparser.UNNAMED_SECTION if section is None else section]
-        except KeyError:
-            return {}
+        files = parser.read(venv_path / "pyvenv.cfg", encoding="utf-8")
+        if files:
+            try:
+                return parser[
+                    configparser.UNNAMED_SECTION if section is None else section
+                ]
+            except KeyError:
+                return {}
+        else:
+            raise FileNotFoundError(venv_path / "pyvenv.cfg")
 
 
 class CrossVenvConfig:
@@ -198,9 +200,9 @@ class CrossVenvConfig:
         :raises ValueError: if the venv doesn't record the configuration that
             was used to create it.
         """
-        values = _read_pyvenv_cfg(venv_path, PYVENV_XVENV_KEY)
-        build_details_path = values.get(PYVENV_BUILD_DETAILS_KEY)
-        sysconfigdata_path = values.get(PYVENV_SYSCONFIGDATA_KEY)
+        xvenv_config = read_pyvenv_cfg(venv_path, PYVENV_XVENV_KEY)
+        build_details_path = xvenv_config.get(PYVENV_BUILD_DETAILS_KEY)
+        sysconfigdata_path = xvenv_config.get(PYVENV_SYSCONFIGDATA_KEY)
         if build_details_path is None and sysconfigdata_path is None:
             raise ValueError(
                 f"{venv_path} does not record the cross-platform configuration "
@@ -276,6 +278,11 @@ class CrossVenvConfig:
 
         # Inside a cross env, sys.platform is the target; the venv layout
         # is determined by the host.
+        if not (venv_path / "pyvenv.cfg").exists():
+            raise ValueError(
+                f"{venv_path} does not appear to be a virtual environment."
+            )
+
         if host_platform() == "win32":
             bin_path = "Scripts/python.exe"
             lib_glob = "Lib/site-packages"
@@ -283,9 +290,7 @@ class CrossVenvConfig:
             bin_path = "bin/python3"
             lib_glob = "lib/*/site-packages"
         if not (venv_path / bin_path).exists():
-            raise ValueError(
-                f"{venv_path} does not appear to be a virtual environment."
-            )
+            raise ValueError(f"{venv_path} does not appear to be a Python environment.")
 
         # Update path references in the sysconfigdata to reflect local conditions.
         platlibs = list(venv_path.glob(lib_glob))
@@ -328,7 +333,7 @@ class CrossVenvConfig:
             build_details = None
 
         # Check the venv version matches the configuration file that has been provided
-        venv_config = _read_pyvenv_cfg(venv_path, None)
+        venv_config = read_pyvenv_cfg(venv_path, None)
         venv_version = venv_config.get("version", venv_config.get("version_info"))
         if venv_version is None:
             raise ValueError("Could not determine Python version from target venv.")

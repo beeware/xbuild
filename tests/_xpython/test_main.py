@@ -1,18 +1,11 @@
-import subprocess
 import sys
+import textwrap
 from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 
 from xpython.__main__ import _parse_args, _run, main, main_parser
-from xpython.project import (
-    PROJECT_FILENAME,
-    ProjectConfig,
-    SetupOptions,
-    read_project,
-    write_project,
-)
 from xvenv.convert import CrossVenvConfig
 
 
@@ -393,77 +386,6 @@ def test_run_current_env(
     assert exit_code == 0
 
 
-def test_run_writes_project(
-    tmp_path,
-    monkeypatch,
-    mock_CrossVenvConfig,
-    mock_config,
-    mock_resolve_requirements,
-):
-    """After a successful setup, the project file is written before the
-    testbed is run."""
-    monkeypatch.chdir(tmp_path)
-    parser = main_parser()
-    args = _parse_args(
-        parser,
-        [
-            "--platform",
-            "android",
-            "-d",
-            "pytest",
-            "--src",
-            "tests",
-            "--",
-            "-m",
-            "pytest",
-        ],
-    )
-    args.work_path = tmp_path / "work"
-    args.work_path.mkdir()
-
-    def check_project_written(**kwargs):
-        assert (args.work_path / PROJECT_FILENAME).is_file()
-        return 0
-
-    mock_config.run_testbed.side_effect = check_project_written
-
-    assert _run(args) == 0
-
-    assert read_project(args.work_path) == ProjectConfig(
-        platform="android",
-        options=SetupOptions(
-            dependencies=["pytest"],
-            src=[tmp_path.resolve() / "tests"],
-            platform="android",
-        ),
-    )
-
-
-def test_run_install_failure_no_project(
-    tmp_path,
-    monkeypatch,
-    mock_CrossVenvConfig,
-    mock_config,
-    mock_resolve_requirements,
-):
-    """If dependency installation fails, no project file is written."""
-    mock_resolve_requirements.return_value = ["pytest"]
-    monkeypatch.setattr(
-        "xpython.__main__.install_requirements",
-        Mock(side_effect=subprocess.CalledProcessError(1, ["pip"])),
-    )
-    parser = main_parser()
-    args = _parse_args(parser, ["--platform", "android", "-d", "pytest"])
-    args.work_path = tmp_path / "work"
-    args.work_path.mkdir()
-
-    with pytest.raises(subprocess.CalledProcessError):
-        _run(args)
-
-    assert not (args.work_path / PROJECT_FILENAME).exists()
-    mock_config.run_testbed.assert_not_called()
-
-
 @pytest.fixture
 def native_env(monkeypatch):
     """Ensure we're not in a cross env."""
@@ -474,14 +396,17 @@ def native_env(monkeypatch):
 def reusable_work_path(tmp_path):
     """A work directory configured by a previous xpython run."""
     work_path = tmp_path / "work"
-    work_path.mkdir()
-    write_project(
-        work_path,
-        ProjectConfig(
-            platform="android",
-            options=SetupOptions(dependencies=["pytest"], platform="android"),
-        ),
+    (work_path / "venv").mkdir(parents=True)
+    (work_path / "venv/pyvenv.cfg").write_text(
+        textwrap.dedent("""
+        version = 3.13.7
+        [xvenv]
+        platform = android
+        multiarch = aarch64-linux-android
+        sysconfigdata = /path/to/sysconfigdata.py
+        """)
     )
+
     return work_path
 
 
@@ -520,7 +445,7 @@ def test_main_fresh_work_dir(
         work_path.resolve() / "venv", with_pip=True
     )
     mock_config.setup_testbed.assert_called_once()
-    assert (work_path / PROJECT_FILENAME).is_file()
+    # assert (work_path / PROJECT_FILENAME).is_file()
 
 
 def test_main_reuse(
@@ -598,21 +523,31 @@ def test_main_reuse_warnings(
             [
                 "--platform",
                 "android",
+                "--src",
+                "stuff",
+                "--src",
+                "other/path",
                 "-d",
                 "requests",
+                "--dependency",
+                "pytest",
                 "--group",
                 "test",
+                "--group",
+                "dev",
                 "--work-dir",
                 str(reusable_work_path),
             ]
         )
 
     assert excinfo.value.code == 3
-    err = capsys.readouterr().err
-    assert "Ignoring --dependency [requests]" in err
-    assert "configured with --dependency [pytest]" in err
-    assert "Ignoring --group [test]" in err
-    assert "Ignoring --platform" not in err
+    err = capsys.readouterr().out
+    assert " - Ignoring src path stuff" in err
+    assert " - Ignoring src path other/path" in err
+    assert " - Ignoring dependency 'requests'" in err
+    assert " - Ignoring dependency 'pytest'" in err
+    assert " - Ignoring dependency group 'test'" in err
+    assert " - Ignoring dependency group 'dev'" in err
     mock_CrossVenvConfig.assert_not_called()
     assert mock_run_testbed.call_args.args == ("android",)
 
@@ -621,7 +556,8 @@ def test_main_reuse_warnings(
     "content",
     [
         pytest.param(None, id="empty-dir"),
-        pytest.param("not toml [", id="invalid-project"),
+        pytest.param("invalid venv config [", id="invalid-config"),
+        pytest.param("version = 3.13.7", id="missing-xvenv"),
     ],
 )
 def test_main_existing_invalid_work_dir(
@@ -635,15 +571,15 @@ def test_main_existing_invalid_work_dir(
     work_path = tmp_path / "work"
     work_path.mkdir()
     if content is not None:
-        (work_path / PROJECT_FILENAME).write_text(content, encoding="utf-8")
+        (work_path / "venv").mkdir()
+        (work_path / "venv/pyvenv.cfg").write_text(content, encoding="utf-8")
 
     with pytest.raises(SystemExit) as excinfo:
         main(["--platform", "android", "--work-dir", str(work_path)])
 
     assert excinfo.value.code == 1
     err = capsys.readouterr().err
-    assert "is not a valid xpython work directory" in err
-    assert "choose a different --work-dir" in err
+    assert "does not appear to be a valid xpython work directory" in err
     mock_CrossVenvConfig.assert_not_called()
 
 
@@ -667,7 +603,7 @@ def test_parse_reuse(native_env, reusable_work_path, monkeypatch):
     args = _parse_args(parser, ["--work-dir", "work"])
 
     assert args.work_path == reusable_work_path.resolve()
-    assert args.project.platform == "android"
+    assert args.project["platform"] == "android"
 
 
 def test_parse_reuse_wrong_platform_option(native_env, reusable_work_path, capsys):

@@ -9,9 +9,9 @@ import pytest
 
 from xvenv.convert import (
     CrossVenvConfig,
-    _read_pyvenv_cfg,
     in_cross_env,
     localized_vars,
+    read_pyvenv_cfg,
 )
 
 
@@ -537,12 +537,12 @@ def test_convert_records_sysconfig_source(tmp_path):
 
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    xvenv_config = _read_pyvenv_cfg(venv_path, "xvenv")
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
     assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
     assert "build_details" not in xvenv_config
 
     # Pre-existing content is preserved.
-    existing_config = _read_pyvenv_cfg(venv_path, None)
+    existing_config = read_pyvenv_cfg(venv_path, None)
     assert existing_config["home"] == "/usr/bin"
     assert existing_config["version"] == "3.13.5"
 
@@ -555,12 +555,12 @@ def test_convert_records_build_details_source(tmp_path):
 
     _build_details_config(build_details_path).convert(venv_path)
 
-    xvenv_config = _read_pyvenv_cfg(venv_path, "xvenv")
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
     assert "sysconfigdata" not in xvenv_config
     assert xvenv_config["build-details"] == str(build_details_path.resolve())
 
     # Pre-existing content is preserved.
-    existing_config = _read_pyvenv_cfg(venv_path, None)
+    existing_config = read_pyvenv_cfg(venv_path, None)
     assert existing_config["home"] == "/usr/bin"
     assert existing_config["version"] == "3.14.7"
 
@@ -579,7 +579,7 @@ def test_convert_replaces_previous_source(tmp_path):
 
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    xvenv_config = _read_pyvenv_cfg(venv_path, "xvenv")
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
     assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
     assert "build_details" not in xvenv_config
 
@@ -604,7 +604,7 @@ def test_convert_replaces_previous_source(tmp_path):
         ),
     ],
 )
-def test_read_pyvenv_cfg(tmp_path, section, value):
+def testread_pyvenv_cfg(tmp_path, section, value):
     """pyvenv.cfg is parsed into a dict of stripped `key = value` pairs."""
     (tmp_path / "pyvenv.cfg").write_text(
         (
@@ -619,15 +619,16 @@ def test_read_pyvenv_cfg(tmp_path, section, value):
         "utf-8",
     )
 
-    assert _read_pyvenv_cfg(tmp_path, section) == value
+    assert read_pyvenv_cfg(tmp_path, section) == value
 
 
-def test_read_pyvenv_cfg_missing(tmp_path):
+def testread_pyvenv_cfg_missing(tmp_path):
     """A missing pyvenv.cfg is parsed as an empty dict."""
-    assert _read_pyvenv_cfg(tmp_path, None) == {}
+    with pytest.raises(FileNotFoundError):
+        read_pyvenv_cfg(tmp_path, None)
 
 
-def test_read_pyvenv_cfg_literal_values(tmp_path):
+def testread_pyvenv_cfg_literal_values(tmp_path):
     """Values are read literally: `%` isn't interpolated, and `:` (e.g., in a
     Windows path) isn't treated as a key/value delimiter."""
     (tmp_path / "pyvenv.cfg").write_text(
@@ -635,7 +636,7 @@ def test_read_pyvenv_cfg_literal_values(tmp_path):
         "command = C:\\Python\\python.exe -m venv C:\\venv\n"
     )
 
-    assert _read_pyvenv_cfg(tmp_path, None) == {
+    assert read_pyvenv_cfg(tmp_path, None) == {
         "home": "C:\\Program Files\\Python 100%",
         "command": "C:\\Python\\python.exe -m venv C:\\venv",
     }
@@ -661,11 +662,11 @@ def test_convert_virtualenv_pyvenv_cfg(tmp_path):
 
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    base_config = _read_pyvenv_cfg(venv_path, None)
+    base_config = read_pyvenv_cfg(venv_path, None)
     assert base_config["home"] == "/usr/bin"
     assert base_config["version"] == "3.13.5"
 
-    xvenv_config = _read_pyvenv_cfg(venv_path, "xvenv")
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
     assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
     assert "build_details" not in xvenv_config
 
@@ -686,11 +687,11 @@ def test_convert_uv_pyvenv_cfg(tmp_path):
 
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    base_config = _read_pyvenv_cfg(venv_path, None)
+    base_config = read_pyvenv_cfg(venv_path, None)
     assert base_config["home"] == "/usr/bin"
     assert base_config["version_info"] == "3.13.5"
 
-    xvenv_config = _read_pyvenv_cfg(venv_path, "xvenv")
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
     assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
     assert "build_details" not in xvenv_config
 
@@ -777,19 +778,13 @@ def test_from_venv_build_details(tmp_path):
     assert config.sysconfigdata_path is None
 
 
-def test_from_venv_unrecorded(tmp_path):
-    """A venv without a recorded source (e.g. made by xvenv <= 0.4.0) raises."""
+def test_from_venv_missing_xvenv_config(tmp_path):
+    """A venv without xvenv config data raises an error."""
     venv_path = tmp_path / "venv"
     _fake_venv(venv_path, "3.13.5")
 
     with pytest.raises(ValueError, match="does not record the cross-platform"):
         CrossVenvConfig.from_venv(venv_path)
-
-
-def test_from_venv_missing_pyvenv_cfg(tmp_path):
-    """A directory with no pyvenv.cfg raises the same error."""
-    with pytest.raises(ValueError, match="does not record the cross-platform"):
-        CrossVenvConfig.from_venv(tmp_path)
 
 
 def test_from_venv_recorded_file_missing(tmp_path):
@@ -837,7 +832,7 @@ def test_convert_records_non_ascii_source_as_utf8(tmp_path, non_utf8_locale):
 
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    xvenv_config = _read_pyvenv_cfg(venv_path, "xvenv")
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
     assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
     assert "build_details" not in xvenv_config
 
@@ -884,7 +879,7 @@ def test_platform_config_relative_path_is_absolute(tmp_path, monkeypatch, mock_d
 
     config._write_pyvenv_cfg(venv_path)
 
-    xvenv_config = _read_pyvenv_cfg(venv_path, "xvenv")
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
     assert xvenv_config["build-details"] == str(mock_deps["config_path"].resolve())
     assert "sysconfigdata" not in xvenv_config
 

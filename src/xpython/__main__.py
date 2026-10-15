@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import subprocess
 import sys
 import tempfile
@@ -11,16 +12,14 @@ from build.__main__ import _cprint, _error
 
 import xpython
 from xpython.deps import install_requirements, resolve_requirements
-from xpython.project import (
-    InvalidProjectError,
-    ProjectConfig,
-    SetupOptions,
-    option_discrepancies,
-    read_project,
-    write_project,
-)
 from xvenv.args import MISSING_CONFIG_ERROR, make_common_parser, parse_common_args
-from xvenv.convert import CrossVenvConfig, in_cross_env, run_testbed
+from xvenv.convert import (
+    CrossVenvConfig,
+    in_cross_env,
+    read_pyvenv_cfg,
+    resolve_multiarch,
+    run_testbed,
+)
 
 
 def main_parser() -> argparse.ArgumentParser:
@@ -169,22 +168,62 @@ def _parse_args(
 
     args = parse_common_args(parser, xpython_args, require_config=False)
 
-    args.project = None
     if args.work_path is not None:
         args.work_path = args.work_path.resolve()
         if args.work_path.exists():
             try:
-                args.project = read_project(args.work_path)
-            except InvalidProjectError as e:
+                args.project = read_pyvenv_cfg(args.work_path / "venv", "xvenv")
+                if args.project == {}:
+                    raise ValueError()
+            except (configparser.ParsingError, FileNotFoundError, ValueError):
                 _error(
-                    f"Working directory `{args.work_path}` exists, but is not a "
-                    f"valid xpython work directory ({e}). Delete it, or choose a "
-                    "different --work-dir."
+                    f"Working directory `{args.work_path}` exists, but does not "
+                    "appear to be a valid xpython work directory with a xvenv. "
+                    "Delete it, or choose a different --work-dir."
                 )
+        else:
+            args.project = None
+    else:
+        args.project = None
 
     if args.project is not None:
         # Reusing an existing project; the recorded platform is the target.
-        target_platform = args.project.platform
+        target_platform = args.project["platform"]
+
+        # Check that there hasn't been any drift in arguments
+        if args.platform:
+            if args.platform != target_platform:
+                _error(
+                    "The provided platform doesn't match the existing "
+                    f"work directory configuration ({target_platform})"
+                )
+            if args.arch:
+                multiarch = resolve_multiarch(args.platform, args.arch)
+                if multiarch != args.project["multiarch"]:
+                    _error(
+                        "The provided architecture doesn't match the "
+                        "existing work directory configuration "
+                        f"({args.project['multiarch']})"
+                    )
+                    _error("arch mismatch")
+        elif args.build_details_path:
+            if (
+                "build-details" not in args.project
+                or args.build_details_path != args.project["build-details"]
+            ):
+                _error(
+                    "The provided build details path doesn't match the existing "
+                    f"work directory ({args.project['build-details']})"
+                )
+        elif args.sysconfigdata_path:
+            if (
+                "sysconfigdata" not in args.project
+                or args.sysconfigdata_path != args.project["sysconfigdata"]
+            ):
+                _error(
+                    "The provided sysconfigdata path doesn't match the existing "
+                    f"work directory ({args.project['sysconfigdata']})"
+                )
     elif args.use_current_env:
         if not in_cross_env():
             parser.error(MISSING_CONFIG_ERROR)
@@ -210,10 +249,10 @@ def main(cli_args: Sequence[str]) -> None:
 
     :param cli_args: CLI arguments
     """
-    parser = main_parser()
-    args = _parse_args(parser, cli_args)
-
     try:
+        parser = main_parser()
+        args = _parse_args(parser, cli_args)
+
         if args.project is not None:
             exit_code = _reuse(args)
         elif args.work_path is not None:
@@ -273,16 +312,6 @@ def _run(args: argparse.Namespace) -> int:
         venv_python = venv_path / "bin" / "python3"
         install_requirements(venv_python, requirements, packages_path, args.find_links)
 
-    # Record the project configuration only once setup has fully succeeded,
-    # so that a partially configured work directory can't be reused.
-    write_project(
-        args.work_path,
-        ProjectConfig(
-            platform=cross_venv.platform,
-            options=SetupOptions.from_args(args),
-        ),
-    )
-
     _cprint("{bold}Running testbed...{reset}")
     return cross_venv.run_testbed(
         work_path=args.work_path,
@@ -308,19 +337,16 @@ def _reuse(args: argparse.Namespace) -> int:
     project = args.project
     _cprint("{bold}Reusing testbed project in {}...{reset}", str(args.work_path))
 
-    for flag, recorded, given in option_discrepancies(
-        project.options, SetupOptions.from_args(args)
-    ):
-        _cprint(
-            "{yellow}WARNING{reset} {}",
-            f"Ignoring {flag} {given}; {args.work_path} was configured with "
-            f"{flag} {recorded}.",
-            file=sys.stderr,
-        )
+    for path in args.src:
+        _cprint(f" - Ignoring src path {path}")
+    for dep in args.dependencies:
+        _cprint(f" - Ignoring dependency {dep!r}")
+    for group in args.groups:
+        _cprint(f" - Ignoring dependency group {group!r}")
 
     _cprint("{bold}Running testbed...{reset}")
     return run_testbed(
-        project.platform,
+        project["platform"],
         work_path=args.work_path,
         args=args.forwarded_args,
         simulator=args.simulator,
