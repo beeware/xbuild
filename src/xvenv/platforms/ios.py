@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from xvenv import versions
+from xvenv.fetch import download_archive
 from xvenv.platforms import build_platform_env, host_platform
 
 VALID_ARCHES = ["arm64-iphonesimulator", "x86_64-iphonesimulator", "arm64-iphoneos"]
@@ -45,6 +46,18 @@ def download_url(version_info: tuple, arch: str) -> str:
         f"https://www.python.org/ftp/python/{release}/"
         f"python-{version}-iOS-XCframework.tar.gz"
     )
+
+
+def fetch_archive(version_info: tuple, arch: str, cache_path: Path) -> Path:
+    """Download (if not already cached) and extract the iOS Python build.
+
+    :param version_info: The `sys.version_info` tuple for the version being
+        requested.
+    :param arch: The architecture being built.
+    :param cache_path: The cache directory to use.
+    :returns: The path of the extracted archive.
+    """
+    return download_archive(download_url(version_info, arch), cache_path)
 
 
 def archive_path(path: Path) -> Path:

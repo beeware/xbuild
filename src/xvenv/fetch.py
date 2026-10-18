@@ -95,6 +95,61 @@ def _current_version_info():
     return sys.version_info
 
 
+def download(url: str, cache_path: Path) -> Path:
+    """Download a file into the cache, unless it has already been downloaded.
+
+    :param url: The URL to download.
+    :param cache_path: The (already-resolved, already-existing) cache
+        directory to use — see :func:`resolve_cache_path`.
+    :returns: The path of the downloaded file in the cache.
+    :raises ValueError: if the download fails.
+    """
+    filename = url.rsplit("/", 1)[-1]
+    download_path = cache_path / filename
+    with FileLock(str(download_path) + ".lock"):
+        if download_path.is_file():
+            print(f"Cached {filename} exists.")
+        else:
+            print(f"Downloading {filename}...", end="", flush=True)
+            try:
+                urllib.request.urlretrieve(url, download_path)
+                print(" done.")
+            except OSError as e:
+                download_path.unlink(missing_ok=True)
+                raise ValueError(f"Failed to download {url}: {e}") from e
+
+    return download_path
+
+
+def download_archive(url: str, cache_path: Path) -> Path:
+    """Download (if not already cached) and extract a `.tar.gz` Python build.
+
+    :param url: The URL of the archive to download.
+    :param cache_path: The (already-resolved, already-existing) cache
+        directory to use — see :func:`resolve_cache_path`.
+    :returns: The path of the extracted archive in the cache.
+    :raises ValueError: if the download fails.
+    """
+    archive_name = url.rsplit("/", 1)[-1]
+    extracted_name = archive_name[: -len(".tar.gz")]
+    extracted_path = cache_path / extracted_name
+
+    if not extracted_path.is_dir():
+        archive_path = download(url, cache_path)
+
+        # NOTE: if extraction fails partway (disk full, corrupt archive),
+        # extracted_path already exists and will be treated as a valid cache
+        # hit on retry. No rollback/cleanup on partial failure -- delete the
+        # cache directory manually to retry a failed download.
+        print(f"Extracting {archive_name}...", end="", flush=True)
+        extracted_path.mkdir()
+        with tarfile.open(archive_path) as tar:
+            tar.extractall(extracted_path, filter="data")
+        print(" done.")
+
+    return extracted_path
+
+
 def fetch_python(platform_name: str, arch: str, cache_path: Path) -> tuple[Path, bool]:
     """Download (if not already cached) and locate the sysconfig/build-details
     file for a target platform/arch's Python build.
@@ -111,35 +166,7 @@ def fetch_python(platform_name: str, arch: str, cache_path: Path) -> tuple[Path,
     """
     platform_module = import_module(f"xvenv.platforms.{platform_name}")
     version_info = _current_version_info()
-    url = platform_module.download_url(version_info, arch)
-
-    archive_name = url.rsplit("/", 1)[-1]
-    extracted_name = archive_name[: -len(".tar.gz")]
-    extracted_path = cache_path / extracted_name
-
-    if not extracted_path.is_dir():
-        archive_path = cache_path / archive_name
-        with FileLock(str(archive_path) + ".lock"):
-            if archive_path.is_file():
-                print(f"Cached {archive_name} exists.")
-            else:
-                print(f"Downloading {archive_name}...", end="", flush=True)
-                try:
-                    urllib.request.urlretrieve(url, archive_path)
-                    print(" done.")
-                except OSError as e:
-                    archive_path.unlink(missing_ok=True)
-                    raise ValueError(f"Failed to download {url}: {e}") from e
-
-        # NOTE: if extraction fails partway (disk full, corrupt archive),
-        # extracted_path already exists and will be treated as a valid cache
-        # hit on retry. No rollback/cleanup on partial failure -- delete the
-        # cache directory manually to retry a failed download.
-        print(f"Extracting {archive_name}...", end="", flush=True)
-        extracted_path.mkdir()
-        with tarfile.open(archive_path) as tar:
-            tar.extractall(extracted_path, filter="data")
-        print(" done.")
+    extracted_path = platform_module.fetch_archive(version_info, arch, cache_path)
 
     config_file = platform_module.config_path(extracted_path, version_info, arch)
     return config_file, config_file.name == "build-details.json"
