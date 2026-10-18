@@ -361,7 +361,11 @@ class CrossVenvConfig:
             relevant if `venv_path` doesn't already exist.
         """
         if not venv_path.exists():
-            venv.create(venv_path, with_pip=with_pip)
+            # Match the `python -m venv` default of symlinking the interpreter
+            # (except on Windows). A copied interpreter can't find its
+            # libpython if it's linked relative to the executable, as
+            # python-build-standalone builds (e.g., those managed by uv) are.
+            venv.create(venv_path, with_pip=with_pip, symlinks=(os.name != "nt"))
 
         self.convert(venv_path)
 
