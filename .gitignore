@@ -46,3 +46,4 @@ _build
 .superpowers/
 .worktrees/
 docs/superpowers/
+.xbuild-cache/

@@ -267,6 +267,27 @@ def test_config_via_archive_path(tmp_path, mock_deps):
     )
 
 
+def test_cache_path_resolved_lazily(tmp_path, mock_deps):
+    """The cache directory is only resolved when something needs it (e.g., a
+    platform installing a toolchain), and then only once."""
+    supplied_archive = tmp_path / "my-existing-build"
+    supplied_archive.mkdir()
+
+    config = CrossVenvConfig(
+        platform="android",
+        arch=None,
+        archive_path=supplied_archive,
+        build_details_path=None,
+        sysconfigdata_path=None,
+        cache_path=tmp_path / "explicit-cache",
+    )
+    mock_deps["resolve_cache_path"].assert_not_called()
+
+    assert config.cache_path == mock_deps["cache_path"]
+    assert config.cache_path == mock_deps["cache_path"]
+    mock_deps["resolve_cache_path"].assert_called_once_with(tmp_path / "explicit-cache")
+
+
 def test_config_via_build_details_path(tmp_path):
     """An environment can be configured with a build-details.json."""
     build_details_path = tmp_path / "build-details.json"

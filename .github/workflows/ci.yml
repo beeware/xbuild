@@ -129,7 +129,20 @@ jobs:
         python -m pip install -U pip
         python -m pip install --group tox
 
+    # The Emscripten live tests download a Pyodide cross-build environment and
+    # install a matching Emscripten SDK (several hundred MB). Cache them
+    # between runs; the key changes whenever the pinned Pyodide versions do.
+    - name: Cache downloaded Python builds and toolchains
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+      with:
+        path: ${{ github.workspace }}/.xbuild-cache
+        key: xbuild-cache-${{ runner.os }}-${{ runner.arch }}-py${{ matrix.python-version }}-${{ hashFiles('src/xvenv/platforms/emscripten/__init__.py', 'src/xvenv/platforms/android.py', 'src/xvenv/platforms/ios.py') }}
+        restore-keys: |
+          xbuild-cache-${{ runner.os }}-${{ runner.arch }}-py${{ matrix.python-version }}-
+
     - name: Test
+      env:
+        XBUILD_CACHE: ${{ github.workspace }}/.xbuild-cache
       run: |
         python -m tox -e py
 

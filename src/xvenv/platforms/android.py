@@ -76,6 +76,10 @@ def config_path(extracted_dir: Path, version_info, arch: str) -> Path:
     return py_dir / f"_sysconfigdata__android_{arch}-linux-android.py"
 
 
+def prefix_path(config_data_path: Path) -> Path:
+    return config_data_path.parents[2]
+
+
 def build_details_from_sysconfigdata(sysconfigdata):
     # Reconstruct a build_details-alike structure from sysconfigdata.
     arch, _, platform = sysconfigdata["MULTIARCH"].split("-")
