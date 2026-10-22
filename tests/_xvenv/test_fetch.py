@@ -129,13 +129,20 @@ def test_default_arch_unknown_arch(monkeypatch, platform_name):
         resolve_arch(platform_name, "sparc64")
 
 
-@pytest.mark.parametrize("platform_name", ["ios", "android", "emscripten"])
+@pytest.mark.parametrize("platform_name", ["ios", "android"])
 def test_default_arch_unknown_host_machine(monkeypatch, platform_name):
     """An unknown host machine type raises an error."""
     monkeypatch.setattr("platform.machine", lambda: "sparc64")
 
     with pytest.raises(ValueError, match="sparc64"):
         resolve_arch(platform_name, None)
+
+
+def test_default_arch_emscripten_any_host_machine(monkeypatch):
+    """Emscripten's architecture doesn't depend on the host machine."""
+    monkeypatch.setattr("platform.machine", lambda: "sparc64")
+
+    assert resolve_arch("emscripten", None) == "wasm32"
 
 
 def test_skip_download_when_cached(tmp_path, monkeypatch):

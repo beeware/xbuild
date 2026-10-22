@@ -128,6 +128,13 @@ def test_platform_android():
     assert android_ver.is_emulator == EXPECTED["android_is_emulator"]
 
 
+@pytest.mark.skipif(sys.platform != "emscripten", reason="Emscripten-specific check")
+def test_platform_emscripten():
+    """Emscripten platform properties are as expected."""
+    assert platform.libc_ver() == ("emscripten", EXPECTED["emscripten_release"])
+    assert sysconfig.get_config_var("PYODIDE_ABI_VERSION") == EXPECTED["pyodide_abi"]
+
+
 @pytest.mark.skipif(sys.platform != "android", reason="Android-specific check")
 def test_sys_android():
     """Android sys properties are as expected."""

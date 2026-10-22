@@ -12,7 +12,7 @@ description = "A PEP517 build frontend for cross-compiling wheels."
 readme = "README.md"
 requires-python = ">= 3.11"
 license = "BSD-3-Clause"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "LICENSE.third-party"]
 authors = [
     {name="Russell Keith-Magee", email="russell@keith-magee.com"},
 ]
@@ -107,6 +107,7 @@ markers = [
     "live: mark a test as a live (slow) test.",
     "iOS: mark test as iOS specific.",
     "android: mark test as Android specific.",
+    "emscripten: mark test as Emscripten specific.",
 ]
 
 [tool.check-wheel-contents]

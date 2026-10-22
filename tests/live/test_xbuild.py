@@ -30,6 +30,8 @@ from pathlib import Path
 
 import pytest
 
+from xvenv.platforms.emscripten import PYODIDE_VERSIONS
+
 from .test_xvenv import _install_xbuild, venv_python_exe
 
 SAMPLE_PROJECTS = [
@@ -63,6 +65,22 @@ CASES = [
             pytest.mark.android,
         ],
     ),
+    pytest.param(
+        "emscripten",
+        id="emscripten",
+        marks=[
+            pytest.mark.skipif(
+                sys.platform == "win32",
+                reason="emscripten xbuild tests cannot be run on Windows",
+            ),
+            pytest.mark.skipif(
+                f"{sys.version_info.major}.{sys.version_info.minor}"
+                not in PYODIDE_VERSIONS,
+                reason="No Pyodide release for this Python version",
+            ),
+            pytest.mark.emscripten,
+        ],
+    ),
 ]
 
 _ANDROID_HOST_TRIPLETS = {
@@ -78,6 +96,8 @@ def _check_preconditions(platform_name):
         _check_preconditions_ios()
     elif platform_name == "android":
         _check_preconditions_android()
+    elif platform_name == "emscripten":
+        _check_preconditions_emscripten()
     else:
         raise AssertionError(f"no precondition check for {platform_name!r}")
 
@@ -102,6 +122,15 @@ def _check_preconditions_android():
         pytest.fail(
             "JAVA_HOME environment variable is not set. It must point at "
             "an installed JDK."
+        )
+
+
+def _check_preconditions_emscripten():
+    if not shutil.which("node"):
+        pytest.fail(
+            "node is not on PATH. Node.js 18+ is required to run the Pyodide "
+            "interpreter (and meson's cross-compilation checks); install it from "
+            "https://nodejs.org or your package manager."
         )
 
 

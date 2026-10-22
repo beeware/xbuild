@@ -53,6 +53,10 @@ def archive_path(path: Path) -> Path:
     return path.parents[4]
 
 
+def prefix_path(config_data_path: Path) -> Path:
+    return config_data_path.parents[2]
+
+
 def config_path(extracted_dir: Path, version_info: tuple, arch: str) -> Path:
     """Locate the sysconfig/build-details file inside an extracted iOS
     XCframework archive.

@@ -118,13 +118,16 @@ class CrossVenvConfig:
         :param sysconfigdata_path: An explicit path to a sysconfigdata python
             file. Ignored if `platform` is specified.
         :param cache_path: The directory to use for caching downloaded Python
-            builds, or `None` to use the default resolution order (see
-            `xvenv.fetch.resolve_cache_path()`). Ignored if `archive_path` is
-            given, or if `platform` is `None`.
+            builds and toolchains, or `None` to use the default resolution
+            order (see `xvenv.fetch.resolve_cache_path()`). The directory is
+            only resolved (and created) when it is first needed.
         :returns: The resolved `CrossVenvConfig`.
-        :raises NotImplementedError: if `platform`/`arch` isn't supported for
-            download yet (e.g. emscripten).
+        :raises ValueError: if the configuration can't be resolved (e.g. the
+            platform/arch isn't supported, or the configuration file can't be
+            found).
         """
+        self._cache_arg = cache_path
+        self._cache_path: Path | None = None
         if platform is not None:
             arch = resolve_arch(platform, arch)
 
@@ -133,8 +136,9 @@ class CrossVenvConfig:
                     platform, arch, Path(archive_path).resolve()
                 )
             else:
-                cache_path = resolve_cache_path(cache_path)
-                config_path, is_build_details = fetch_python(platform, arch, cache_path)
+                config_path, is_build_details = fetch_python(
+                    platform, arch, self.cache_path
+                )
 
             # The cache path may be relative (e.g. `--cache ./cache`); always
             # use (and record) an absolute path.
@@ -177,6 +181,14 @@ class CrossVenvConfig:
             ) from None
 
         self.archive_path = self.platform_module.archive_path(source_path)
+
+    @property
+    def cache_path(self) -> Path:
+        """The directory used for caching downloaded Python builds and
+        toolchains. Resolved (and created) on first access."""
+        if self._cache_path is None:
+            self._cache_path = resolve_cache_path(self._cache_arg)
+        return self._cache_path
 
     @classmethod
     def from_venv(cls, venv_path: Path) -> CrossVenvConfig:
@@ -265,6 +277,9 @@ class CrossVenvConfig:
             raise ValueError(f"Found more than one site packages in {venv_path}")
 
         venv_site_packages_path = platlibs[0]
+        # Platforms may add or adjust sysconfig variables (e.g. Emscripten
+        # records the Emscripten version that built the target).
+        patch_sysconfig = getattr(self.platform_module, "patch_sysconfig", None)
         if self.build_details_path:
             # If build_details.json exists, then so does sysconfig_vars.
             with open(self.build_details_path, encoding="utf-8") as fp:
@@ -272,6 +287,7 @@ class CrossVenvConfig:
 
             version = build_details["language"]["version"]
             abiflags = "".join(build_details["abi"]["flags"])
+            prefix = self.platform_module.prefix_path(self.build_details_path)
 
             localize_sysconfigdata(
                 (
@@ -279,6 +295,8 @@ class CrossVenvConfig:
                     / f"_sysconfigdata_{abiflags}_{self.platform}_{self.arch}.py"
                 ),
                 venv_site_packages_path,
+                prefix,
+                patch_sysconfig,
             )
             localize_sysconfig_vars(
                 (
@@ -286,21 +304,28 @@ class CrossVenvConfig:
                     / f"_sysconfig_vars_{abiflags}_{self.platform}_{self.arch}.json"
                 ),
                 venv_site_packages_path,
+                prefix,
+                patch_sysconfig,
             )
         else:
             # We've been given a sysconfigdata file instead.
+            prefix = self.platform_module.prefix_path(self.sysconfigdata_path)
             _, _, abiflags, _, _ = self.sysconfigdata_path.stem.split("_", 4)
 
             # Localize the sysconfig data.
             sysconfigdata = localize_sysconfigdata(
                 self.sysconfigdata_path,
                 venv_site_packages_path,
+                prefix,
+                patch_sysconfig,
             )
             version = sysconfigdata["VERSION"]
 
             # We'll need to reconstruct build_details-like data once we have
             # a platform module, as the keys in sysconfig data vary by platform.
-            build_details = None
+            build_details = self.platform_module.build_details_from_sysconfigdata(
+                sysconfigdata
+            )
 
         # Check the venv version matches the configuration file that has been provided
         venv_config = _read_pyvenv_cfg(venv_path)
@@ -324,10 +349,6 @@ class CrossVenvConfig:
             "sdk": sdk,
         }
 
-        if build_details is None:
-            build_details = self.platform_module.build_details_from_sysconfigdata(
-                sysconfigdata
-            )
         self.platform_module.extend_context(context, build_details)
 
         cross_multiarch = f"_cross_{self.platform}_{self.arch.replace('-', '_')}"
@@ -349,6 +370,12 @@ class CrossVenvConfig:
         # Record the configuration source, so that the configuration of this
         # environment can be reconstructed later (see `from_venv()`).
         _record_source(venv_path, self.build_details_path, self.sysconfigdata_path)
+
+        # Give the platform a chance to make any additional modifications to
+        # the venv (e.g., Emscripten installs a patched pip).
+        post_convert = getattr(self.platform_module, "post_convert", None)
+        if post_convert is not None:
+            post_convert(venv_path, self)
 
     def create(self, venv_path: Path, with_pip: bool = True):
         """Create (if `venv_path` doesn't already exist) and convert a virtual
@@ -381,9 +408,7 @@ class CrossVenvConfig:
             for the duration of the build.
         :raises ValueError: if the platform module's own `prepare_env()`
             raises (e.g. missing `ANDROID_HOME`, missing NDK, non-macOS for
-            iOS).
-        :raises NotImplementedError: for platforms that don't support
-            environment preparation yet (currently: emscripten).
+            iOS, or a failed Emscripten SDK install).
         """
         env = dict(self.platform_module.prepare_env(self))
 
@@ -440,7 +465,7 @@ class CrossVenvConfig:
         )
 
 
-def localized_vars(orig_vars, slice_path):
+def localized_vars(orig_vars, prefix):
     """Update (where possible) any references to build-time variables with the best
     guess of the installed location."""
     # The host's sysconfigdata will include references to build-time variables.
@@ -474,9 +499,9 @@ def localized_vars(orig_vars, slice_path):
             if tool_dir is not None:
                 final = final.replace(f"{tool_dir}/", "")
             # Replace any reference to the build prefix
-            final = final.replace(orig_prefix, str(slice_path))
+            final = final.replace(orig_prefix, str(prefix))
             # Replace any reference to the build-time Framework location
-            final = final.replace("-F .", f"-F {slice_path}")
+            final = final.replace("-F .", f"-F {prefix}")
         localized_vars[key] = final
 
     # Remove LDLIBRARY from the sysconfig vars. At runtime, ctypes on Android
@@ -489,46 +514,58 @@ def localized_vars(orig_vars, slice_path):
     return localized_vars
 
 
-def localize_sysconfigdata(sysconfigdata_path, venv_site_packages):
+def localize_sysconfigdata(
+    sysconfigdata_path, venv_site_packages, prefix, patch_sysconfig=None
+):
     """Localize a sysconfigdata python module.
 
-    :param support_path: The platform config that contains the sysconfigdata module to
-        localize.
+    :param sysconfigdata_path: The sysconfigdata module to localize.
     :param venv_site_packages: The site packages folder where the localized
         sysconfigdata module should be output.
+    :param prefix: The install prefix of the target Python build.
+    :param patch_sysconfig: An optional `(prefix, vars) -> vars` callable
+        that the platform can use to adjust the localized variables.
+    :returns: The localized sysconfig variables.
     """
     sysconfigdata = parse_sysconfigdata(sysconfigdata_path)
+    build_vars = localized_vars(sysconfigdata.build_time_vars, prefix)
+    if patch_sysconfig is not None:
+        build_vars = patch_sysconfig(prefix, build_vars)
 
     # Write the updated sysconfigdata module into the cross-platform site.
-    slice_path = sysconfigdata_path.parent.parent.parent
     with (venv_site_packages / sysconfigdata_path.name).open(
         "w", encoding="utf-8"
     ) as f:
         f.write(f"# Generated from {sysconfigdata_path}\n")
         f.write("build_time_vars = ")
         pprint.pprint(
-            localized_vars(sysconfigdata.build_time_vars, slice_path),
+            build_vars,
             stream=f,
             compact=True,
         )
 
-    return sysconfigdata.build_time_vars
+    return build_vars
 
 
-def localize_sysconfig_vars(sysconfig_vars_path, venv_site_packages):
+def localize_sysconfig_vars(
+    sysconfig_vars_path, venv_site_packages, prefix, patch_sysconfig=None
+):
     """Localize a sysconfig_vars.json file.
 
-    :param support_path: The platform config that contains the sysconfigdata module to
-        localize.
+    :param sysconfig_vars_path: The sysconfig_vars.json file to localize.
     :param venv_site_packages: The site-packages folder where the localized
         sysconfig_vars.json file should be output.
+    :param prefix: The install prefix of the target Python build.
+    :param patch_sysconfig: An optional `(prefix, vars) -> vars` callable
+        that the platform can use to adjust the localized variables.
     :return: The localized sysconfig
     """
     with sysconfig_vars_path.open("rb") as f:
         build_time_vars = json.load(f)
 
-    prefix = sysconfig_vars_path.parent.parent.parent
     sysconfig_vars = localized_vars(build_time_vars, prefix)
+    if patch_sysconfig is not None:
+        sysconfig_vars = patch_sysconfig(prefix, sysconfig_vars)
 
     with (venv_site_packages / sysconfig_vars_path.name).open(
         "w", encoding="utf-8"

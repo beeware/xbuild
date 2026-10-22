@@ -19,3 +19,8 @@ ios_release = "13.0"
 [ios."arm64-iphoneos"]
 sysconfig_platform = "ios-13.0-arm64-iphoneos"
 ios_release = "13.0"
+
+[emscripten.wasm32]
+emscripten_release = "5.0.3"
+sysconfig_platform = "emscripten-5.0.3-wasm32"
+pyodide_abi = "2026_0"
