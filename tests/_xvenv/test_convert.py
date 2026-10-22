@@ -73,7 +73,9 @@ def test_creates_venv_when_missing(tmp_path, mock_config, mock_deps, mock_conver
 
     mock_config.create(venv_path)
 
-    mock_deps["create"].assert_called_once_with(venv_path, with_pip=True)
+    mock_deps["create"].assert_called_once_with(
+        venv_path, with_pip=True, symlinks=(os.name != "nt")
+    )
     mock_convert.assert_called_once_with(venv_path)
 
 
@@ -95,7 +97,26 @@ def test_with_pip_passthrough(tmp_path, mock_config, mock_deps, mock_convert, wi
 
     mock_config.create(venv_path, with_pip=with_pip)
 
-    mock_deps["create"].assert_called_once_with(venv_path, with_pip=with_pip)
+    mock_deps["create"].assert_called_once_with(
+        venv_path, with_pip=with_pip, symlinks=(os.name != "nt")
+    )
+    mock_convert.assert_called_once_with(venv_path)
+
+
+@pytest.mark.parametrize("os_name, symlinks", [("posix", True), ("nt", False)])
+def test_symlinks(
+    tmp_path, monkeypatch, mock_config, mock_deps, mock_convert, os_name, symlinks
+):
+    """The interpreter is symlinked into the venv, except on Windows, matching
+    the default of `python -m venv`."""
+    venv_path = tmp_path / "x-venv"
+    monkeypatch.setattr("xvenv.convert.os.name", os_name)
+
+    mock_config.create(venv_path)
+
+    mock_deps["create"].assert_called_once_with(
+        venv_path, with_pip=True, symlinks=symlinks
+    )
     mock_convert.assert_called_once_with(venv_path)
 
 
