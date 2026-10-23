@@ -59,8 +59,8 @@ _RELEASELEVEL_SUFFIX = {
 }
 
 
-def resolve_arch(platform_name: str, arch: str | None) -> str:
-    """Resolve the architecture for the build, resolving a "useful default"
+def resolve_multiarch(platform_name: str, arch: str | None) -> str:
+    """Resolve the multi-architecture for the build, resolving a "useful default"
     based on the host machine's architecture if an architecture wasn't specified
 
     :param platform_name: One of `"ios"`, `"android"`, `"emscripten"`.
@@ -70,17 +70,17 @@ def resolve_arch(platform_name: str, arch: str | None) -> str:
     platform_module = import_module(f"xvenv.platforms.{platform_name}")
 
     if arch is not None:
-        if arch not in platform_module.VALID_ARCHES:
+        try:
+            return platform_module.VALID_ARCHES[arch]
+        except KeyError:
             raise ValueError(
                 f"{arch!r} is not a valid --arch for {platform_name}. "
                 f"Valid values are: {', '.join(platform_module.VALID_ARCHES)}"
-            )
-        else:
-            return arch
+            ) from None
 
     host_machine = platform.machine()
     try:
-        return platform_module.DEFAULT_ARCH[host_machine]
+        return platform_module.VALID_ARCHES[platform_module.DEFAULT_ARCH[host_machine]]
     except KeyError:
         raise ValueError(
             f"Don't know a default --arch for {platform_name} on host "
@@ -150,12 +150,16 @@ def download_archive(url: str, cache_path: Path) -> Path:
     return extracted_path
 
 
-def fetch_python(platform_name: str, arch: str, cache_path: Path) -> tuple[Path, bool]:
+def fetch_python(
+    platform_name: str,
+    multiarch: str,
+    cache_path: Path,
+) -> tuple[Path, bool]:
     """Download (if not already cached) and locate the sysconfig/build-details
     file for a target platform/arch's Python build.
 
     :param platform_name: One of `"ios"`, `"android"`, `"emscripten"`.
-    :param arch: The target architecture.
+    :param multiarch: The target multi-architecture.
     :param cache_path: The (already-resolved, already-existing) cache
         directory to use — see :func:`resolve_cache_path`.
     :returns: A tuple of `(config_path, is_build_details)`, where
@@ -166,9 +170,9 @@ def fetch_python(platform_name: str, arch: str, cache_path: Path) -> tuple[Path,
     """
     platform_module = import_module(f"xvenv.platforms.{platform_name}")
     version_info = _current_version_info()
-    extracted_path = platform_module.fetch_archive(version_info, arch, cache_path)
+    extracted_path = platform_module.fetch_archive(version_info, multiarch, cache_path)
 
-    config_file = platform_module.config_path(extracted_path, version_info, arch)
+    config_file = platform_module.config_path(extracted_path, version_info, multiarch)
     return config_file, config_file.name == "build-details.json"
 
 
@@ -192,13 +196,15 @@ def parse_sysconfigdata(path: Path) -> dict:
 
 
 def use_archive_path(
-    platform_name: str, arch: str, archive_path: Path
+    platform_name: str,
+    multiarch: str,
+    archive_path: Path,
 ) -> tuple[Path, bool]:
     """Locate the sysconfig/build-details file inside an already-extracted
     Python build, without downloading or caching anything.
 
     :param platform_name: One of `"ios"`, `"android"`, `"emscripten"`.
-    :param arch: The target architecture (already resolved via `resolve_arch()`).
+    :param multiarch: The target architecture.
     :param archive_path: Path to a pre-extracted Python build, laid out the
         same way `fetch_python()` would have extracted its own download.
     :returns: A tuple of `(config_path, is_build_details)`, same shape as
@@ -213,12 +219,12 @@ def use_archive_path(
 
     platform_module = import_module(f"xvenv.platforms.{platform_name}")
     version_info = _current_version_info()
-    config_file = platform_module.config_path(archive_path, version_info, arch)
+    config_file = platform_module.config_path(archive_path, version_info, multiarch)
 
     if not config_file.is_file():
         raise ValueError(
             f"Could not find a Python {versions.series(version_info)} build "
-            f"for {platform_name}/{arch} in {archive_path} "
+            f"for {platform_name}/{multiarch} in {archive_path} "
             f"(expected {config_file})."
         )
 

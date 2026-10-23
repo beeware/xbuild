@@ -8,6 +8,10 @@ from build.__main__ import _setup_cli
 
 from xvenv.convert import in_cross_env
 
+MISSING_CONFIG_ERROR = (
+    "One of the arguments --build-details, --sysconfig, or --platform is required"
+)
+
 
 def make_common_parser(
     cmd: str,
@@ -111,11 +115,17 @@ def make_common_parser(
 def parse_common_args(
     parser: argparse.ArgumentParser,
     cli_args: Sequence[str],
+    *,
+    require_config: bool = True,
 ) -> argparse.Namespace:
     """Perform initial parsing and validation of common arguments.
 
     :param parser: The complete parser to use.
     :param cli_args: The command line arguments to parse.
+    :param require_config: If True, it is an error to provide none of
+        `--platform`/`--build-details`/`--sysconfig` when not running in a
+        cross-platform environment. If False, the caller is responsible for
+        that check.
     :returns: The namespace of parsed arguments.
     """
     args = parser.parse_args(cli_args)
@@ -133,10 +143,7 @@ def parse_common_args(
         value is None
         for value in (args.platform, args.build_details_path, args.sysconfigdata_path)
     )
-    if args.use_current_env and not in_cross_env():
-        parser.error(
-            "One of the arguments --build-details, --sysconfig, "
-            "or --platform is required"
-        )
+    if require_config and args.use_current_env and not in_cross_env():
+        parser.error(MISSING_CONFIG_ERROR)
 
     return args

@@ -6,17 +6,19 @@
 
 ```console
 (venv) $ xpython --platform ios --src tests -d pytest -- -m pytest tests
-(venv) $ xpython --platform android --group test -- -m pytest tests
+(venv) $ xpython --platform android --group test --work-dir build/android -- -m pytest tests
 ```
 
 `xpython` will:
 
-1. Create (or reuses) a cross-platform virtual environment for the target `--platform`/`--arch`, downloading and caching the target Python build the same way `xvenv --platform ...` does.
-2. Resolve dependencies (`-d`/`--dependency` specs and/or `--group` names from `[dependency-groups]` in `./pyproject.toml`) and installs them using that environment's own `pip`.
+1. Create a cross-platform virtual environment for the target `--platform`/`--arch`, downloading and caching the target Python build the same way `xvenv --platform ...` does.
+2. Resolve dependencies (`-d`/`--dependency` specs and/or `--group` names from `[dependency-groups]` in `./pyproject.toml`) and install them using that environment's own `pip`.
 3. Copy each `--src` path into the testbed's working directory.
 4. Forward everything after `--` to the platform's testbed (see the `-- [args ...]` option below).
 5. Run the project on a simulator/emulator
 6. Exit with the exit code produced by the test code (or by the testbed driver itself, if it failed to build/launch before the test code could run).
+
+If you use `--work-dir` to name a directory that was set up by a previous `xpython` invocation, steps 1-3 are skipped, and the existing testbed project is reused (see [`--work-dir`](#xpython-work-dir) below).
 
 If you run `xpython` from inside an active cross-platform environment, you can omit `--platform`/`--build-details`/`--sysconfig`; `xpython` will target the platform of the current environment (see [Specifying the target platform](./index.md#target-platform)).
 
@@ -60,9 +62,15 @@ The name of a Gradle-managed Android device to use. Defaults to `maxVersion` if 
 
 The serial number of an already-connected Android device to use. Only valid with `--platform android`. Mutually exclusive with `--managed`.
 
-### `--work-dir DIR`
+### `--work-dir DIR` { #xpython-work-dir }
 
-Use this directory to store the cross-environment, dependency install, and testbed staging, instead of a temporary directory. Unlike a temporary directory, this directory is **not** deleted when `xpython` exits — useful for inspecting a failed run.
+Use this directory to store the cross-environment, installed dependencies, and testbed project, instead of a temporary directory. Unlike a temporary directory, this directory is **not** deleted when `xpython` exits.
+
+If `DIR` doesn't exist, `xpython` creates it and sets up the testbed project in it. Once setup has completed successfully, `xpython` records the configuration of the project in `DIR/xpython.toml`.
+
+If `DIR` already exists and was set up by a previous `xpython` invocation, the existing testbed project is reused. The cross-environment isn't recreated, the testbed isn't cloned again, no sources are copied, and no dependencies are installed. Only the run options (`--simulator`, `--managed`, `--connected` and `--verbose`, plus the arguments after `--`) are used. Environment setup options (`--platform`, `--arch`, `--build-details`, and `--sysconfig`) will be checked against the cross-platform environment in the work directory; if there are any discrepancies, an error will be raised. Arguments changing the code in the app (`--dependency`, `--group` and `--src`) can be omitted; if they are specified, they will be ignored with a warning.
+
+If `DIR` exists but wasn't set up by `xpython` (or setup didn't complete successfully), `xpython` exits with an error.
 
 ### `-- [args ...]`
 

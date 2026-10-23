@@ -22,7 +22,10 @@ from xvenv.platforms import build_platform_env, host_platform
 # regardless of the Python version being targeted.
 TESTBED_RESOURCES = Path(xpython.__file__).parent / "resources" / "android"
 
-VALID_ARCHES = ["aarch64", "x86_64"]
+VALID_ARCHES = {
+    "aarch64": "aarch64-linux-android",
+    "x86_64": "x86_64-linux-android",
+}
 DEFAULT_ARCH = {
     # Linux architectures
     "aarch64": "aarch64",
@@ -45,17 +48,17 @@ CHAQUOPY_BUILDS = {
     "3.12": "3.12.15-0",
 }
 
-# The Android ABI name for each architecture.
+# The Android ABI name for each multi-architecture.
 ANDROID_ABIS = {
-    "aarch64": "arm64-v8a",
-    "x86_64": "x86_64",
+    "aarch64-linux-android": "arm64-v8a",
+    "x86_64-linux-android": "x86_64",
 }
 
-# The canonical GNU host type for each architecture, as reported by the
+# The canonical GNU host type for each multi-architecture, as reported by the
 # sysconfigdata of official Android builds.
 HOST_GNU_TYPES = {
-    "aarch64": "aarch64-unknown-linux-android",
-    "x86_64": "x86_64-pc-linux-android",
+    "aarch64-linux-android": "aarch64-unknown-linux-android",
+    "x86_64-linux-android": "x86_64-pc-linux-android",
 }
 
 
@@ -74,7 +77,7 @@ def _chaquopy_url(series: str, classifier: str) -> str:
     )
 
 
-def download_url(version_info: tuple, arch: str) -> str:
+def download_url(version_info: tuple, multiarch: str) -> str:
     """Compute the download URL for the Android build.
 
     For Python 3.11 and 3.12, this is the URL of the binary components of the
@@ -82,29 +85,29 @@ def download_url(version_info: tuple, arch: str) -> str:
 
     :param version: The `sys.version_info` tuple for the version being
         requested.
-    :param arch: The architecture build built.
+    :param multiarch: The mulit-architecture being requested.
     :returns: The download URL.
     """
     series = versions.series(version_info)
     if version_info[:2] < (3, 11):
         raise ValueError(f"xbuild doesn't support Python {series} on Android")
     elif series in CHAQUOPY_BUILDS:
-        return _chaquopy_url(series, ANDROID_ABIS[arch])
+        return _chaquopy_url(series, ANDROID_ABIS[multiarch])
     elif series == "3.13":
         return (
             "https://repo.maven.apache.org/maven2/com/chaquo/python/python/"
-            f"3.13.15/python-3.13.15-{arch}-linux-android.tar.gz"
+            f"3.13.15/python-3.13.15-{multiarch}.tar.gz"
         )
     else:
         version = versions.version(version_info)
         release = versions.release(version_info)
         return (
             f"https://www.python.org/ftp/python/{release}/"
-            f"python-{version}-{arch}-linux-android.tar.gz"
+            f"python-{version}-{multiarch}.tar.gz"
         )
 
 
-def fetch_archive(version_info: tuple, arch: str, cache_path: Path) -> Path:
+def fetch_archive(version_info: tuple, multiarch: str, cache_path: Path) -> Path:
     """Download (if not already cached) and extract the Android Python build.
 
     For Python 3.11 and 3.12, the Chaquopy build is downloaded, and assembled
@@ -112,20 +115,18 @@ def fetch_archive(version_info: tuple, arch: str, cache_path: Path) -> Path:
 
     :param version_info: The `sys.version_info` tuple for the version being
         requested.
-    :param arch: The architecture being built.
+    :param multiarch: The multi-architecture being requested.
     :param cache_path: The cache directory to use.
     :returns: The path of the extracted archive.
     """
     series = versions.series(version_info)
     if series not in CHAQUOPY_BUILDS:
-        return download_archive(download_url(version_info, arch), cache_path)
+        return download_archive(download_url(version_info, multiarch), cache_path)
 
-    extracted_path = (
-        cache_path / f"chaquopy-{CHAQUOPY_BUILDS[series]}-{arch}-linux-android"
-    )
+    extracted_path = cache_path / f"chaquopy-{CHAQUOPY_BUILDS[series]}-{multiarch}"
     with FileLock(str(extracted_path) + ".lock"):
         if not extracted_path.is_dir():
-            abi_zip = download(download_url(version_info, arch), cache_path)
+            abi_zip = download(download_url(version_info, multiarch), cache_path)
             stdlib_zip = download(_chaquopy_url(series, "stdlib"), cache_path)
 
             print(f"Assembling {extracted_path.name}...", end="", flush=True)
@@ -138,7 +139,7 @@ def fetch_archive(version_info: tuple, arch: str, cache_path: Path) -> Path:
                     abi_zip=abi_zip,
                     stdlib_zip=stdlib_zip,
                     series=series,
-                    arch=arch,
+                    multiarch=multiarch,
                 )
                 staging_path.rename(extracted_path)
             print(" done.")
@@ -151,19 +152,19 @@ def assemble_chaquopy_archive(
     abi_zip: Path,
     stdlib_zip: Path,
     series: str,
-    arch: str,
+    multiarch: str,
 ) -> None:
     """Assemble the zip files of a Chaquopy build into the layout of an
     official Android release package.
 
     :param path: The directory to create, containing the assembled archive.
-    :param abi_zip: The zip file of binary components for `arch`.
+    :param abi_zip: The zip file of binary components for `multiarch`.
     :param stdlib_zip: The zip file of the standard library.
     :param series: The Python version series (e.g., 3.12).
-    :param arch: One of the values in `VALID_ARCHES`, e.g. `"aarch64"`.
+    :param multiarch: One of the multiarch values from `VALID_ARCHES`,
+        e.g. `"aarch64-linux-android"`.
     """
-    abi = ANDROID_ABIS[arch]
-    triplet = f"{arch}-linux-android"
+    abi = ANDROID_ABIS[multiarch]
     prefix_path = path / "prefix"
     stdlib_path = prefix_path / "lib" / f"python{series}"
 
@@ -185,13 +186,13 @@ def assemble_chaquopy_archive(
     build_time_vars = parse_sysconfigdata(
         stdlib_path / "_sysconfigdata__linux_.py"
     ).build_time_vars
-    with (stdlib_path / f"_sysconfigdata__android_{triplet}.py").open(
+    with (stdlib_path / f"_sysconfigdata__android_{multiarch}.py").open(
         "w", encoding="utf-8"
     ) as f:
         f.write("# Generated by xvenv from Chaquopy's _sysconfigdata__linux_.py\n")
         f.write("build_time_vars = ")
         pprint.pprint(
-            android_sysconfigdata(build_time_vars, arch), stream=f, compact=True
+            android_sysconfigdata(build_time_vars, multiarch), stream=f, compact=True
         )
 
     # Add the build tools of an official release package, using the API level
@@ -208,7 +209,7 @@ def assemble_chaquopy_archive(
     shutil.copy(TESTBED_RESOURCES / "android.py", path / "android.py")
 
 
-def android_sysconfigdata(build_time_vars: dict, arch: str) -> dict:
+def android_sysconfigdata(build_time_vars: dict, multiarch: str) -> dict:
     """Convert the sysconfig data of a Chaquopy build into the form provided by
     official Android builds.
 
@@ -218,21 +219,21 @@ def android_sysconfigdata(build_time_vars: dict, arch: str) -> dict:
     whichever architecture it was generated on.
 
     :param build_time_vars: The build time variables of the Chaquopy build.
-    :param arch: One of the values in `VALID_ARCHES`, e.g. `"aarch64"`.
-    :returns: The build time variables for `arch`.
+    :param multiarch: One of the multiarch values from `VALID_ARCHES`,
+        e.g. `"aarch64-linux-android"`.
+    :returns: The build time variables for `multiarch`.
     """
-    triplet = f"{arch}-linux-android"
     build_arch = build_time_vars["HOST_GNU_TYPE"].split("-")[0]
     build_triplet = f"{build_arch}-linux-android"
 
     android_vars = {
         key: (
-            value.replace(build_triplet, triplet) if isinstance(value, str) else value
+            value.replace(build_triplet, multiarch) if isinstance(value, str) else value
         )
         for key, value in build_time_vars.items()
     }
-    android_vars["MULTIARCH"] = triplet
-    android_vars["HOST_GNU_TYPE"] = HOST_GNU_TYPES[arch]
+    android_vars["MULTIARCH"] = multiarch
+    android_vars["HOST_GNU_TYPE"] = HOST_GNU_TYPES[multiarch]
     return android_vars
 
 
@@ -242,14 +243,15 @@ def archive_path(path: Path) -> Path:
     return path.parents[3]
 
 
-def config_path(extracted_dir: Path, version_info, arch: str) -> Path:
+def config_path(extracted_dir: Path, version_info, multiarch: str) -> Path:
     """Locate the sysconfig/build-details file inside an extracted Android
     archive.
 
     :param extracted_dir: The root of the extracted archive.
     :param version_info: A `sys.version_info`-shaped value for the Python
         version the archive contains.
-    :param arch: One of the values in `VALID_ARCHES`, e.g. `"aarch64"`.
+    :param multiarch: One of the multiarch values from `VALID_ARCHES`,
+        e.g. `"aarch64-linux-android"`.
     :returns: The path to `build-details.json` (Python 3.14+) or the
         legacy `_sysconfigdata__android_*.py` module (Python <3.14).
     """
@@ -261,7 +263,7 @@ def config_path(extracted_dir: Path, version_info, arch: str) -> Path:
     )
     if version_info[:2] >= (3, 14):
         return py_dir / "build-details.json"
-    return py_dir / f"_sysconfigdata__android_{arch}-linux-android.py"
+    return py_dir / f"_sysconfigdata__android_{multiarch}.py"
 
 
 def build_details_from_sysconfigdata(sysconfigdata):

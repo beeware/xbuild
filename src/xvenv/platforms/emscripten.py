@@ -4,7 +4,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-VALID_ARCHES = ["wasm32"]
+VALID_ARCHES = {"wasm32": "wasm32"}
 DEFAULT_ARCH = {
     # Linux architectures
     "aarch64": "wasm32",
@@ -45,13 +45,13 @@ def extend_context(context, build_details):
 """
 
 
-def download_url(version_info: tuple, arch: str) -> str:
+def download_url(version_info: tuple, multiarch: str) -> str:
     """Compute the python.org download URL for the iOS XCframework build.
 
     :param version: The `sys.version_info` tuple for the version being
         requested.
-    :param arch: The architecture build built. Ignored; this should always be
-        wasm32.
+    :param multiarch: The architecture being requested. Ignored; this should
+        always be wasm32.
     :returns: The download URL.
     """
     raise NotImplementedError(
@@ -59,12 +59,12 @@ def download_url(version_info: tuple, arch: str) -> str:
     )
 
 
-def fetch_archive(version_info: tuple, arch: str, cache_path: Path) -> Path:
+def fetch_archive(version_info: tuple, multiarch: str, cache_path: Path) -> Path:
     """Download (if not already cached) and extract the Emscripten Python build.
 
     :param version_info: The `sys.version_info` tuple for the version being
         requested.
-    :param arch: The architecture being built.
+    :param multiarch: The multi-architecture being requested.
     :param cache_path: The cache directory to use.
     :returns: The path of the extracted archive.
     """
@@ -81,7 +81,7 @@ def archive_path(path: Path) -> Path:
     )
 
 
-def config_path(extracted_path: Path, version_info, arch: str):
+def config_path(extracted_path: Path, version_info, multiarch: str):
     raise NotImplementedError(
         "xvenv does not yet know how to configure a Python build for emscripten."
     )

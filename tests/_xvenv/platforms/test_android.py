@@ -166,7 +166,7 @@ def test_download_url(version_details, arch, url):
     """The download URL can be constructed from the version and architecture."""
     version_info = VersionInfo(**version_details)
 
-    actual_url = download_url(version_info, arch)
+    actual_url = download_url(version_info, f"{arch}-linux-android")
 
     assert actual_url == url
 
@@ -262,7 +262,7 @@ def test_config_path(tmp_path, version_details, arch, path):
     """The location of the Android configuration path can be determined."""
     version_info = VersionInfo(**version_details)
 
-    actual_config_path = config_path(tmp_path, version_info, arch)
+    actual_config_path = config_path(tmp_path, version_info, f"{arch}-linux-android")
 
     assert actual_config_path == tmp_path / path
 
@@ -344,7 +344,7 @@ def test_fetch_archive_chaquopy(tmp_path, mock_urlretrieve, chaquopy_downloads):
     cache_path = tmp_path / "cache"
     cache_path.mkdir()
 
-    archive_path = fetch_archive(VERSION_3_12, "aarch64", cache_path)
+    archive_path = fetch_archive(VERSION_3_12, "aarch64-linux-android", cache_path)
 
     assert archive_path == cache_path / "chaquopy-3.12.15-0-aarch64-linux-android"
     assert sorted(call.args[0] for call in mock_urlretrieve.call_args_list) == sorted(
@@ -365,7 +365,7 @@ def test_fetch_archive_chaquopy(tmp_path, mock_urlretrieve, chaquopy_downloads):
 
     # The sysconfigdata module of an official build has been generated, for the
     # requested architecture.
-    config_file = config_path(archive_path, VERSION_3_12, "aarch64")
+    config_file = config_path(archive_path, VERSION_3_12, "aarch64-linux-android")
     assert config_file.is_file()
     build_time_vars = parse_sysconfigdata(config_file).build_time_vars
     assert build_time_vars["MULTIARCH"] == "aarch64-linux-android"
@@ -392,10 +392,10 @@ def test_fetch_archive_chaquopy_cached(tmp_path, mock_urlretrieve):
     """An already-assembled Chaquopy build is reused."""
     cache_path = tmp_path / "cache"
     cache_path.mkdir()
-    fetch_archive(VERSION_3_12, "aarch64", cache_path)
+    fetch_archive(VERSION_3_12, "aarch64-linux-android", cache_path)
     mock_urlretrieve.reset_mock()
 
-    archive_path = fetch_archive(VERSION_3_12, "aarch64", cache_path)
+    archive_path = fetch_archive(VERSION_3_12, "aarch64-linux-android", cache_path)
 
     assert archive_path == cache_path / "chaquopy-3.12.15-0-aarch64-linux-android"
     mock_urlretrieve.assert_not_called()
@@ -415,7 +415,7 @@ def test_fetch_archive_chaquopy_failure(tmp_path, monkeypatch, mock_urlretrieve)
     cache_path.mkdir()
 
     with pytest.raises(ValueError, match=r"Unable to set the API level"):
-        fetch_archive(VERSION_3_12, "aarch64", cache_path)
+        fetch_archive(VERSION_3_12, "aarch64-linux-android", cache_path)
 
     assert [path for path in cache_path.iterdir() if path.is_dir()] == []
 
@@ -442,7 +442,9 @@ def test_fetch_archive_chaquopy_failure(tmp_path, monkeypatch, mock_urlretrieve)
 def test_android_sysconfigdata(arch, cc, ldflags, host_gnu_type):
     """Chaquopy's sysconfig data is converted to describe the requested
     architecture, without altering references to the build machine."""
-    android_vars = android_sysconfigdata(CHAQUOPY_BUILD_TIME_VARS, arch)
+    android_vars = android_sysconfigdata(
+        CHAQUOPY_BUILD_TIME_VARS, f"{arch}-linux-android"
+    )
 
     assert android_vars == {
         **CHAQUOPY_BUILD_TIME_VARS,

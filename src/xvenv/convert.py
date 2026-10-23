@@ -13,8 +13,8 @@ from types import ModuleType
 from xvenv.fetch import (
     fetch_python,
     parse_sysconfigdata,
-    resolve_arch,
     resolve_cache_path,
+    resolve_multiarch,
     use_archive_path,
 )
 from xvenv.platforms import host_platform
@@ -22,9 +22,10 @@ from xvenv.platforms import host_platform
 # Keys written to a cross venv's pyvenv.cfg, recording the configuration
 # file that was used to create it. This allows the configuration of an
 # existing cross venv to be reconstructed (see `CrossVenvConfig.from_venv()`).
-PYVENV_BUILD_DETAILS_KEY = "xvenv-build-details"
-PYVENV_SYSCONFIG_KEY = "xvenv-sysconfig"
-_PYVENV_KEYS = {PYVENV_BUILD_DETAILS_KEY, PYVENV_SYSCONFIG_KEY}
+PYVENV_XVENV_KEY = "xvenv"
+PYVENV_BUILD_DETAILS_KEY = "build-details"
+PYVENV_SYSCONFIGDATA_KEY = "sysconfigdata"
+_PYVENV_KEYS = {PYVENV_BUILD_DETAILS_KEY, PYVENV_SYSCONFIGDATA_KEY}
 
 
 def in_cross_env() -> bool:
@@ -32,52 +33,66 @@ def in_cross_env() -> bool:
     return bool(getattr(sys, "cross_compiling", False))
 
 
-def _read_pyvenv_cfg(venv_path: Path) -> dict[str, str]:
+def run_testbed(
+    platform: str,
+    work_path: Path,
+    args: list[str],
+    verbose: int,
+    **kwargs,
+) -> int:
+    """Run an already-configured testbed project for a platform.
+
+    This only requires the platform name, not a full `CrossVenvConfig`, so it
+    can be used to re-run an existing testbed without re-resolving the Python
+    build configuration.
+
+    :param platform: The target platform name (e.g., "ios", "android").
+    :param work_path: The working directory containing the testbed.
+    :param args: Arguments to pass to the testbed process.
+    :param verbose: Verbosity level.
+    :param kwargs: Any additional platform-specific arguments.
+    :returns: The exit code of the testbed subprocess.
+    """
+    platform_module = import_module(f"xvenv.platforms.{platform}")
+    return platform_module.run_testbed(
+        work_path=work_path,
+        args=args,
+        verbose=verbose,
+        **kwargs,
+    )
+
+
+def read_pyvenv_cfg(venv_path: Path, section: str | None) -> dict[str, str]:
     """Parse a venv's pyvenv.cfg into a dict. Returns `{}` if missing."""
     if sys.version_info < (3, 13):
         # allow_unnamed_section wasn't added until 3.13.
         parser = configparser.ConfigParser(interpolation=None)
+        content = (venv_path / "pyvenv.cfg").read_text(encoding="utf-8")
+        parser.read_string("[UNNAMED]\n" + content)
         try:
-            content = (venv_path / "pyvenv.cfg").read_text(encoding="utf-8")
-            parser.read_string("[UNNAMED]\n" + content)
-            return parser["UNNAMED"]
-        except FileNotFoundError:
+            return parser["UNNAMED" if section is None else section]
+        except KeyError:
             return {}
     else:
         parser = configparser.ConfigParser(
             allow_unnamed_section=True,
             interpolation=None,
         )
-        parser.read(venv_path / "pyvenv.cfg", encoding="utf-8")
-        try:
-            return parser[configparser.UNNAMED_SECTION]
-        except KeyError:
-            return {}
-
-
-def _record_source(
-    venv_path: Path,
-    build_details_path: Path | None,
-    sysconfigdata_path: Path | None,
-) -> None:
-    """Record the configuration file used to create a cross venv in its
-    pyvenv.cfg, replacing any previously recorded value."""
-    cfg_path = venv_path / "pyvenv.cfg"
-    lines = [
-        line
-        for line in cfg_path.read_text(encoding="utf-8").splitlines()
-        if line.partition("=")[0].strip() not in _PYVENV_KEYS
-    ]
-    if build_details_path:
-        lines.append(f"{PYVENV_BUILD_DETAILS_KEY} = {build_details_path}")
-    else:
-        lines.append(f"{PYVENV_SYSCONFIG_KEY} = {sysconfigdata_path}")
-    cfg_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        files = parser.read(venv_path / "pyvenv.cfg", encoding="utf-8")
+        if files:
+            try:
+                return parser[
+                    configparser.UNNAMED_SECTION if section is None else section
+                ]
+            except KeyError:
+                return {}
+        else:
+            raise FileNotFoundError(venv_path / "pyvenv.cfg")
 
 
 class CrossVenvConfig:
     platform: str
-    arch: str
+    multiarch: str
     archive_path: Path
     platform_module: ModuleType
     build_details_path: Path | None
@@ -107,9 +122,8 @@ class CrossVenvConfig:
 
         :param platform: One of `"ios"`, `"android"`, `"emscripten"`, or `None`
             to use `build_details_path`/`sysconfigdata_path` directly.
-        :param arch: The target architecture, or `None` to use a host-arch-based
-            default (see `xvenv.fetch.resolve_arch()`). Ignored if `platform` is
-            `None`.
+        :param arch: A user-specified target architecture, or `None` to use a
+            host-arch-based default. Ignored if `platform` is `None`.
         :param archive_path: The path to an already-extracted Python build to
             use instead of downloading one, or `None` to download (and cache) as
             usual. Ignored if `platform` is not specified.
@@ -126,15 +140,17 @@ class CrossVenvConfig:
             download yet (e.g. emscripten).
         """
         if platform is not None:
-            arch = resolve_arch(platform, arch)
+            multiarch = resolve_multiarch(platform, arch)
 
             if archive_path is not None:
                 config_path, is_build_details = use_archive_path(
-                    platform, arch, Path(archive_path).resolve()
+                    platform, multiarch, Path(archive_path).resolve()
                 )
             else:
                 cache_path = resolve_cache_path(cache_path)
-                config_path, is_build_details = fetch_python(platform, arch, cache_path)
+                config_path, is_build_details = fetch_python(
+                    platform, multiarch, cache_path
+                )
 
             # The cache path may be relative (e.g. `--cache ./cache`); always
             # use (and record) an absolute path.
@@ -155,12 +171,12 @@ class CrossVenvConfig:
             with open(self.build_details_path, encoding="utf-8") as fp:
                 build_details = json.load(fp)
             self.platform = build_details["platform"].split("-")[0]
-            self.arch = build_details["implementation"]["_multiarch"]
+            self.multiarch = build_details["implementation"]["_multiarch"]
             source_path = self.build_details_path
         elif self.sysconfigdata_path:
             if not self.sysconfigdata_path.is_file():
                 raise ValueError(f"Could not find {self.sysconfigdata_path}")
-            _, _, _, self.platform, self.arch = self.sysconfigdata_path.stem.split(
+            _, _, _, self.platform, self.multiarch = self.sysconfigdata_path.stem.split(
                 "_", 4
             )
             source_path = self.sysconfigdata_path
@@ -185,12 +201,11 @@ class CrossVenvConfig:
         :param venv_path: The root of a venv previously converted by `convert()`.
         :returns: The resolved `CrossVenvConfig`.
         :raises ValueError: if the venv doesn't record the configuration that
-            was used to create it (e.g., it was created by xvenv 0.4.0 or
-            earlier), or the recorded configuration file no longer exists.
+            was used to create it.
         """
-        values = _read_pyvenv_cfg(venv_path)
-        build_details_path = values.get(PYVENV_BUILD_DETAILS_KEY)
-        sysconfigdata_path = values.get(PYVENV_SYSCONFIG_KEY)
+        xvenv_config = read_pyvenv_cfg(venv_path, PYVENV_XVENV_KEY)
+        build_details_path = xvenv_config.get(PYVENV_BUILD_DETAILS_KEY)
+        sysconfigdata_path = xvenv_config.get(PYVENV_SYSCONFIGDATA_KEY)
         if build_details_path is None and sysconfigdata_path is None:
             raise ValueError(
                 f"{venv_path} does not record the cross-platform configuration "
@@ -232,7 +247,27 @@ class CrossVenvConfig:
     @property
     def description(self) -> str:
         name = "iOS" if self.platform == "ios" else self.platform.capitalize()
-        return f"{name} {self.arch}"
+        return f"{name} {self.multiarch}"
+
+    def _write_pyvenv_cfg(self, venv_path: Path) -> None:
+        """Record the configuration file used to create a cross venv in its
+        pyvenv.cfg, replacing any previously recorded value."""
+        cfg_path = venv_path / "pyvenv.cfg"
+        lines = [
+            line
+            for line in cfg_path.read_text(encoding="utf-8").splitlines()
+            if line.partition("=")[0].strip() not in _PYVENV_KEYS
+        ] + [
+            "[xvenv]",
+            f"platform = {self.platform}",
+            f"multiarch = {self.multiarch}",
+        ]
+        if self.build_details_path:
+            lines.append(f"{PYVENV_BUILD_DETAILS_KEY} = {self.build_details_path}")
+        else:
+            lines.append(f"{PYVENV_SYSCONFIGDATA_KEY} = {self.sysconfigdata_path}")
+
+        cfg_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def convert(self, venv_path: Path) -> None:
         """Convert a virtual environment into a cross-platform environment.
@@ -246,6 +281,11 @@ class CrossVenvConfig:
 
         # Inside a cross env, sys.platform is the target; the venv layout
         # is determined by the host.
+        if not (venv_path / "pyvenv.cfg").exists():
+            raise ValueError(
+                f"{venv_path} does not appear to be a virtual environment."
+            )
+
         if host_platform() == "win32":
             bin_path = "Scripts/python.exe"
             lib_glob = "Lib/site-packages"
@@ -253,9 +293,7 @@ class CrossVenvConfig:
             bin_path = "bin/python3"
             lib_glob = "lib/*/site-packages"
         if not (venv_path / bin_path).exists():
-            raise ValueError(
-                f"{venv_path} does not appear to be a virtual environment."
-            )
+            raise ValueError(f"{venv_path} does not appear to be a Python environment.")
 
         # Update path references in the sysconfigdata to reflect local conditions.
         platlibs = list(venv_path.glob(lib_glob))
@@ -273,18 +311,13 @@ class CrossVenvConfig:
             version = build_details["language"]["version"]
             abiflags = "".join(build_details["abi"]["flags"])
 
+            identifier = f"{abiflags}_{self.platform}_{self.multiarch}"
             localize_sysconfigdata(
-                (
-                    self.build_details_path.parent
-                    / f"_sysconfigdata_{abiflags}_{self.platform}_{self.arch}.py"
-                ),
+                self.build_details_path.parent / f"_sysconfigdata_{identifier}.py",
                 venv_site_packages_path,
             )
             localize_sysconfig_vars(
-                (
-                    self.build_details_path.parent
-                    / f"_sysconfig_vars_{abiflags}_{self.platform}_{self.arch}.json"
-                ),
+                self.build_details_path.parent / f"_sysconfig_vars_{identifier}.json",
                 venv_site_packages_path,
             )
         else:
@@ -298,12 +331,12 @@ class CrossVenvConfig:
             )
             version = sysconfigdata["VERSION"]
 
-            # We'll need to reconstruct build_details-like data once we have
-            # a platform module, as the keys in sysconfig data vary by platform.
-            build_details = None
+            build_details = self.platform_module.build_details_from_sysconfigdata(
+                sysconfigdata
+            )
 
         # Check the venv version matches the configuration file that has been provided
-        venv_config = _read_pyvenv_cfg(venv_path)
+        venv_config = read_pyvenv_cfg(venv_path, None)
         venv_version = venv_config.get("version", venv_config.get("version_info"))
         if venv_version is None:
             raise ValueError("Could not determine Python version from target venv.")
@@ -314,23 +347,19 @@ class CrossVenvConfig:
             )
 
         # Generate the context for the templated cross-target file
-        arch, sdk = self.arch.split("-", 1)
+        arch, sdk = self.multiarch.split("-", 1)
         context = {
             "platform": self.platform,
             "os": self.platform,  # some platforms use different capitalization here
-            "multiarch": self.arch,
+            "multiarch": self.multiarch,
             "abiflags": abiflags,
             "arch": arch,
             "sdk": sdk,
         }
 
-        if build_details is None:
-            build_details = self.platform_module.build_details_from_sysconfigdata(
-                sysconfigdata
-            )
         self.platform_module.extend_context(context, build_details)
 
-        cross_multiarch = f"_cross_{self.platform}_{self.arch.replace('-', '_')}"
+        cross_multiarch = f"_cross_{self.platform}_{self.multiarch.replace('-', '_')}"
 
         # Render the template for the cross-target file.
         template = (Path(__file__).parent / "_cross_target.py.tmpl").read_text(
@@ -348,7 +377,7 @@ class CrossVenvConfig:
 
         # Record the configuration source, so that the configuration of this
         # environment can be reconstructed later (see `from_venv()`).
-        _record_source(venv_path, self.build_details_path, self.sysconfigdata_path)
+        self._write_pyvenv_cfg(venv_path)
 
     def create(self, venv_path: Path, with_pip: bool = True):
         """Create (if `venv_path` doesn't already exist) and convert a virtual
@@ -361,7 +390,11 @@ class CrossVenvConfig:
             relevant if `venv_path` doesn't already exist.
         """
         if not venv_path.exists():
-            venv.create(venv_path, with_pip=with_pip)
+            # Match the `python -m venv` default of symlinking the interpreter
+            # (except on Windows). A copied interpreter can't find its
+            # libpython if it's linked relative to the executable, as
+            # python-build-standalone builds (e.g., those managed by uv) are.
+            venv.create(venv_path, with_pip=with_pip, symlinks=(os.name != "nt"))
 
         self.convert(venv_path)
 
@@ -428,7 +461,8 @@ class CrossVenvConfig:
         :param kwargs: Any additional platform-specific arguments.
         :returns: The exit code of the testbed subprocess.
         """
-        return self.platform_module.run_testbed(
+        return run_testbed(
+            self.platform,
             work_path=work_path,
             args=args,
             verbose=verbose,
