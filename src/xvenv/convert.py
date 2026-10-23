@@ -328,9 +328,9 @@ class CrossVenvConfig:
             )
             version = sysconfigdata["VERSION"]
 
-            # We'll need to reconstruct build_details-like data once we have
-            # a platform module, as the keys in sysconfig data vary by platform.
-            build_details = None
+            build_details = self.platform_module.build_details_from_sysconfigdata(
+                sysconfigdata
+            )
 
         # Check the venv version matches the configuration file that has been provided
         venv_config = read_pyvenv_cfg(venv_path, None)
@@ -354,10 +354,6 @@ class CrossVenvConfig:
             "sdk": sdk,
         }
 
-        if build_details is None:
-            build_details = self.platform_module.build_details_from_sysconfigdata(
-                sysconfigdata
-            )
         self.platform_module.extend_context(context, build_details)
 
         cross_multiarch = f"_cross_{self.platform}_{self.multiarch.replace('-', '_')}"
