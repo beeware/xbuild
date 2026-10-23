@@ -131,32 +131,30 @@ def _parse_args(
     split and platform-specific forwarded-argument handling.
 
     Everything before the first literal `"--"` in `cli_args` is parsed as
-    `xpython`'s own flags. Everything after it is treated as a raw,
-    unparsed list of forwarded arguments: for an iOS target, the first
-    forwarded argument must be `-m` (stripped, then split into
-    `args.module`/`args.module_args`); for an Android target, the
-    forwarded arguments are stored verbatim as `args.forwarded_args`, with
-    no validation.
+    `xpython`'s own flags. Everything after it is treated as a raw, unparsed
+    list of forwarded arguments: for an iOS target, the first forwarded argument
+    must be `-m` (stripped, then split into `args.module`/`args.module_args`);
+    for an Android target, the forwarded arguments are stored verbatim as
+    `args.forwarded_args`, with no validation.
 
     If none of `--platform`/`--build-details`/`--sysconfig` is given, the
     current cross-platform environment is used (`args.use_current_env` is
     `True`); this is an error if not running in a cross-platform environment.
 
-    If `"--"` is absent from `cli_args` entirely, the forwarded-argument
-    list is treated as empty (not an error).
+    If `"--"` is absent from `cli_args` entirely, the forwarded-argument list is
+    treated as empty (not an error).
 
-    If `--work-dir` names an existing directory, it must contain a project
-    file written by a previous successful xpython invocation; the
-    recorded project is stored as `args.project`, and its platform is used
-    as the target platform. Otherwise, `args.project` is `None`.
+    If `--work-dir` names an existing directory, it must contain a `venv` folder
+    written by a previous successful xpython invocation; the recorded project is
+    stored as `args.project`, and its platform is used as the target platform.
+    Otherwise, `args.project` is `None`.
 
     :param parser: The full argument parser
     :param cli_args: CLI arguments
     :param prog: Program name to show in help text
     :returns: The parsed, validated, and platform-annotated namespace.
-    :raises SystemExit: via `parser.error(...)` (exit code 2) for any
-        invalid flag combination, including a non-`-m` first forwarded
-        argument on iOS.
+    :raises SystemExit: via `parser.error(...)` (exit code 2) for any invalid
+        flag combination, including a non-`-m` first forwarded argument on iOS.
     """
     try:
         separator_index = cli_args.index("--")

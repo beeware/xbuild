@@ -6,7 +6,7 @@
 
 ```console
 (venv) $ xpython --platform ios --src tests -d pytest -- -m pytest tests
-(venv) $ xpython --platform android --group test -- -m pytest tests
+(venv) $ xpython --platform android --group test --work-dir build/android -- -m pytest tests
 ```
 
 `xpython` will:
@@ -69,13 +69,6 @@ Use this directory to store the cross-environment, installed dependencies, and t
 If `DIR` doesn't exist, `xpython` creates it and sets up the testbed project in it. Once setup has completed successfully, `xpython` records the configuration of the project in `DIR/xpython.toml`.
 
 If `DIR` already exists and was set up by a previous `xpython` invocation, the existing testbed project is reused. The cross-environment isn't recreated, the testbed isn't cloned again, no sources are copied, and no dependencies are installed. Only the run options (`--simulator`, `--managed`, `--connected` and `--verbose`, plus the arguments after `--`) are used. Environment setup options (`--platform`, `--arch`, `--build-details`, and `--sysconfig`) will be checked against the cross-platform environment in the work directory; if there are any discrepancies, an error will be raised. Arguments changing the code in the app (`--dependency`, `--group` and `--src`) can be omitted; if they are specified, they will be ignored with a warning.
-
-```console
-(venv) $ xpython --platform android --src tests --group test --work-dir build/android -- -m pytest tests
-(venv) $ xpython --work-dir build/android -- -m pytest tests -k test_widget
-```
-
-Sources are copied, and dependencies installed, only when `DIR` is first set up. To pick up changes to your sources or dependencies, delete `DIR` and run `xpython` again.
 
 If `DIR` exists but wasn't set up by `xpython` (or setup didn't complete successfully), `xpython` exits with an error.
 

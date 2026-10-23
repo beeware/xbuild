@@ -445,7 +445,6 @@ def test_main_fresh_work_dir(
         work_path.resolve() / "venv", with_pip=True
     )
     mock_config.setup_testbed.assert_called_once()
-    # assert (work_path / PROJECT_FILENAME).is_file()
 
 
 def test_main_reuse(
