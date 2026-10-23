@@ -5,8 +5,10 @@
 `xbuild` supports:
 
 - Python {{ min_python_version }} or higher for iOS;
-- Python 3.13 or higher for Android.
+- Python {{ min_python_version }} or higher for Android;
 - Python 3.14 or higher for Emscripten.
+
+There are no official Android builds of Python 3.11 or 3.12, so `xbuild` uses the builds published by [Chaquopy](https://chaquo.com/chaquopy/) for those versions.
 
 ## How does `xbuild` work?
 

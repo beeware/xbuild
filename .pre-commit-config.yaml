@@ -1,3 +1,5 @@
+# Files vendored from CPython are kept identical to their source.
+exclude: ^src/xpython/resources/
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

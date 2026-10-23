@@ -56,10 +56,6 @@ CASES = [
                 sys.platform == "win32",
                 reason="Android xbuild tests cannot be run on Windows",
             ),
-            pytest.mark.skipif(
-                sys.version_info < (3, 13),
-                reason="Android tests require Python 3.13+",
-            ),
             pytest.mark.android,
         ],
     ),

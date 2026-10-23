@@ -59,6 +59,20 @@ def download_url(version_info: tuple, multiarch: str) -> str:
     )
 
 
+def fetch_archive(version_info: tuple, multiarch: str, cache_path: Path) -> Path:
+    """Download (if not already cached) and extract the Emscripten Python build.
+
+    :param version_info: The `sys.version_info` tuple for the version being
+        requested.
+    :param multiarch: The multi-architecture being requested.
+    :param cache_path: The cache directory to use.
+    :returns: The path of the extracted archive.
+    """
+    raise NotImplementedError(
+        "xvenv does not yet know how to download a Python build for emscripten."
+    )
+
+
 def archive_path(path: Path) -> Path:
     """Determine the root of the Python archive based on the location of a
     build_details.json/sysconfigdata.py file."""

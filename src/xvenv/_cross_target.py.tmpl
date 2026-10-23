@@ -77,6 +77,10 @@ def patch_cross_env():
             "IOSVersionInfo",
             ["system", "release", "model", "is_simulator"]
         )
+        platform.AndroidVer = collections.namedtuple(
+            "AndroidVer",
+            ["release", "api_level", "manufacturer", "model", "device", "is_emulator"]
+        )
 
     # -------------------------------------------------------------------------
 {platform_extra}
