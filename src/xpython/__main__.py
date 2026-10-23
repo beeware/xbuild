@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import subprocess
 import sys
 import tempfile
@@ -11,8 +12,14 @@ from build.__main__ import _cprint, _error
 
 import xpython
 from xpython.deps import install_requirements, resolve_requirements
-from xvenv.args import make_common_parser, parse_common_args
-from xvenv.convert import CrossVenvConfig
+from xvenv.args import MISSING_CONFIG_ERROR, make_common_parser, parse_common_args
+from xvenv.convert import (
+    CrossVenvConfig,
+    in_cross_env,
+    read_pyvenv_cfg,
+    resolve_multiarch,
+    run_testbed,
+)
 
 
 def main_parser() -> argparse.ArgumentParser:
@@ -109,7 +116,8 @@ def main_parser() -> argparse.ArgumentParser:
             "Use this directory for the cross-venv, dependency install, "
             "and testbed staging, instead of a temporary directory. Unlike "
             "a temporary directory, this directory is NOT deleted when "
-            "xpython exits."
+            "xpython exits. If the directory was set up by a previous "
+            "xpython invocation, the existing testbed project is reused."
         ),
     )
     return parser
@@ -123,27 +131,30 @@ def _parse_args(
     split and platform-specific forwarded-argument handling.
 
     Everything before the first literal `"--"` in `cli_args` is parsed as
-    `xpython`'s own flags. Everything after it is treated as a raw,
-    unparsed list of forwarded arguments: for an iOS target, the first
-    forwarded argument must be `-m` (stripped, then split into
-    `args.module`/`args.module_args`); for an Android target, the
-    forwarded arguments are stored verbatim as `args.forwarded_args`, with
-    no validation.
+    `xpython`'s own flags. Everything after it is treated as a raw, unparsed
+    list of forwarded arguments: for an iOS target, the first forwarded argument
+    must be `-m` (stripped, then split into `args.module`/`args.module_args`);
+    for an Android target, the forwarded arguments are stored verbatim as
+    `args.forwarded_args`, with no validation.
 
     If none of `--platform`/`--build-details`/`--sysconfig` is given, the
     current cross-platform environment is used (`args.use_current_env` is
     `True`); this is an error if not running in a cross-platform environment.
 
-    If `"--"` is absent from `cli_args` entirely, the forwarded-argument
-    list is treated as empty (not an error).
+    If `"--"` is absent from `cli_args` entirely, the forwarded-argument list is
+    treated as empty (not an error).
+
+    If `--work-dir` names an existing directory, it must contain a `venv` folder
+    written by a previous successful xpython invocation; the recorded project is
+    stored as `args.project`, and its platform is used as the target platform.
+    Otherwise, `args.project` is `None`.
 
     :param parser: The full argument parser
     :param cli_args: CLI arguments
     :param prog: Program name to show in help text
     :returns: The parsed, validated, and platform-annotated namespace.
-    :raises SystemExit: via `parser.error(...)` (exit code 2) for any
-        invalid flag combination, including a non-`-m` first forwarded
-        argument on iOS.
+    :raises SystemExit: via `parser.error(...)` (exit code 2) for any invalid
+        flag combination, including a non-`-m` first forwarded argument on iOS.
     """
     try:
         separator_index = cli_args.index("--")
@@ -153,9 +164,67 @@ def _parse_args(
         xpython_args = cli_args
         forwarded_args = []
 
-    args = parse_common_args(parser, xpython_args)
+    args = parse_common_args(parser, xpython_args, require_config=False)
 
-    if args.use_current_env:
+    if args.work_path is not None:
+        args.work_path = args.work_path.resolve()
+        if args.work_path.exists():
+            try:
+                args.project = read_pyvenv_cfg(args.work_path / "venv", "xvenv")
+                if args.project == {}:
+                    raise ValueError()
+            except (configparser.ParsingError, FileNotFoundError, ValueError):
+                _error(
+                    f"Working directory `{args.work_path}` exists, but does not "
+                    "appear to be a valid xpython work directory with a xvenv. "
+                    "Delete it, or choose a different --work-dir."
+                )
+        else:
+            args.project = None
+    else:
+        args.project = None
+
+    if args.project is not None:
+        # Reusing an existing project; the recorded platform is the target.
+        target_platform = args.project["platform"]
+
+        # Check that there hasn't been any drift in arguments
+        if args.platform:
+            if args.platform != target_platform:
+                _error(
+                    "The provided platform doesn't match the existing "
+                    f"work directory configuration ({target_platform})"
+                )
+            if args.arch:
+                multiarch = resolve_multiarch(args.platform, args.arch)
+                if multiarch != args.project["multiarch"]:
+                    _error(
+                        "The provided architecture doesn't match the "
+                        "existing work directory configuration "
+                        f"({args.project['multiarch']})"
+                    )
+                    _error("arch mismatch")
+        elif args.build_details_path:
+            if (
+                "build-details" not in args.project
+                or args.build_details_path != args.project["build-details"]
+            ):
+                _error(
+                    "The provided build details path doesn't match the existing "
+                    f"work directory ({args.project['build-details']})"
+                )
+        elif args.sysconfigdata_path:
+            if (
+                "sysconfigdata" not in args.project
+                or args.sysconfigdata_path != args.project["sysconfigdata"]
+            ):
+                _error(
+                    "The provided sysconfigdata path doesn't match the existing "
+                    f"work directory ({args.project['sysconfigdata']})"
+                )
+    elif args.use_current_env:
+        if not in_cross_env():
+            parser.error(MISSING_CONFIG_ERROR)
         # In a cross-platform environment, sys.platform is the target platform.
         target_platform = sys.platform
     else:
@@ -178,15 +247,14 @@ def main(cli_args: Sequence[str]) -> None:
 
     :param cli_args: CLI arguments
     """
-    parser = main_parser()
-    args = _parse_args(parser, cli_args)
-
     try:
-        if args.work_path is not None:
-            if args.work_path.exists():
-                _error(f"Working directory `{args.work_path}` already exists.")
+        parser = main_parser()
+        args = _parse_args(parser, cli_args)
 
-            args.work_path.mkdir(parents=True, exist_ok=True)
+        if args.project is not None:
+            exit_code = _reuse(args)
+        elif args.work_path is not None:
+            args.work_path.mkdir(parents=True)
             exit_code = _run(args)
         else:
             with tempfile.TemporaryDirectory() as tmp:
@@ -244,6 +312,39 @@ def _run(args: argparse.Namespace) -> int:
 
     _cprint("{bold}Running testbed...{reset}")
     return cross_venv.run_testbed(
+        work_path=args.work_path,
+        args=args.forwarded_args,
+        simulator=args.simulator,
+        managed=args.managed,
+        connected=args.connected,
+        verbose=args.verbosity,
+    )
+
+
+def _reuse(args: argparse.Namespace) -> int:
+    """Run the testbed of an existing, already-configured work directory.
+
+    No setup is performed. Any setup options that were provided and differ
+    from the options used to configure the work directory are ignored, with
+    a warning.
+
+    :param args: The parsed CLI namespace, with `project` set to the
+        configuration recorded in `work_path`.
+    :returns: The exit code to propagate from `main()`.
+    """
+    project = args.project
+    _cprint("{bold}Reusing testbed project in {}...{reset}", str(args.work_path))
+
+    for path in args.src:
+        _cprint(f" - Ignoring src path {path}")
+    for dep in args.dependencies:
+        _cprint(f" - Ignoring dependency {dep!r}")
+    for group in args.groups:
+        _cprint(f" - Ignoring dependency group {group!r}")
+
+    _cprint("{bold}Running testbed...{reset}")
+    return run_testbed(
+        project["platform"],
         work_path=args.work_path,
         args=args.forwarded_args,
         simulator=args.simulator,

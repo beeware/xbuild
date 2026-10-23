@@ -101,7 +101,7 @@ def test_download_url(version_details, arch, url):
     """The download URL can be constructed from the version and architecture."""
     version_info = VersionInfo(**version_details)
 
-    actual_url = download_url(version_info, arch)
+    actual_url = download_url(version_info, f"{arch}-linux-android")
 
     assert actual_url == url
 
@@ -175,7 +175,7 @@ def test_config_path(tmp_path, version_details, arch, path):
     """The location of the Android configuration path can be determined."""
     version_info = VersionInfo(**version_details)
 
-    actual_config_path = config_path(tmp_path, version_info, arch)
+    actual_config_path = config_path(tmp_path, version_info, f"{arch}-linux-android")
 
     assert actual_config_path == tmp_path / path
 
