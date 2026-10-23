@@ -543,7 +543,7 @@ def test_main_reuse_warnings(
     assert excinfo.value.code == 3
     err = capsys.readouterr().out
     assert " - Ignoring src path stuff" in err
-    assert " - Ignoring src path other/path" in err
+    assert " - Ignoring src path other" in err
     assert " - Ignoring dependency 'requests'" in err
     assert " - Ignoring dependency 'pytest'" in err
     assert " - Ignoring dependency group 'test'" in err

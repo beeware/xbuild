@@ -69,7 +69,10 @@ def read_pyvenv_cfg(venv_path: Path, section: str | None) -> dict[str, str]:
         parser = configparser.ConfigParser(interpolation=None)
         content = (venv_path / "pyvenv.cfg").read_text(encoding="utf-8")
         parser.read_string("[UNNAMED]\n" + content)
-        return parser["UNNAMED" if section is None else section]
+        try:
+            return parser["UNNAMED" if section is None else section]
+        except KeyError:
+            return {}
     else:
         parser = configparser.ConfigParser(
             allow_unnamed_section=True,
