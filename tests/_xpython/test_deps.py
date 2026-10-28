@@ -87,12 +87,12 @@ def test_install_requirements_runs_pip(tmp_path, monkeypatch):
 
     mock_run.assert_called_once()
     assert mock_run.call_args.args[0] == [
-        str(venv_python),
+        venv_python,
         "-m",
         "pip",
         "install",
         "--target",
-        str(packages_dir),
+        packages_dir,
         "--find-links",
         "/tmp/wheels",
         "requests",

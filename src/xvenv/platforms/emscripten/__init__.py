@@ -9,7 +9,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import textwrap
 from pathlib import Path
 
 from filelock import FileLock
@@ -21,19 +20,6 @@ from xvenv.platforms import (
     build_platform_env,
 )
 from xvenv.platforms.emscripten import pywasmcross
-
-# `pip_wrapper.py` is only ever executed inside a cross venv; importing it here
-# would import pip and register its atexit hook in *this* process. Refer to it
-# by path, and keep its filenames in sync with the constants it defines (a
-# test checks that they match).
-PIP_WRAPPER_SOURCE = Path(__file__).parent / "pip_wrapper.py"
-PIP_WRAPPER_NAME = "_pip-wrapper.py"
-PIP_PATCHED_NAME = "pip_patched"
-
-# The pip console scripts that a venv installs: `pip`, `pip3`, `pip3.14`.
-# Anything else starting with "pip" (pip-compile, pipx, pip-audit, ...) is
-# not ours to touch.
-PIP_SCRIPT_RE = re.compile(r"pip(3(\.\d+)?)?")
 
 VALID_ARCHES = {"wasm32": "wasm32"}
 
@@ -277,6 +263,40 @@ def extend_context(context, build_details):
     context["os_release"] = emscripten_version
     context["os_version"] = "#1"
 
+    context["pre_patch_extra"] = """
+    ###########################################################################
+    # Patch invocations of `pip`
+    ###########################################################################
+    if (
+        sys.orig_argv[1:3] == ["-m", "pip"]
+        or sys.orig_argv[1:3] == ["-m", "pip3"]
+        or sys.orig_argv[1] == f"{sys.prefix}/bin/pip"
+    ):
+        # Ensure that the vendored urllib3 is imported before sys.platform
+        # is patched.
+        try:
+            import pip._vendor.urllib3
+        except ImportError:
+            # pip no longer vendors urllib3 (or vendors it under another name);
+            # whatever it uses instead is its own concern.
+            pass
+
+        # Patch the platform tags lookup so that pyodide/pyemscripten tags
+        # are honored. We know we're in an emscripten environment, so we
+        # don't need to handle any other platform tags.
+        from pip._vendor.packaging import tags  # noqa: E402
+
+        @monkeypatch(tags)
+        def platform_tags() -> Iterator[str]:
+            abi_version = sysconfig.get_config_var(
+                "PYEMSCRIPTEN_PLATFORM_VERSION"
+            ) or sysconfig.get_config_var("PYODIDE_ABI_VERSION")
+            if abi_version:
+                yield f"pyodide_{abi_version}_wasm32"
+                yield f"pyemscripten_{abi_version}_wasm32"
+            yield from tags._generic_platforms()
+
+"""
     context["sys_extra"] = ""
     # The stdlib's `_pyrepl.trace` (imported by `pdb`, and hence by pytest)
     # does `from posix import _emscripten_log` when sys.platform is
@@ -675,50 +695,6 @@ def prepare_env(config) -> dict[str, str]:
 ###########################################################################
 # Cross venv customization
 ###########################################################################
-def install_pip_wrapper(venv_path: Path) -> None:
-    """Replace the `pip*` scripts of a cross venv with the Emscripten-aware
-    pip wrapper.
-
-    pip's stock console script is left to run under the (patched) venv
-    interpreter, but it doesn't know about Pyodide's wheel platform tags, and
-    its vendored urllib3 would misbehave when `sys.platform` reports
-    Emscripten. `pip_wrapper.py` fixes both; this installs it as `pip`.
-
-    :param venv_path: The root of the cross venv.
-    """
-    venv_bin = venv_path / "bin"
-    python = venv_bin / "python3"
-    if not python.exists():
-        # No bin/python3 means this isn't a Unix-layout venv (or it's broken);
-        # there's nothing sensible to install into.
-        return
-
-    pips = [path for path in venv_bin.iterdir() if PIP_SCRIPT_RE.fullmatch(path.name)]
-    if not pips:
-        # The venv was created --without-pip; nothing to wrap.
-        return
-
-    wrapper_path = venv_bin / PIP_WRAPPER_NAME
-    patched_path = venv_bin / PIP_PATCHED_NAME
-
-    shutil.copy(PIP_WRAPPER_SOURCE, wrapper_path)
-
-    # Other than the monkey patches, this is exactly what normal pip looks
-    # like: run the pip entry point under the venv's interpreter.
-    patched_path.write_text(
-        textwrap.dedent(
-            f"""\
-            #!/usr/bin/env bash
-            exec {shlex.quote(str(python))} -s {shlex.quote(str(wrapper_path))} "$@"
-            """
-        ),
-        encoding="utf-8",
-    )
-    patched_path.chmod(0o755)
-
-    for pip in pips:
-        pip.unlink(missing_ok=True)
-        pip.symlink_to(patched_path)
 
 
 def install_xpython_symlink(venv_path: Path, config) -> None:
@@ -745,7 +721,6 @@ def post_convert(venv_path: Path, config) -> None:
     :param venv_path: The root of the cross venv.
     :param config: The resolved `xvenv.convert.CrossVenvConfig`.
     """
-    install_pip_wrapper(venv_path)
     install_xpython_symlink(venv_path, config)
 
 

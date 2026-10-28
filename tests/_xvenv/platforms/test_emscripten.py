@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -16,8 +15,6 @@ from xvenv.platforms.emscripten import (
     EMSDK_COMPLETE_MARKER,
     MESON_CROSS_FILE,
     MESON_CROSS_FILE_VAR,
-    PIP_PATCHED_NAME,
-    PIP_WRAPPER_NAME,
     SYMLINK_ENV_VARS,
     archive_path,
     build_details_from_sysconfigdata,
@@ -29,13 +26,11 @@ from xvenv.platforms.emscripten import (
     ensure_emscripten,
     extend_context,
     install_emsdk,
-    install_pip_wrapper,
     install_xpython_symlink,
     installed_emscripten_version,
     make_command_wrapper_symlinks,
     packages_path,
     patch_sysconfig,
-    post_convert,
     prefix_path,
     prepare_env,
     pyodide_root,
@@ -838,107 +833,6 @@ def _fake_venv(venv_path, pips=("pip", "pip3", "pip3.14")):
         (venv_path / "bin" / pip).write_text("#!/python\nstock pip\n")
 
 
-def test_install_pip_wrapper(tmp_path):
-    """All pip scripts are replaced by symlinks to a launcher that runs the
-    wrapper under the venv's interpreter."""
-    venv_path = tmp_path / "venv"
-    _fake_venv(venv_path)
-
-    install_pip_wrapper(venv_path)
-
-    venv_bin = venv_path / "bin"
-    wrapper = venv_bin / PIP_WRAPPER_NAME
-    patched = venv_bin / PIP_PATCHED_NAME
-    assert (
-        wrapper.read_text()
-        == (Path(pywasmcross.__file__).parent / "pip_wrapper.py").read_text()
-    )
-    assert os.access(patched, os.X_OK)
-    assert patched.read_text() == (
-        f'#!/usr/bin/env bash\nexec {venv_bin / "python3"} -s {wrapper} "$@"\n'
-    )
-    for pip in ("pip", "pip3", "pip3.14"):
-        link = venv_bin / pip
-        assert link.is_symlink()
-        assert os.readlink(link) == str(patched)
-
-
-def test_install_pip_wrapper_quotes_paths(tmp_path):
-    """A venv path with shell metacharacters is quoted in the launcher."""
-    venv_path = tmp_path / "my venv"
-    _fake_venv(venv_path)
-
-    install_pip_wrapper(venv_path)
-
-    launcher = (venv_path / "bin" / PIP_PATCHED_NAME).read_text()
-    assert f"exec '{venv_path / 'bin/python3'}' -s '{venv_path / 'bin'}/" in launcher
-
-
-def test_install_pip_wrapper_idempotent(tmp_path):
-    """Installing the wrapper twice (e.g., re-converting a venv) works."""
-    venv_path = tmp_path / "venv"
-    _fake_venv(venv_path)
-
-    install_pip_wrapper(venv_path)
-    install_pip_wrapper(venv_path)
-
-    venv_bin = venv_path / "bin"
-    assert os.readlink(venv_bin / "pip") == str(venv_bin / PIP_PATCHED_NAME)
-    assert not (venv_bin / PIP_PATCHED_NAME).is_symlink()
-    assert not (venv_bin / PIP_WRAPPER_NAME).is_symlink()
-
-
-def test_install_pip_wrapper_leaves_other_pip_tools(tmp_path):
-    """Scripts that merely start with "pip" (pip-tools, pipx, ...) aren't
-    touched."""
-    venv_path = tmp_path / "venv"
-    _fake_venv(venv_path, pips=("pip", "pip-compile", "pipx", "pip-audit"))
-
-    install_pip_wrapper(venv_path)
-
-    venv_bin = venv_path / "bin"
-    assert (venv_bin / "pip").is_symlink()
-    for name in ("pip-compile", "pipx", "pip-audit"):
-        assert not (venv_bin / name).is_symlink()
-        assert (venv_bin / name).read_text() == "#!/python\nstock pip\n"
-
-
-def test_install_pip_wrapper_without_pip(tmp_path):
-    """A venv created --without-pip is left alone."""
-    venv_path = tmp_path / "venv"
-    _fake_venv(venv_path, pips=())
-
-    install_pip_wrapper(venv_path)
-
-    assert sorted(p.name for p in (venv_path / "bin").iterdir()) == ["python3"]
-
-
-def test_install_pip_wrapper_not_a_unix_venv(tmp_path):
-    """Nothing is installed if there's no bin/python3."""
-    venv_path = tmp_path / "venv"
-    venv_path.mkdir()
-
-    install_pip_wrapper(venv_path)
-
-    assert list(venv_path.iterdir()) == []
-
-
-def test_pip_wrapper_constants_in_sync():
-    """The filenames the platform module uses match the ones the (standalone)
-    wrapper script defines."""
-    source = (Path(pywasmcross.__file__).parent / "pip_wrapper.py").read_text()
-    for name, value in [
-        ("PIP_WRAPPER_NAME", PIP_WRAPPER_NAME),
-        ("PIP_PATCHED_NAME", PIP_PATCHED_NAME),
-        ("PIP_SCRIPT_RE", emscripten_module.PIP_SCRIPT_RE.pattern),
-    ]:
-        match = re.search(
-            rf'^{name} = (?:re\.compile\()?r?"([^"]+)"', source, re.MULTILINE
-        )
-        assert match, name
-        assert match.group(1) == value, name
-
-
 def test_install_xpython_symlink(tmp_path):
     """Inside an xbuildenv, the Pyodide interpreter is linked as xpython; the
     link is replaced if it already exists."""
@@ -962,23 +856,6 @@ def test_install_xpython_symlink_standalone(tmp_path):
     install_xpython_symlink(venv_path, _emscripten_config(tmp_path / "standalone"))
 
     assert not os.path.lexists(venv_path / "bin/xpython")
-
-
-def test_post_convert(tmp_path, monkeypatch):
-    """post_convert installs the pip wrapper and the xpython symlink."""
-    calls = []
-    monkeypatch.setattr(
-        emscripten_module, "install_pip_wrapper", lambda venv: calls.append("pip")
-    )
-    monkeypatch.setattr(
-        emscripten_module,
-        "install_xpython_symlink",
-        lambda venv, config: calls.append("xpython"),
-    )
-
-    post_convert(tmp_path, Mock())
-
-    assert calls == ["pip", "xpython"]
 
 
 @pytest.mark.parametrize("layout", ["xbuildenv", "standalone"])
@@ -1006,8 +883,6 @@ def test_convert(tmp_path, layout):
         cache_path=None,
     ).convert(venv_path)
 
-    assert (venv_path / "bin" / "pip").is_symlink()
-    assert (venv_path / "bin" / PIP_WRAPPER_NAME).is_file()
     localized = (site_packages / sysconfigdata_path.name).read_text()
     assert "'EMSCRIPTEN_VERSION': '5.0.3'" in localized
     assert (venv_path / "bin/xpython").is_symlink() == (layout == "xbuildenv")
