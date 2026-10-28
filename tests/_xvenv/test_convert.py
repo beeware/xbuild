@@ -9,10 +9,9 @@ import pytest
 
 from xvenv.convert import (
     CrossVenvConfig,
-    _read_pyvenv_cfg,
-    _record_source,
     in_cross_env,
     localized_vars,
+    read_pyvenv_cfg,
 )
 
 
@@ -37,13 +36,13 @@ def mock_deps(monkeypatch, tmp_path):
         "cache_path": cache_path,
         "create": Mock(),
         "resolve_cache_path": Mock(return_value=cache_path),
-        "resolve_arch": Mock(return_value="aarch64"),
+        "resolve_multiarch": Mock(return_value="aarch64-linux-android"),
         "fetch_python": Mock(return_value=(config_path, True)),
         "use_archive_path": Mock(return_value=(config_path, True)),
     }
     monkeypatch.setattr("xvenv.convert.venv.create", mocks["create"])
     monkeypatch.setattr("xvenv.convert.resolve_cache_path", mocks["resolve_cache_path"])
-    monkeypatch.setattr("xvenv.convert.resolve_arch", mocks["resolve_arch"])
+    monkeypatch.setattr("xvenv.convert.resolve_multiarch", mocks["resolve_multiarch"])
     monkeypatch.setattr("xvenv.convert.fetch_python", mocks["fetch_python"])
     monkeypatch.setattr("xvenv.convert.use_archive_path", mocks["use_archive_path"])
     return mocks
@@ -73,7 +72,9 @@ def test_creates_venv_when_missing(tmp_path, mock_config, mock_deps, mock_conver
 
     mock_config.create(venv_path)
 
-    mock_deps["create"].assert_called_once_with(venv_path, with_pip=True)
+    mock_deps["create"].assert_called_once_with(
+        venv_path, with_pip=True, symlinks=(os.name != "nt")
+    )
     mock_convert.assert_called_once_with(venv_path)
 
 
@@ -95,7 +96,26 @@ def test_with_pip_passthrough(tmp_path, mock_config, mock_deps, mock_convert, wi
 
     mock_config.create(venv_path, with_pip=with_pip)
 
-    mock_deps["create"].assert_called_once_with(venv_path, with_pip=with_pip)
+    mock_deps["create"].assert_called_once_with(
+        venv_path, with_pip=with_pip, symlinks=(os.name != "nt")
+    )
+    mock_convert.assert_called_once_with(venv_path)
+
+
+@pytest.mark.parametrize("os_name, symlinks", [("posix", True), ("nt", False)])
+def test_symlinks(
+    tmp_path, monkeypatch, mock_config, mock_deps, mock_convert, os_name, symlinks
+):
+    """The interpreter is symlinked into the venv, except on Windows, matching
+    the default of `python -m venv`."""
+    venv_path = tmp_path / "x-venv"
+    monkeypatch.setattr("xvenv.convert.os.name", os_name)
+
+    mock_config.create(venv_path)
+
+    mock_deps["create"].assert_called_once_with(
+        venv_path, with_pip=True, symlinks=symlinks
+    )
     mock_convert.assert_called_once_with(venv_path)
 
 
@@ -234,12 +254,12 @@ def test_config_via_platform(tmp_path, mock_deps):
     )
 
     mock_deps["resolve_cache_path"].assert_called_once_with(None)
-    mock_deps["resolve_arch"].assert_called_once_with("android", None)
+    mock_deps["resolve_multiarch"].assert_called_once_with("android", None)
     mock_deps["fetch_python"].assert_called_once_with(
-        "android", "aarch64", mock_deps["cache_path"]
+        "android", "aarch64-linux-android", mock_deps["cache_path"]
     )
     assert config.platform == "android"
-    assert config.arch == "aarch64-linux-android"
+    assert config.multiarch == "aarch64-linux-android"
     assert config.build_details_path == mock_deps["config_path"]
     assert config.sysconfigdata_path is None
     assert config.archive_path == mock_deps["archive_path"]
@@ -263,7 +283,7 @@ def test_config_via_archive_path(tmp_path, mock_deps):
     mock_deps["resolve_cache_path"].assert_not_called()
     mock_deps["fetch_python"].assert_not_called()
     mock_deps["use_archive_path"].assert_called_once_with(
-        "android", "aarch64", supplied_archive.resolve()
+        "android", "aarch64-linux-android", supplied_archive.resolve()
     )
 
 
@@ -311,7 +331,7 @@ def test_config_via_build_details_path(tmp_path):
     )
 
     assert config.platform == "ios"
-    assert config.arch == "arm64-iphonesimulator"
+    assert config.multiarch == "arm64-iphonesimulator"
     assert config.build_details_path == build_details_path.resolve()
     assert config.sysconfigdata_path is None
     assert config.platform_module.__name__ == "xvenv.platforms.ios"
@@ -338,7 +358,7 @@ def test_config_via_sysconfigdata_path(tmp_path):
     )
 
     assert config.platform == "android"
-    assert config.arch == "aarch64-linux-android"
+    assert config.multiarch == "aarch64-linux-android"
     assert config.sysconfigdata_path == sysconfigdata_path.resolve()
     assert config.build_details_path is None
     assert config.platform_module.__name__ == "xvenv.platforms.android"
@@ -559,12 +579,14 @@ def test_convert_records_sysconfig_source(tmp_path):
 
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    lines = (venv_path / "pyvenv.cfg").read_text().splitlines()
-    assert f"xvenv-sysconfig = {sysconfigdata_path.resolve()}" in lines
-    assert not any(line.startswith("xvenv-build-details") for line in lines)
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
+    assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
+    assert "build_details" not in xvenv_config
+
     # Pre-existing content is preserved.
-    assert "home = /usr/bin" in lines
-    assert "version = 3.13.5" in lines
+    existing_config = read_pyvenv_cfg(venv_path, None)
+    assert existing_config["home"] == "/usr/bin"
+    assert existing_config["version"] == "3.13.5"
 
 
 def test_convert_records_build_details_source(tmp_path):
@@ -575,9 +597,14 @@ def test_convert_records_build_details_source(tmp_path):
 
     _build_details_config(build_details_path).convert(venv_path)
 
-    lines = (venv_path / "pyvenv.cfg").read_text().splitlines()
-    assert f"xvenv-build-details = {build_details_path.resolve()}" in lines
-    assert not any(line.startswith("xvenv-sysconfig") for line in lines)
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
+    assert "sysconfigdata" not in xvenv_config
+    assert xvenv_config["build-details"] == str(build_details_path.resolve())
+
+    # Pre-existing content is preserved.
+    existing_config = read_pyvenv_cfg(venv_path, None)
+    assert existing_config["home"] == "/usr/bin"
+    assert existing_config["version"] == "3.14.7"
 
 
 def test_convert_replaces_previous_source(tmp_path):
@@ -594,33 +621,56 @@ def test_convert_replaces_previous_source(tmp_path):
 
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    lines = cfg_path.read_text().splitlines()
-    assert [line for line in lines if line.startswith("xvenv-")] == [
-        f"xvenv-sysconfig = {sysconfigdata_path.resolve()}"
-    ]
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
+    assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
+    assert "build_details" not in xvenv_config
 
 
-def test_read_pyvenv_cfg(tmp_path):
+@pytest.mark.parametrize(
+    ("section", "value"),
+    [
+        (
+            None,
+            {
+                "home": "/usr/bin",
+                "include-system-site-packages": "false",
+                "version": "3.13.5",
+            },
+        ),
+        (
+            "xvenv",
+            {
+                "platform": "android",
+                "arch": "aarch64-linux-android",
+            },
+        ),
+    ],
+)
+def testread_pyvenv_cfg(tmp_path, section, value):
     """pyvenv.cfg is parsed into a dict of stripped `key = value` pairs."""
     (tmp_path / "pyvenv.cfg").write_text(
-        "home = /usr/bin\n"
-        "include-system-site-packages = false\n"
-        "version   =   3.13.5  \n"
+        (
+            "home = /usr/bin\n"
+            "include-system-site-packages = false\n"
+            "version   =   3.13.5  \n"
+            "\n"
+            "[xvenv]\n"
+            "platform = android\n"
+            "arch = aarch64-linux-android\n"
+        ),
+        "utf-8",
     )
 
-    assert _read_pyvenv_cfg(tmp_path) == {
-        "home": "/usr/bin",
-        "include-system-site-packages": "false",
-        "version": "3.13.5",
-    }
+    assert read_pyvenv_cfg(tmp_path, section) == value
 
 
-def test_read_pyvenv_cfg_missing(tmp_path):
+def testread_pyvenv_cfg_missing(tmp_path):
     """A missing pyvenv.cfg is parsed as an empty dict."""
-    assert _read_pyvenv_cfg(tmp_path) == {}
+    with pytest.raises(FileNotFoundError):
+        read_pyvenv_cfg(tmp_path, None)
 
 
-def test_read_pyvenv_cfg_literal_values(tmp_path):
+def testread_pyvenv_cfg_literal_values(tmp_path):
     """Values are read literally: `%` isn't interpolated, and `:` (e.g., in a
     Windows path) isn't treated as a key/value delimiter."""
     (tmp_path / "pyvenv.cfg").write_text(
@@ -628,7 +678,7 @@ def test_read_pyvenv_cfg_literal_values(tmp_path):
         "command = C:\\Python\\python.exe -m venv C:\\venv\n"
     )
 
-    assert _read_pyvenv_cfg(tmp_path) == {
+    assert read_pyvenv_cfg(tmp_path, None) == {
         "home": "C:\\Program Files\\Python 100%",
         "command": "C:\\Python\\python.exe -m venv C:\\venv",
     }
@@ -654,8 +704,13 @@ def test_convert_virtualenv_pyvenv_cfg(tmp_path):
 
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    lines = (venv_path / "pyvenv.cfg").read_text().splitlines()
-    assert f"xvenv-sysconfig = {sysconfigdata_path.resolve()}" in lines
+    base_config = read_pyvenv_cfg(venv_path, None)
+    assert base_config["home"] == "/usr/bin"
+    assert base_config["version"] == "3.13.5"
+
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
+    assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
+    assert "build_details" not in xvenv_config
 
 
 def test_convert_uv_pyvenv_cfg(tmp_path):
@@ -674,8 +729,13 @@ def test_convert_uv_pyvenv_cfg(tmp_path):
 
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    lines = (venv_path / "pyvenv.cfg").read_text().splitlines()
-    assert f"xvenv-sysconfig = {sysconfigdata_path.resolve()}" in lines
+    base_config = read_pyvenv_cfg(venv_path, None)
+    assert base_config["home"] == "/usr/bin"
+    assert base_config["version_info"] == "3.13.5"
+
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
+    assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
+    assert "build_details" not in xvenv_config
 
 
 def test_convert_uv_version_mismatch(tmp_path):
@@ -739,7 +799,7 @@ def test_from_venv_sysconfig(tmp_path):
     config = CrossVenvConfig.from_venv(venv_path)
 
     assert config.platform == "android"
-    assert config.arch == "aarch64-linux-android"
+    assert config.multiarch == "aarch64-linux-android"
     assert config.sysconfigdata_path == sysconfigdata_path.resolve()
     assert config.build_details_path is None
     assert config.archive_path == (tmp_path / "archive").resolve()
@@ -755,24 +815,18 @@ def test_from_venv_build_details(tmp_path):
     config = CrossVenvConfig.from_venv(venv_path)
 
     assert config.platform == "android"
-    assert config.arch == "aarch64-linux-android"
+    assert config.multiarch == "aarch64-linux-android"
     assert config.build_details_path == build_details_path.resolve()
     assert config.sysconfigdata_path is None
 
 
-def test_from_venv_unrecorded(tmp_path):
-    """A venv without a recorded source (e.g. made by xvenv <= 0.4.0) raises."""
+def test_from_venv_missing_xvenv_config(tmp_path):
+    """A venv without xvenv config data raises an error."""
     venv_path = tmp_path / "venv"
     _fake_venv(venv_path, "3.13.5")
 
     with pytest.raises(ValueError, match="does not record the cross-platform"):
         CrossVenvConfig.from_venv(venv_path)
-
-
-def test_from_venv_missing_pyvenv_cfg(tmp_path):
-    """A directory with no pyvenv.cfg raises the same error."""
-    with pytest.raises(ValueError, match="does not record the cross-platform"):
-        CrossVenvConfig.from_venv(tmp_path)
 
 
 def test_from_venv_recorded_file_missing(tmp_path):
@@ -782,7 +836,7 @@ def test_from_venv_recorded_file_missing(tmp_path):
     _fake_venv(venv_path, "3.13.5")
     cfg_path = venv_path / "pyvenv.cfg"
     missing = tmp_path / "gone" / "_sysconfigdata__android_aarch64-linux-android.py"
-    cfg_path.write_text(cfg_path.read_text() + f"xvenv-sysconfig = {missing}\n")
+    cfg_path.write_text(cfg_path.read_text() + f"[xvenv]\nsysconfigdata = {missing}\n")
 
     with pytest.raises(ValueError, match="Could not find") as exc_info:
         CrossVenvConfig.from_venv(venv_path)
@@ -820,8 +874,9 @@ def test_convert_records_non_ascii_source_as_utf8(tmp_path, non_utf8_locale):
 
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    content = (venv_path / "pyvenv.cfg").read_bytes().decode("utf-8")
-    assert f"xvenv-sysconfig = {sysconfigdata_path.resolve()}" in content.splitlines()
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
+    assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
+    assert "build_details" not in xvenv_config
 
     config = CrossVenvConfig.from_venv(venv_path)
     assert config.sysconfigdata_path == sysconfigdata_path.resolve()
@@ -863,9 +918,12 @@ def test_platform_config_relative_path_is_absolute(tmp_path, monkeypatch, mock_d
 
     venv_path = tmp_path / "venv"
     _fake_venv(venv_path, "3.14.7")
-    _record_source(venv_path, config.build_details_path, config.sysconfigdata_path)
-    lines = (venv_path / "pyvenv.cfg").read_text(encoding="utf-8").splitlines()
-    assert f"xvenv-build-details = {mock_deps['config_path'].resolve()}" in lines
+
+    config._write_pyvenv_cfg(venv_path)
+
+    xvenv_config = read_pyvenv_cfg(venv_path, "xvenv")
+    assert xvenv_config["build-details"] == str(mock_deps["config_path"].resolve())
+    assert "sysconfigdata" not in xvenv_config
 
 
 @pytest.mark.parametrize(("value", "expected"), [(True, True), (None, False)])
@@ -929,3 +987,52 @@ def test_convert_records_host_platform(tmp_path):
     patch = 'sys.platform = "android"'
     assert record in source
     assert source.index(record) < source.index(patch)
+
+
+def test_run_testbed_by_platform(monkeypatch, tmp_path):
+    """run_testbed() delegates to the named platform module."""
+    from xvenv.convert import run_testbed
+
+    platform_run_testbed = Mock(return_value=42)
+    monkeypatch.setattr("xvenv.platforms.android.run_testbed", platform_run_testbed)
+
+    result = run_testbed(
+        "android",
+        work_path=tmp_path,
+        args=["-m", "pytest"],
+        verbose=1,
+        managed="maxVersion",
+        connected=None,
+    )
+
+    assert result == 42
+    platform_run_testbed.assert_called_once_with(
+        work_path=tmp_path,
+        args=["-m", "pytest"],
+        verbose=1,
+        managed="maxVersion",
+        connected=None,
+    )
+
+
+def test_config_run_testbed_uses_platform(monkeypatch, tmp_path):
+    """CrossVenvConfig.run_testbed() delegates using its platform name."""
+    platform_run_testbed = Mock(return_value=0)
+    monkeypatch.setattr("xvenv.platforms.ios.run_testbed", platform_run_testbed)
+    config = Mock(spec=CrossVenvConfig, platform="ios")
+
+    result = CrossVenvConfig.run_testbed(
+        config,
+        work_path=tmp_path,
+        args=["-m", "pytest"],
+        verbose=0,
+        simulator="iPhone 16e",
+    )
+
+    assert result == 0
+    platform_run_testbed.assert_called_once_with(
+        work_path=tmp_path,
+        args=["-m", "pytest"],
+        verbose=0,
+        simulator="iPhone 16e",
+    )

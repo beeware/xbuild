@@ -127,7 +127,7 @@ def _emscripten_config(
     return Mock(
         spec=CrossVenvConfig,
         platform="emscripten",
-        arch="wasm32-emscripten",
+        multiarch="wasm32-emscripten",
         archive_path=prefix,
         build_details_path=build_details_path,
         sysconfigdata_path=sysconfigdata_path,

@@ -9,20 +9,24 @@ from pathlib import Path
 from xvenv import versions
 from xvenv.platforms import build_platform_env, host_platform
 
-VALID_ARCHES = ["arm64-iphonesimulator", "x86_64-iphonesimulator", "arm64-iphoneos"]
+VALID_ARCHES = {
+    "arm64-iphonesimulator": "arm64-iphonesimulator",
+    "x86_64-iphonesimulator": "x86_64-iphonesimulator",
+    "arm64-iphoneos": "arm64-iphoneos",
+}
 DEFAULT_ARCH = {
     "arm64": "arm64-iphonesimulator",
     "x86_64": "x86_64-iphonesimulator",
 }
 
 
-def download_url(version_info: tuple, arch: str) -> str:
+def download_url(version_info: tuple, multiarch: str) -> str:
     """Compute the python.org download URL for the iOS XCframework build.
 
     :param version: The `sys.version_info` tuple for the version being
         requested.
-    :param arch: The architecture build built. Ignored; the single XCframework
-        download includes all architectures.
+    :param multiarch: The multi-architecture being requested. Ignored; the
+        single XCframework download includes all architectures.
     :returns: The download URL.
     """
     version = versions.version(version_info)
@@ -57,19 +61,19 @@ def prefix_path(config_data_path: Path) -> Path:
     return config_data_path.parents[2]
 
 
-def config_path(extracted_dir: Path, version_info: tuple, arch: str) -> Path:
+def config_path(extracted_dir: Path, version_info: tuple, multiarch: str) -> Path:
     """Locate the sysconfig/build-details file inside an extracted iOS
     XCframework archive.
 
     :param extracted_dir: The root of the extracted archive.
     :param version_info: A `sys.version_info`-shaped value for the Python
         version the archive contains.
-    :param arch: One of the values in `VALID_ARCHES`, e.g.
+    :param multiarch: One of the values in `VALID_ARCHES`, e.g.
         `"arm64_iphonesimulator"`.
     :returns: The path to `build-details.json` (Python 3.14+) or the
         legacy `_sysconfigdata__ios_*.py` module (Python <3.14).
     """
-    cpu, sdk = arch.rsplit("-", 1)
+    cpu, sdk = multiarch.rsplit("-", 1)
     if sdk == "iphonesimulator":
         slice_dir = "ios-arm64_x86_64-simulator"
     else:
@@ -152,7 +156,7 @@ def prepare_env(config) -> dict[str, str]:
             "with `sudo xcode-select -s /Applications/Xcode.app`."
         )
 
-    _cpu, sdk = config.arch.rsplit("-", 1)
+    _cpu, sdk = config.multiarch.rsplit("-", 1)
     slice_dir = (
         "ios-arm64_x86_64-simulator" if sdk == "iphonesimulator" else "ios-arm64"
     )

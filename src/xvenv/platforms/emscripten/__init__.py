@@ -35,7 +35,7 @@ PIP_PATCHED_NAME = "pip_patched"
 # not ours to touch.
 PIP_SCRIPT_RE = re.compile(r"pip(3(\.\d+)?)?")
 
-VALID_ARCHES = ["wasm32"]
+VALID_ARCHES = {"wasm32": "wasm32"}
 
 
 class AlwaysWasm32:
@@ -118,13 +118,13 @@ UNKNOWN_VERSION = "unknown"
 ###########################################################################
 # Locating the target Python build
 ###########################################################################
-def download_url(version_info: tuple, arch: str) -> str:
+def download_url(version_info: tuple, multiarch: str) -> str:
     """Compute the download URL for the Pyodide cross-build environment that
     matches a Python version.
 
     :param version_info: The `sys.version_info` tuple for the version being
         requested.
-    :param arch: The architecture being built. Ignored; this is always wasm32.
+    :param multiarch: Ignored; this is always wasm32.
     :returns: The download URL.
     :raises ValueError: if the Python version isn't supported on Emscripten.
     """
@@ -142,13 +142,13 @@ def download_url(version_info: tuple, arch: str) -> str:
     )
 
 
-def config_path(extracted_path: Path, version_info, arch: str) -> Path:
+def config_path(extracted_path: Path, version_info, multiarch: str) -> Path:
     """Locate the sysconfigdata file inside an extracted Pyodide xbuildenv.
 
     :param extracted_path: The root of the extracted archive.
     :param version_info: A `sys.version_info`-shaped value for the Python
         version the archive contains.
-    :param arch: Ignored; this is always wasm32.
+    :param multiarch: Ignored; this is always wasm32.
     :returns: The path to the `_sysconfigdata__emscripten_wasm32-emscripten.py`
         module. If the archive doesn't contain a build of the requested Python
         series, the returned path won't exist (the caller reports that).
@@ -322,7 +322,7 @@ def _sysconfig_vars(config) -> tuple[Path, dict]:
         abiflags = "".join(build_details["abi"]["flags"])
         sysconfigdata_path = (
             config.build_details_path.parent
-            / f"_sysconfigdata_{abiflags}_{config.platform}_{config.arch}.py"
+            / f"_sysconfigdata_{abiflags}_{config.platform}_{config.multiarch}.py"
         )
 
     if not sysconfigdata_path.is_file():
