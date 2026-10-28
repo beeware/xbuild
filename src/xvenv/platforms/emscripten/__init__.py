@@ -287,7 +287,7 @@ def extend_context(context, build_details):
         from pip._vendor.packaging import tags  # noqa: E402
 
         @monkeypatch(tags)
-        def platform_tags() -> Iterator[str]:
+        def platform_tags():
             abi_version = sysconfig.get_config_var(
                 "PYEMSCRIPTEN_PLATFORM_VERSION"
             ) or sysconfig.get_config_var("PYODIDE_ABI_VERSION")
