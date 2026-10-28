@@ -1,23 +1,19 @@
 Third-party licenses
 ====================
 
-xbuild is licensed under the BSD 3-Clause License (see LICENSE). The
-following files are derived from third-party projects, and are distributed
-under their original licenses, which are reproduced below.
-
+xbuild is licensed under the BSD 3-Clause License (see LICENSE). However,
+some of the content in xbuild has been derived from third-party projects,
+under the terms of their original licenses.
 
 pyodide-build
 -------------
 
-* src/xvenv/platforms/emscripten/pywasmcross.py
-* src/xvenv/platforms/emscripten/pip_wrapper.py
-
-These files are ported from pyodide-build
-(https://github.com/pyodide/pyodide-build; `pyodide_build/pywasmcross.py` and
-`pyodide_build/pip_wrapper.py` as of commit
-45caaca689e8366ea34811f920d246ee5323644c), and are therefore subject to the
-Mozilla Public License, v. 2.0. Modifications made for xbuild are also made
-available under the MPL 2.0 in those files.
+`src/xvenv/platforms/emscripten/pywasmcross.py` is ported from pyodide-build
+(https://github.com/pyodide/pyodide-build as of commit
+45caaca689e8366ea34811f920d246ee5323644c). Other aspects of the Emscripten
+backend (such as `pip` handling) are substantially informed by the
+`pyodide-build` implementation. This code is subject to the Mozilla Public
+License, v2.0.
 
 Copyright (c) 2019-2026, Pyodide contributors.
 
