@@ -258,7 +258,7 @@ def main(cli_args: Sequence[str]) -> None:
             exit_code = _run(args)
         else:
             with tempfile.TemporaryDirectory() as tmp:
-                args.work_path = Path(tmp)
+                args.work_path = Path(tmp).resolve()
                 exit_code = _run(args)
     except (ValueError, NotImplementedError) as e:
         _error(e)
@@ -296,7 +296,7 @@ def _run(args: argparse.Namespace) -> int:
 
     _cprint("{bold}Creating testbed project...{reset}")
     cross_venv.setup_testbed(
-        work_path=args.work_path,
+        work_path=args.work_path.resolve(),
         src_paths=args.src,
     )
 

@@ -189,7 +189,15 @@ def test_build_wheel(tmp_path, platform_name, sample_project):
                 "-m",
                 "pytest",
                 "tests",
-            ],
+            ]
+            # On Python 3.12, Pyodide 0.27.8 doesn't support the way that pytest
+            # captures stdout by creating a temp file, so we need to disable
+            # output capture.
+            + (
+                ["--capture=no"]
+                if platform_name == "emscripten" and sys.version_info < (3, 13)
+                else []
+            ),
             cwd=project_dir,
             check=True,
         )
