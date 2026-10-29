@@ -276,9 +276,11 @@ def extend_context(context, build_details):
     # Patch invocations of `pip`
     ###########################################################################
     if (
-        sys.orig_argv[1:3] == ["-m", "pip"]
-        or sys.orig_argv[1:3] == ["-m", "pip3"]
-        or sys.orig_argv[1] == f"{sys.prefix}/bin/pip"
+        len(sys.orig_argv) > 3 and (
+            sys.orig_argv[1:3] == ["-m", "pip"]
+            or sys.orig_argv[1:3] == ["-m", "pip3"]
+        )
+        or (len(sys.orig_argv) > 2 and sys.orig_argv[1] == f"{sys.prefix}/bin/pip")
     ):
         # Ensure that the vendored urllib3 is imported before sys.platform
         # is patched.
@@ -784,7 +786,11 @@ def run_testbed(
         *(args or ["-m", "test"]),
     ]
 
-    result = subprocess.run(
-        command, check=False, cwd=work_path / "src", env=build_platform_env()
-    )
+    env = build_platform_env()
+
+    # On Python 3.12, Pyodide needs an explicit export of the work
+    # dir to be guaranteed to be able to see it.
+    if sys.version_info < (3, 13):
+        env["_PYODIDE_EXTRA_MOUNTS"] = str(work_path)
+    result = subprocess.run(command, check=False, cwd=work_path / "src", env=env)
     return result.returncode

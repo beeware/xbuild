@@ -29,13 +29,6 @@ def patch_cross_env():
     sys.platform = "{platform}"
     sys.implementation._multiarch = "{multiarch}"
     sys.abiflags = "{abiflags}"
-
-    if sys.version_info < (3, 14):
-        sys.base_prefix = sysconfig.get_config_var("prefix")
-        sys.base_exec_prefix = sysconfig.get_config_var("prefix")
-    else:
-        sys.base_prefix = sysconfig._get_sysconfigdata()["prefix"]
-        sys.base_exec_prefix = sysconfig._get_sysconfigdata()["prefix"]
     # -------------------------------------------------------------------------
 {sys_extra}
     ###########################################################################
@@ -99,8 +92,16 @@ def patch_cross_env():
         return "{platform}-{platform_version}-{machine}"
 
     @monkeypatch(sysconfig)
-    def get_sysconfigdata_name():
+    def _get_sysconfigdata_name():
         return "_sysconfigdata__{platform}_{multiarch}"
+
+    # Patch sys prefix details based on current sysconfig data.
+    if sys.version_info < (3, 14):
+        sys.base_prefix = sysconfig.get_config_var("prefix")
+        sys.base_exec_prefix = sysconfig.get_config_var("prefix")
+    else:
+        sys.base_prefix = sysconfig._get_sysconfigdata()["prefix"]
+        sys.base_exec_prefix = sysconfig._get_sysconfigdata()["prefix"]
 
     # Ensure module-level values cached at time of import are updated.
     sysconfig._BASE_PREFIX = sys.base_prefix
