@@ -12,7 +12,11 @@ description = "A PEP517 build frontend for cross-compiling wheels."
 readme = "README.md"
 requires-python = ">= 3.11"
 license = "BSD-3-Clause"
-license-files = ["LICENSE", "LICENSE.pyodide"]
+license-files = [
+    "LICENSE",
+    "LICENSE.pyodide",
+    "LICENSE.python"
+]
 authors = [
     {name="Russell Keith-Magee", email="russell@keith-magee.com"},
 ]
