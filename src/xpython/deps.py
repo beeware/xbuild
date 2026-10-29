@@ -69,7 +69,7 @@ def install_requirements(
     if not requirements:
         return
 
-    command = [str(venv_python), "-m", "pip", "install", "--target", str(packages_path)]
+    command = [venv_python, "-m", "pip", "install", "--target", packages_path]
     for directory in find_links:
         command.extend(["--find-links", str(directory)])
     command.extend(requirements)

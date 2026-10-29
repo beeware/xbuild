@@ -162,7 +162,6 @@ def test_localize_vars(tool_dir, prefix_dir):
             f"'CC={tool_dir}aarch64-linux-android21-clang' "
             "'--without-ensurepip'"
         ),
-        "LDLIBRARY": "libPython.so",
     }
 
     result = localized_vars(orig_vars, "/slice/path")
@@ -189,16 +188,12 @@ def test_localize_vars(tool_dir, prefix_dir):
         "'--without-ensurepip'"
     )
 
-    # LDLIBRARY has been removed.
-    assert "LDLIBRARY" not in result
-
 
 def test_missing_cc_key():
     """If CC isn't present, localized_vars() still works."""
     orig_vars = {
         "prefix": "/usr/local",
         "BINDIR": "/usr/local/bin",
-        "LDLIBRARY": "libPython.so",
     }
 
     result = localized_vars(orig_vars, "/slice/path")
@@ -280,7 +275,6 @@ def test_config_via_archive_path(tmp_path, mock_deps):
         cache_path=None,
     )
 
-    mock_deps["resolve_cache_path"].assert_not_called()
     mock_deps["fetch_python"].assert_not_called()
     mock_deps["use_archive_path"].assert_called_once_with(
         "android", "aarch64-linux-android", supplied_archive.resolve()
@@ -775,13 +769,14 @@ def test_from_venv_sysconfig(tmp_path):
     _fake_venv(venv_path, "3.13.5")
     _sysconfig_config(sysconfigdata_path).convert(venv_path)
 
-    config = CrossVenvConfig.from_venv(venv_path)
+    config = CrossVenvConfig.from_venv(venv_path, cache_path=tmp_path / "cache")
 
     assert config.platform == "android"
     assert config.multiarch == "aarch64-linux-android"
     assert config.sysconfigdata_path == sysconfigdata_path.resolve()
     assert config.build_details_path is None
     assert config.archive_path == (tmp_path / "archive").resolve()
+    assert config.cache_path == (tmp_path / "cache").resolve()
 
 
 def test_from_venv_build_details(tmp_path):
@@ -791,12 +786,14 @@ def test_from_venv_build_details(tmp_path):
     _fake_venv(venv_path, "3.14.7")
     _build_details_config(build_details_path).convert(venv_path)
 
-    config = CrossVenvConfig.from_venv(venv_path)
+    config = CrossVenvConfig.from_venv(venv_path, cache_path=tmp_path / "cache")
 
     assert config.platform == "android"
     assert config.multiarch == "aarch64-linux-android"
     assert config.build_details_path == build_details_path.resolve()
     assert config.sysconfigdata_path is None
+    assert config.archive_path == (tmp_path / "archive").resolve()
+    assert config.cache_path == (tmp_path / "cache").resolve()
 
 
 def test_from_venv_missing_xvenv_config(tmp_path):
@@ -805,7 +802,7 @@ def test_from_venv_missing_xvenv_config(tmp_path):
     _fake_venv(venv_path, "3.13.5")
 
     with pytest.raises(ValueError, match="does not record the cross-platform"):
-        CrossVenvConfig.from_venv(venv_path)
+        CrossVenvConfig.from_venv(venv_path, cache_path=None)
 
 
 def test_from_venv_recorded_file_missing(tmp_path):
@@ -818,7 +815,7 @@ def test_from_venv_recorded_file_missing(tmp_path):
     cfg_path.write_text(cfg_path.read_text() + f"[xvenv]\nsysconfigdata = {missing}\n")
 
     with pytest.raises(ValueError, match="Could not find") as exc_info:
-        CrossVenvConfig.from_venv(venv_path)
+        CrossVenvConfig.from_venv(venv_path, cache_path=None)
 
     message = str(exc_info.value)
     assert str(cfg_path) in message
@@ -857,7 +854,7 @@ def test_convert_records_non_ascii_source_as_utf8(tmp_path, non_utf8_locale):
     assert xvenv_config["sysconfigdata"] == str(sysconfigdata_path.resolve())
     assert "build_details" not in xvenv_config
 
-    config = CrossVenvConfig.from_venv(venv_path)
+    config = CrossVenvConfig.from_venv(venv_path, cache_path=None)
     assert config.sysconfigdata_path == sysconfigdata_path.resolve()
 
 
@@ -921,7 +918,7 @@ def test_from_current_env_not_cross(monkeypatch):
     monkeypatch.delattr(sys, "cross_compiling", raising=False)
 
     with pytest.raises(ValueError, match="Not running in a cross-platform environment"):
-        CrossVenvConfig.from_current_env()
+        CrossVenvConfig.from_current_env(cache_path=None)
 
 
 def test_from_current_env_uses_sys_prefix(monkeypatch):
@@ -931,8 +928,8 @@ def test_from_current_env_uses_sys_prefix(monkeypatch):
     from_venv = Mock(return_value=sentinel)
     monkeypatch.setattr(CrossVenvConfig, "from_venv", from_venv)
 
-    assert CrossVenvConfig.from_current_env() is sentinel
-    from_venv.assert_called_once_with(Path(sys.prefix))
+    assert CrossVenvConfig.from_current_env(cache_path=None) is sentinel
+    from_venv.assert_called_once_with(Path(sys.prefix), cache_path=None)
 
 
 def test_convert_uses_host_venv_layout(tmp_path, monkeypatch):

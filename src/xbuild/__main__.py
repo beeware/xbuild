@@ -223,7 +223,7 @@ def main(cli_args: Sequence[str]) -> None:
 
     try:
         if args.use_current_env:
-            cross_venv = CrossVenvConfig.from_current_env()
+            cross_venv = CrossVenvConfig.from_current_env(cache_path=args.cache)
         else:
             cross_venv = CrossVenvConfig(
                 platform=args.platform,

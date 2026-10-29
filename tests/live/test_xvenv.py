@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from xvenv.platforms.emscripten import PYODIDE_VERSIONS
+
 _HERE = Path(__file__).parent
 INNER_PATCHED_DIR = _HERE / "_inner" / "patched"
 INNER_DISABLED_DIR = _HERE / "_inner" / "disabled"
@@ -34,12 +36,27 @@ ANDROID_SKIPS = [
     pytest.mark.android,
 ]
 
+EMSCRIPTEN_SKIPS = [
+    pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Emscripten cross venvs are not supported on Windows",
+    ),
+    pytest.mark.skipif(
+        f"{sys.version_info.major}.{sys.version_info.minor}" not in PYODIDE_VERSIONS,
+        reason="No Pyodide release for this Python version",
+    ),
+    pytest.mark.emscripten,
+]
+
 CASES = [
     pytest.param("ios", "arm64-iphonesimulator", id="ios-arm64-sim", marks=IOS_SKIPS),
     pytest.param("ios", "x86_64-iphonesimulator", id="ios-x86_64-sim", marks=IOS_SKIPS),
     pytest.param("ios", "arm64-iphoneos", id="ios-arm64-device", marks=IOS_SKIPS),
     pytest.param("android", "aarch64", id="android-aarch64", marks=ANDROID_SKIPS),
     pytest.param("android", "x86_64", id="android-x86_64", marks=ANDROID_SKIPS),
+    pytest.param(
+        "emscripten", "wasm32", id="emscripten-wasm32", marks=EMSCRIPTEN_SKIPS
+    ),
 ]
 
 

@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools==84.0.0",
+    "setuptools==84.1.0",
     "setuptools_scm==10.3.4",
 ]
 build-backend = "setuptools.build_meta"
@@ -12,7 +12,7 @@ description = "A PEP517 build frontend for cross-compiling wheels."
 readme = "README.md"
 requires-python = ">= 3.11"
 license = "BSD-3-Clause"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "LICENSE.pyodide"]
 authors = [
     {name="Russell Keith-Magee", email="russell@keith-magee.com"},
 ]
@@ -84,7 +84,7 @@ tox = [
 test = [
     "pytest == 9.1.1",
     "uv == 0.13.4",
-    "virtualenv == 21.14.5",
+    "virtualenv == 21.14.13",
 ]
 dev = [
     {include-group = "pre-commit"},
@@ -107,6 +107,7 @@ markers = [
     "live: mark a test as a live (slow) test.",
     "iOS: mark test as iOS specific.",
     "android: mark test as Android specific.",
+    "emscripten: mark test as Emscripten specific.",
 ]
 
 [tool.check-wheel-contents]

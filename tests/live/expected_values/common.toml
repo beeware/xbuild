@@ -46,3 +46,10 @@ platform_system = "iOS"
 uname_machine = "arm64"
 ios_is_simulator = false
 ios_model = "iphoneos"
+
+[emscripten.wasm32]
+sys_platform = "emscripten"
+multiarch = "wasm32-emscripten"
+abiflags = ""
+platform_system = "Emscripten"
+uname_machine = "wasm32"
