@@ -207,7 +207,7 @@ def test_no_config_in_cross_env(
     main([str(tmp_path)])
 
     mock_CrossVenvConfig.assert_not_called()
-    mock_CrossVenvConfig.from_current_env.assert_called_once_with()
+    mock_CrossVenvConfig.from_current_env.assert_called_once_with(cache_path=None)
     current_config = mock_CrossVenvConfig.from_current_env.return_value
     current_config.prepare_env.assert_called_once_with()
     # The resolved config is the last positional argument to _build()

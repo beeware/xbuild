@@ -381,7 +381,7 @@ def test_run_current_env(
     exit_code = _run(args)
 
     mock_CrossVenvConfig.assert_not_called()
-    mock_CrossVenvConfig.from_current_env.assert_called_once_with()
+    mock_CrossVenvConfig.from_current_env.assert_called_once_with(cache_path=None)
     mock_config.create.assert_called_once_with(args.work_path / "venv", with_pip=True)
     assert exit_code == 0
 

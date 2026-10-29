@@ -140,8 +140,7 @@ class CrossVenvConfig:
             platform/arch isn't supported, or the configuration file can't be
             found).
         """
-        self._cache_arg = cache_path
-        self._cache_path: Path | None = None
+        self.cache_path = resolve_cache_path(cache_path)
         if platform is not None:
             multiarch = resolve_multiarch(platform, arch)
 
@@ -196,16 +195,8 @@ class CrossVenvConfig:
 
         self.archive_path = self.platform_module.archive_path(source_path)
 
-    @property
-    def cache_path(self) -> Path:
-        """The directory used for caching downloaded Python builds and
-        toolchains. Resolved (and created) on first access."""
-        if self._cache_path is None:
-            self._cache_path = resolve_cache_path(self._cache_arg)
-        return self._cache_path
-
     @classmethod
-    def from_venv(cls, venv_path: Path) -> CrossVenvConfig:
+    def from_venv(cls, venv_path: Path, cache_path: Path | None) -> CrossVenvConfig:
         """Reconstruct the configuration of an existing cross-platform venv.
 
         :param venv_path: The root of a venv previously converted by `convert()`.
@@ -236,11 +227,11 @@ class CrossVenvConfig:
             arch=None,
             build_details_path=Path(build_details_path) if build_details_path else None,
             sysconfigdata_path=Path(sysconfigdata_path) if sysconfigdata_path else None,
-            cache_path=None,
+            cache_path=cache_path,
         )
 
     @classmethod
-    def from_current_env(cls) -> CrossVenvConfig:
+    def from_current_env(cls, cache_path: Path | None) -> CrossVenvConfig:
         """Reconstruct the configuration of the active cross-platform venv.
 
         :returns: The resolved `CrossVenvConfig`.
@@ -252,7 +243,7 @@ class CrossVenvConfig:
                 "Not running in a cross-platform environment. Specify "
                 "--platform, --build-details, or --sysconfig."
             )
-        return cls.from_venv(Path(sys.prefix))
+        return cls.from_venv(Path(sys.prefix), cache_path=cache_path)
 
     @property
     def description(self) -> str:

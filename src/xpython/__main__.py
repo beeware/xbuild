@@ -281,7 +281,7 @@ def _run(args: argparse.Namespace) -> int:
     _cprint("{bold}Creating cross-venv...{reset}")
     venv_path = args.work_path / "venv"
     if args.use_current_env:
-        cross_venv = CrossVenvConfig.from_current_env()
+        cross_venv = CrossVenvConfig.from_current_env(cache_path=args.cache)
     else:
         cross_venv = CrossVenvConfig(
             platform=args.platform,
