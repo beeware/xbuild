@@ -9,12 +9,6 @@ To build for Emscripten (Pyodide), you must:
 
 Emscripten is supported for Python 3.12, 3.13 and 3.14.
 
-## Customizing compilation
-
-The compiler flags used for extension modules are derived from the configure-time flags of the target Python build. They can be overridden by setting `SIDE_MODULE_CFLAGS`, `SIDE_MODULE_CXXFLAGS` or `SIDE_MODULE_LDFLAGS` in your environment.
-
-`meson`-based builds (e.g., `meson-python`) are given a [cross file](https://mesonbuild.com/Cross-compilation.html) describing the Emscripten target, which is written alongside the wrappers. Set `MESON_CROSS_FILE` to use your own cross file instead.
-
 ## Known limitations
 
 - Rust extensions (`maturin`, `setuptools-rust`) are not supported: `cargo` is not wrapped, and the Rust tool chain for the `wasm32-unknown-emscripten` target is not configured.

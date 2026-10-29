@@ -55,8 +55,9 @@ SYMLINK_ENV_VARS = {
 }
 
 # Environment variables that can be used to override the compiler flags that
-# are passed to Emscripten when building extension modules. The names match
-# the ones used by pyodide-build.
+# are passed to Emscripten when building extension modules. This is behavior
+# inherited from pyodide-build; however, it's not formally documented for
+# xbuild in the hope that it can be simplified.
 CFLAGS_VAR = "SIDE_MODULE_CFLAGS"
 CXXFLAGS_VAR = "SIDE_MODULE_CXXFLAGS"
 LDFLAGS_VAR = "SIDE_MODULE_LDFLAGS"
