@@ -14,11 +14,7 @@ from pathlib import Path
 from filelock import FileLock
 
 from xvenv import versions
-from xvenv.platforms import (
-    ACTIVE_COMPILER_WRAPPER_DIR_VAR,
-    COMPILER_WRAPPER_DIR_VAR,
-    build_platform_env,
-)
+from xvenv.platforms import build_platform_env
 from xvenv.platforms.emscripten import pywasmcross
 
 VALID_ARCHES = {"wasm32": "wasm32"}
@@ -41,6 +37,8 @@ PYODIDE_VERSIONS = {
     "3.13": "0.29.5",
     "3.14": "314.0.7",
 }
+
+XBUILD_ENV_SCRIPTS_DIR_VAR = "XBUILD_ENV_SCRIPTS_DIR"
 
 # Environment variables that build tools use to find compilers, and the
 # pywasmcross symlink that each should point at. Mirrors pyodide-build's
@@ -420,23 +418,6 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
     return env
 
 
-def _create_symlink_dir() -> Path:
-    """Create the directory that will hold the compiler wrapper symlinks.
-
-    If `XBUILD_COMPILER_WRAPPER_DIR` is set, that directory is used (and left
-    in place afterwards, which helps with reproducing problems). Otherwise, a
-    temporary directory is created, and removed when the process exits.
-    """
-    if explicit := os.environ.get(COMPILER_WRAPPER_DIR_VAR):
-        symlink_dir = Path(explicit).resolve()
-        symlink_dir.mkdir(parents=True, exist_ok=True)
-    else:
-        symlink_dir = Path(tempfile.mkdtemp(prefix="pywasmcross-"))
-        atexit.register(shutil.rmtree, symlink_dir, ignore_errors=True)
-
-    return symlink_dir
-
-
 ###########################################################################
 # Emscripten SDK management
 ###########################################################################
@@ -657,7 +638,9 @@ def prepare_env(config) -> dict[str, str]:
 
     cflags, cxxflags, ldflags = compile_flags(sysconfigdata)
 
-    symlink_dir = _create_symlink_dir()
+    symlink_dir = Path(tempfile.mkdtemp(prefix="pywasmcross-"))
+    atexit.register(shutil.rmtree, symlink_dir, ignore_errors=True)
+
     env.update(make_command_wrapper_symlinks(symlink_dir))
 
     (symlink_dir / MESON_CROSS_FILE_NAME).write_text(MESON_CROSS_FILE, encoding="utf-8")
@@ -685,7 +668,7 @@ def prepare_env(config) -> dict[str, str]:
     env[pywasmcross.ARGS_ENV_VAR] = pywasmcross_env
     (symlink_dir / pywasmcross.ARGS_FILENAME).write_text(pywasmcross_env)
 
-    env[ACTIVE_COMPILER_WRAPPER_DIR_VAR] = str(symlink_dir)
+    env[XBUILD_ENV_SCRIPTS_DIR_VAR] = str(symlink_dir)
     env["PATH"] = os.pathsep.join(
         part for part in [str(symlink_dir), base_path] if part
     )

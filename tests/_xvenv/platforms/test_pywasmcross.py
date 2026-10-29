@@ -8,8 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from xvenv.platforms import BUILD_ENV_SCRIPTS_DIR_VAR
-from xvenv.platforms.emscripten import pywasmcross
+from xvenv.platforms.emscripten import XBUILD_ENV_SCRIPTS_DIR_VAR, pywasmcross
 from xvenv.platforms.emscripten.pywasmcross import (
     EXPORTED_FUNCTIONS_FLAG,
     CrossCompileArgs,
@@ -531,9 +530,9 @@ def test_path_without_wrappers_fallback(tmp_path):
     ) == os.pathsep.join(["/scripts", "/emsdk", "/usr/bin"])
 
 
-def test_build_env_scripts_dir_var_in_sync():
+def test_Xbuild_env_scripts_dir_var_in_sync():
     """pywasmcross can't import xvenv, so it duplicates the variable name."""
-    assert pywasmcross.BUILD_ENV_SCRIPTS_DIR_VAR == BUILD_ENV_SCRIPTS_DIR_VAR
+    assert pywasmcross.XBUILD_ENV_SCRIPTS_DIR_VAR == XBUILD_ENV_SCRIPTS_DIR_VAR
 
 
 ###########################################################################
@@ -638,7 +637,7 @@ def test_end_to_end_scripts_dir(wrapper_dir):
         "c++",
         "-c",
         "x.cpp",
-        env={BUILD_ENV_SCRIPTS_DIR_VAR: "/isolated/bin"},
+        env={XBUILD_ENV_SCRIPTS_DIR_VAR: "/isolated/bin"},
     )
 
     recorded = json.loads(wrapper_dir.record.read_text())

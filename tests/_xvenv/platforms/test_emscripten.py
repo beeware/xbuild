@@ -9,13 +9,13 @@ from unittest.mock import Mock
 import pytest
 
 from xvenv.convert import CrossVenvConfig
-from xvenv.platforms import ACTIVE_COMPILER_WRAPPER_DIR_VAR, COMPILER_WRAPPER_DIR_VAR
 from xvenv.platforms import emscripten as emscripten_module
 from xvenv.platforms.emscripten import (
     EMSDK_COMPLETE_MARKER,
     MESON_CROSS_FILE,
     MESON_CROSS_FILE_VAR,
     SYMLINK_ENV_VARS,
+    XBUILD_ENV_SCRIPTS_DIR_VAR,
     archive_path,
     build_details_from_sysconfigdata,
     compile_flags,
@@ -675,8 +675,6 @@ def test_prepare_env(tmp_path, monkeypatch, fake_emcc, no_flag_overrides, via):
     """prepare_env() creates the compiler wrappers and meson cross file, and
     returns an environment that routes compilation through them with
     localized paths."""
-    wrapper_dir = tmp_path / "wrappers"
-    monkeypatch.setenv(COMPILER_WRAPPER_DIR_VAR, str(wrapper_dir))
     monkeypatch.setenv("PATH", "/orig/bin")
 
     prefix = _xbuildenv(tmp_path)
@@ -698,6 +696,8 @@ def test_prepare_env(tmp_path, monkeypatch, fake_emcc, no_flag_overrides, via):
 
     env = prepare_env(config)
 
+    wrapper_dir = Path(env[XBUILD_ENV_SCRIPTS_DIR_VAR])
+
     # The wrapper directory was created and populated.
     assert (wrapper_dir / "pywasmcross.py").is_file()
     assert (wrapper_dir / "cc").is_symlink()
@@ -705,7 +705,6 @@ def test_prepare_env(tmp_path, monkeypatch, fake_emcc, no_flag_overrides, via):
 
     # PATH has the wrappers in front; tools are pointed at the wrappers.
     assert env["PATH"] == os.pathsep.join([str(wrapper_dir), "/orig/bin"])
-    assert env[ACTIVE_COMPILER_WRAPPER_DIR_VAR] == str(wrapper_dir)
     assert env["CC"] == str(wrapper_dir / "cc")
     assert env["CXX"] == str(wrapper_dir / "c++")
     assert env["AR"] == str(wrapper_dir / "ar")
@@ -746,7 +745,7 @@ def test_prepare_env_standalone_prefix(tmp_path, fake_emcc, no_flag_overrides):
 
     assert "PYODIDE_ROOT" not in env
     assert json.loads(env[pywasmcross.ARGS_ENV_VAR])["abi"] == "2026_0"
-    shutil.rmtree(env[ACTIVE_COMPILER_WRAPPER_DIR_VAR])
+    shutil.rmtree(env[XBUILD_ENV_SCRIPTS_DIR_VAR])
 
 
 def test_prepare_env_installs_emsdk(
@@ -755,7 +754,6 @@ def test_prepare_env_installs_emsdk(
     """Without emcc, a matching SDK is installed (into the cache) and its
     environment is included -- both in the returned PATH, and in the PATH the
     wrappers fall back to."""
-    monkeypatch.delenv(COMPILER_WRAPPER_DIR_VAR, raising=False)
     monkeypatch.setenv("PATH", "/orig/bin")
     prefix = _xbuildenv(tmp_path)
     cache = tmp_path / "cache"
@@ -777,7 +775,7 @@ def test_prepare_env_installs_emsdk(
     env = prepare_env(config)
 
     install.assert_called_once_with("5.0.3", cache, pyodide_root(prefix))
-    wrapper_dir = env[ACTIVE_COMPILER_WRAPPER_DIR_VAR]
+    wrapper_dir = env[XBUILD_ENV_SCRIPTS_DIR_VAR]
     emsdk_path = f"{cache / 'emsdk_5.0.3'}/upstream/emscripten:/orig/bin"
     assert env["PATH"] == os.pathsep.join([wrapper_dir, emsdk_path])
     assert env["EMSDK"] == str(cache / "emsdk_5.0.3")
@@ -790,7 +788,6 @@ def test_prepare_env_respects_user_overrides(
     tmp_path, monkeypatch, fake_emcc, no_flag_overrides
 ):
     """An existing MESON_CROSS_FILE / EMSDK_PYTHON isn't overridden."""
-    monkeypatch.delenv(COMPILER_WRAPPER_DIR_VAR, raising=False)
     monkeypatch.setenv(MESON_CROSS_FILE_VAR, "/my/cross.ini")
     monkeypatch.setenv("EMSDK_PYTHON", "/my/python")
     prefix = _xbuildenv(tmp_path)
@@ -802,12 +799,12 @@ def test_prepare_env_respects_user_overrides(
 
     assert env[MESON_CROSS_FILE_VAR] == "/my/cross.ini"
     assert "EMSDK_PYTHON" not in env
-    shutil.rmtree(env[ACTIVE_COMPILER_WRAPPER_DIR_VAR])
+    shutil.rmtree(env[XBUILD_ENV_SCRIPTS_DIR_VAR])
 
 
 def test_prepare_env_temp_wrapper_dir(tmp_path, monkeypatch, fake_emcc):
     """Without an explicit wrapper directory, a temporary one is created."""
-    monkeypatch.delenv(COMPILER_WRAPPER_DIR_VAR, raising=False)
+    monkeypatch.delenv(XBUILD_ENV_SCRIPTS_DIR_VAR, raising=False)
     prefix = _xbuildenv(tmp_path)
     config = _emscripten_config(
         prefix, sysconfigdata_path=_emscripten_sysconfigdata(prefix)
@@ -815,7 +812,7 @@ def test_prepare_env_temp_wrapper_dir(tmp_path, monkeypatch, fake_emcc):
 
     env = prepare_env(config)
 
-    wrapper_dir = Path(env[ACTIVE_COMPILER_WRAPPER_DIR_VAR])
+    wrapper_dir = Path(env[XBUILD_ENV_SCRIPTS_DIR_VAR])
     assert wrapper_dir.name.startswith("pywasmcross-")
     assert (wrapper_dir / "cc").is_symlink()
     assert env["PATH"].startswith(str(wrapper_dir) + os.pathsep)

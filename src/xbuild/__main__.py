@@ -18,7 +18,7 @@ from build._types import ConfigSettings, Distribution, StrPath
 from build._util import _format_dep_chain
 
 import xbuild
-from xbuild._builder import ProjectXBuilder, make_subprocess_runner
+from xbuild._builder import ProjectXBuilder
 from xbuild.env import XBuildIsolatedEnv
 from xvenv.args import make_common_parser, parse_common_args
 from xvenv.convert import CrossVenvConfig
@@ -65,9 +65,7 @@ def _build_in_isolated_env(
         installer=installer,
         cross_venv=cross_venv,
     ) as env:
-        builder = ProjectXBuilder.from_isolated_env(
-            env, srcdir, runner=make_subprocess_runner(env)
-        )
+        builder = ProjectXBuilder.from_isolated_env(env, srcdir)
 
         # First install the dependencies for the build
         env.install(builder.build_system_requires, for_target=False)
@@ -97,7 +95,7 @@ def _build_in_current_env(
     config_settings: ConfigSettings | None,
     skip_dependency_check: bool = False,
 ) -> str:
-    builder = ProjectXBuilder(srcdir, runner=make_subprocess_runner())
+    builder = ProjectXBuilder(srcdir)
 
     if not skip_dependency_check:
         missing = builder.check_dependencies(distribution, config_settings or {})

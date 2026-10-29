@@ -57,9 +57,9 @@ ARGS_FILENAME = "pywasmcross_env.json"
 
 # The environment variable that names the directory where tools installed into
 # an isolated build environment (cmake, meson, ninja, ...) can be found. This
-# duplicates `xvenv.platforms.BUILD_ENV_SCRIPTS_DIR_VAR` (this module can't
+# duplicates `xvenv.platforms.emscripten.XBUILD_ENV_SCRIPTS_DIR_VAR` (this module can't
 # import xvenv); a test keeps the two in sync.
-BUILD_ENV_SCRIPTS_DIR_VAR = "XBUILD_BUILD_ENV_SCRIPTS_DIR"
+XBUILD_ENV_SCRIPTS_DIR_VAR = "XBUILD_ENV_SCRIPTS_DIR"
 
 SYMLINKS = {
     "cc",
@@ -148,7 +148,7 @@ if IS_COMPILER_INVOCATION:
         os.environ.get("PATH", ""),
         INVOKED_PATH.parent,
         PYWASMCROSS_ARGS.pop("PATH", ""),
-        os.environ.get(BUILD_ENV_SCRIPTS_DIR_VAR),
+        os.environ.get(XBUILD_ENV_SCRIPTS_DIR_VAR),
     )
 
 
