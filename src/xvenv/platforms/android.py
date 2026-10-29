@@ -537,8 +537,6 @@ def run_testbed(
             check=True,
         )
 
-    # The driver script is run with the current interpreter, as installing
-    # xpython won't necessarily preserve the script's executable bit.
     command = [
         sys.executable,
         str(work_path / "android.py"),
