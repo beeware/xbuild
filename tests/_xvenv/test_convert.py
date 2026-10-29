@@ -162,7 +162,6 @@ def test_localize_vars(tool_dir, prefix_dir):
             f"'CC={tool_dir}aarch64-linux-android21-clang' "
             "'--without-ensurepip'"
         ),
-        "LDLIBRARY": "libPython.so",
     }
 
     result = localized_vars(orig_vars, "/slice/path")
@@ -189,16 +188,12 @@ def test_localize_vars(tool_dir, prefix_dir):
         "'--without-ensurepip'"
     )
 
-    # LDLIBRARY has been removed.
-    assert "LDLIBRARY" not in result
-
 
 def test_missing_cc_key():
     """If CC isn't present, localized_vars() still works."""
     orig_vars = {
         "prefix": "/usr/local",
         "BINDIR": "/usr/local/bin",
-        "LDLIBRARY": "libPython.so",
     }
 
     result = localized_vars(orig_vars, "/slice/path")

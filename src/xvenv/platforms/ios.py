@@ -61,6 +61,11 @@ def prefix_path(config_data_path: Path) -> Path:
     return config_data_path.parents[2]
 
 
+def patch_sysconfig(sysconfigvars: dict, prefix: Path) -> dict:
+    """No local modifications for sysconfigvars."""
+    return sysconfigvars
+
+
 def config_path(extracted_dir: Path, version_info: tuple, multiarch: str) -> Path:
     """Locate the sysconfig/build-details file inside an extracted iOS
     XCframework archive.
@@ -176,6 +181,10 @@ def prepare_env(config) -> dict[str, str]:
             ]
         ),
     }
+
+
+def post_convert(venv_path: Path, config) -> None:
+    """No post-conversion modifications required."""
 
 
 def testbed_path(work_path):

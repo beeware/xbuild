@@ -306,7 +306,6 @@ class CrossVenvConfig:
         venv_site_packages_path = platlibs[0]
         # Platforms may add or adjust sysconfig variables (e.g. Emscripten
         # records the Emscripten version that built the target).
-        patch_sysconfig = getattr(self.platform_module, "patch_sysconfig", None)
         if self.build_details_path:
             # If build_details.json exists, then so does sysconfig_vars.
             with open(self.build_details_path, encoding="utf-8") as fp:
@@ -321,13 +320,13 @@ class CrossVenvConfig:
                 self.build_details_path.parent / f"_sysconfigdata_{identifier}.py",
                 venv_site_packages_path,
                 prefix,
-                patch_sysconfig,
+                self.platform_module.patch_sysconfig,
             )
             localize_sysconfig_vars(
                 self.build_details_path.parent / f"_sysconfig_vars_{identifier}.json",
                 venv_site_packages_path,
                 prefix,
-                patch_sysconfig,
+                self.platform_module.patch_sysconfig,
             )
         else:
             # We've been given a sysconfigdata file instead.
@@ -339,7 +338,7 @@ class CrossVenvConfig:
                 self.sysconfigdata_path,
                 venv_site_packages_path,
                 prefix,
-                patch_sysconfig,
+                self.platform_module.patch_sysconfig,
             )
             version = sysconfigdata["VERSION"]
 
@@ -392,16 +391,8 @@ class CrossVenvConfig:
         self._write_pyvenv_cfg(venv_path)
 
         # Give the platform a chance to make any additional modifications to
-        # the venv (e.g., Emscripten installs a patched pip).
-        post_convert = getattr(self.platform_module, "post_convert", None)
-        if post_convert is not None:
-            post_convert(venv_path, self)
-
-        # Give the platform a chance to make any additional modifications to
-        # the venv (e.g., Emscripten installs a patched pip).
-        post_convert = getattr(self.platform_module, "post_convert", None)
-        if post_convert is not None:
-            post_convert(venv_path, self)
+        # the venv.
+        self.platform_module.post_convert(venv_path, self)
 
     def create(self, venv_path: Path, with_pip: bool = True):
         """Create (if `venv_path` doesn't already exist) and convert a virtual
@@ -531,18 +522,14 @@ def localized_vars(orig_vars, prefix):
             final = final.replace("-F .", f"-F {prefix}")
         localized_vars[key] = final
 
-    # Remove LDLIBRARY from the sysconfig vars. At runtime, ctypes on Android
-    # uses `sysconfig.get_config_var("LDLIBRARY")` to find libPython; this
-    # fails in a cross-environment. Removing the LDLIBRARY key causes ctypes
-    # to fall back to `ctypes.DLL(None)`, which is the default behavior on
-    # desktop platforms anyway.
-    localized_vars.pop("LDLIBRARY")
-
     return localized_vars
 
 
 def localize_sysconfigdata(
-    sysconfigdata_path, venv_site_packages, prefix, patch_sysconfig=None
+    sysconfigdata_path,
+    venv_site_packages,
+    prefix,
+    patch_sysconfig,
 ):
     """Localize a sysconfigdata python module.
 
@@ -550,14 +537,13 @@ def localize_sysconfigdata(
     :param venv_site_packages: The site packages folder where the localized
         sysconfigdata module should be output.
     :param prefix: The install prefix of the target Python build.
-    :param patch_sysconfig: An optional `(prefix, vars) -> vars` callable
-        that the platform can use to adjust the localized variables.
+    :param patch_sysconfig: A `(prefix, vars) -> vars` callable that the
+        platform can use to adjust the localized variables.
     :returns: The localized sysconfig variables.
     """
     sysconfigdata = parse_sysconfigdata(sysconfigdata_path)
     build_vars = localized_vars(sysconfigdata.build_time_vars, prefix)
-    if patch_sysconfig is not None:
-        build_vars = patch_sysconfig(prefix, build_vars)
+    build_vars = patch_sysconfig(build_vars, prefix)
 
     # Write the updated sysconfigdata module into the cross-platform site.
     with (venv_site_packages / sysconfigdata_path.name).open(
@@ -575,7 +561,10 @@ def localize_sysconfigdata(
 
 
 def localize_sysconfig_vars(
-    sysconfig_vars_path, venv_site_packages, prefix, patch_sysconfig=None
+    sysconfig_vars_path,
+    venv_site_packages,
+    prefix,
+    patch_sysconfig,
 ):
     """Localize a sysconfig_vars.json file.
 
@@ -583,16 +572,15 @@ def localize_sysconfig_vars(
     :param venv_site_packages: The site-packages folder where the localized
         sysconfig_vars.json file should be output.
     :param prefix: The install prefix of the target Python build.
-    :param patch_sysconfig: An optional `(prefix, vars) -> vars` callable
-        that the platform can use to adjust the localized variables.
+    :param patch_sysconfig: A `(prefix, vars) -> vars` callable that the
+        platform can use to adjust the localized variables.
     :return: The localized sysconfig
     """
     with sysconfig_vars_path.open("rb") as f:
         build_time_vars = json.load(f)
 
     sysconfig_vars = localized_vars(build_time_vars, prefix)
-    if patch_sysconfig is not None:
-        sysconfig_vars = patch_sysconfig(prefix, sysconfig_vars)
+    sysconfig_vars = patch_sysconfig(sysconfig_vars, prefix)
 
     with (venv_site_packages / sysconfig_vars_path.name).open(
         "w", encoding="utf-8"

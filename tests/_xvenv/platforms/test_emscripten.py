@@ -295,7 +295,7 @@ def test_patch_sysconfig(tmp_path):
     """patch_sysconfig records the Emscripten version in the sysconfig vars."""
     prefix = _xbuildenv(tmp_path)
 
-    patched = patch_sysconfig(prefix, dict(BUILD_TIME_VARS))
+    patched = patch_sysconfig(dict(BUILD_TIME_VARS), prefix)
 
     assert patched["EMSCRIPTEN_VERSION"] == "5.0.3"
     assert patched["prefix"] == PREFIX

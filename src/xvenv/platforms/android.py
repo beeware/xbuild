@@ -84,6 +84,19 @@ def prefix_path(config_data_path: Path) -> Path:
     return config_data_path.parents[2]
 
 
+def patch_sysconfig(sysconfigvars: dict, prefix: Path) -> dict:
+    """Remove LDLIBRARY from the sysconfig vars.
+
+    At runtime, ctypes on Android uses `sysconfig.get_config_var("LDLIBRARY")`
+    to find libPython; this fails in a cross-environment. Removing the LDLIBRARY
+    key causes ctypes to fall back to `ctypes.DLL(None)`, which is the default
+    behavior on desktop platforms anyway.
+    """
+    sysconfigvars.pop("LDLIBRARY")
+
+    return sysconfigvars
+
+
 def build_details_from_sysconfigdata(sysconfigdata):
     # Reconstruct a build_details-alike structure from sysconfigdata.
     arch, _, platform = sysconfigdata["MULTIARCH"].split("-")
@@ -235,6 +248,10 @@ def prepare_env(config) -> dict[str, str]:
             android_env[key] = value
 
     return android_env
+
+
+def post_convert(venv_path: Path, config) -> None:
+    """No post-conversion modifications required."""
 
 
 def packages_path(work_path):

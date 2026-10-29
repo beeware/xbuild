@@ -226,7 +226,7 @@ def emscripten_version(prefix: Path, sysconfigdata: dict) -> str:
     return _version_from_toolchain(sysconfigdata) or UNKNOWN_VERSION
 
 
-def patch_sysconfig(prefix: Path, sysconfigvars: dict) -> dict:
+def patch_sysconfig(sysconfigvars: dict, prefix: Path) -> dict:
     """Record the Emscripten version in the localized sysconfig variables, so
     it is available to anything that only has the sysconfigdata to go on."""
     sysconfigvars["EMSCRIPTEN_VERSION"] = emscripten_version(prefix, sysconfigvars)
@@ -350,7 +350,7 @@ def _sysconfig_vars(config) -> tuple[Path, dict]:
 
     prefix = prefix_path(sysconfigdata_path)
     build_time_vars = parse_sysconfigdata(sysconfigdata_path).build_time_vars
-    return prefix, patch_sysconfig(prefix, localized_vars(build_time_vars, prefix))
+    return prefix, patch_sysconfig(localized_vars(build_time_vars, prefix), prefix)
 
 
 def _is_ldflag(flag: str) -> bool:

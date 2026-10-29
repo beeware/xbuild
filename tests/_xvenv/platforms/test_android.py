@@ -9,6 +9,7 @@ from xvenv.convert import CrossVenvConfig
 from xvenv.platforms.android import (
     config_path,
     download_url,
+    patch_sysconfig,
     prepare_env,
     run_testbed,
     setup_testbed,
@@ -178,6 +179,21 @@ def test_config_path(tmp_path, version_details, arch, path):
     actual_config_path = config_path(tmp_path, version_info, f"{arch}-linux-android")
 
     assert actual_config_path == tmp_path / path
+
+
+def test_patch_sysconfig(tmp_path):
+    """patch_sysconfig records the Emscripten version in the sysconfig vars."""
+    prefix_dir = tmp_path / "prefix"
+    sysconfigdata = {
+        "prefix": prefix_dir,
+        "BINDIR": f"{prefix_dir}/bin",
+        "BINLIBDEST": f"{prefix_dir}/lib/python3.13",
+        "LDLIBRARY": f"{prefix_dir}/lib/libpython3.13.so",
+    }
+
+    patched = patch_sysconfig(sysconfigdata, tmp_path / "prefix")
+
+    assert "LDLIBRARY" not in patched
 
 
 def _write_fake_android_py(
