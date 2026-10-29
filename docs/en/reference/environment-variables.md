@@ -31,17 +31,3 @@ This variable is honored on all platforms, but it is most useful when building f
 Directories in `XBUILD_PATH` take precedence over the tools `xbuild` provides for the target platform. Point `XBUILD_PATH` at directories that contain only the specific tools you need, rather than at a general directory like `/opt/homebrew/bin`, which could shadow the target-platform compiler or Python interpreter.
 
 `XBUILD_PATH` only applies to builds performed by `xbuild`. It has no effect on a cross-platform environment that is activated and used directly.
-
-## `XBUILD_COMPILER_WRAPPER_DIR`
-
-Emscripten only. The directory in which `xbuild` creates its compiler wrappers (see [Platform setup: Emscripten](../how-to/platform-setup/emscripten.md#how-compilation-works)). If set, the directory is created if necessary and left in place after the build, which is useful for reproducing a compiler invocation by hand. If not set, a temporary directory is used and removed when `xbuild` exits.
-
-Setting this variable does not, by itself, cause wrappers to be used; wrappers are only created and used when building for Emscripten.
-
-## `SIDE_MODULE_CFLAGS`, `SIDE_MODULE_CXXFLAGS`, `SIDE_MODULE_LDFLAGS`
-
-Emscripten only. Override the compiler and linker flags that the compiler wrappers add when compiling and linking extension modules. By default, these are derived from the configure-time flags of the target Python build.
-
-## `MESON_CROSS_FILE`
-
-Emscripten only. The [meson cross file](https://mesonbuild.com/Cross-compilation.html) passed to `meson setup` by the `meson` compiler wrapper. By default, `xbuild` writes a cross file describing the Emscripten target alongside the compiler wrappers.
