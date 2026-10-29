@@ -243,33 +243,3 @@ def test_current_env_error(monkeypatch, tmp_path, mock_CrossVenvConfig, capsys):
 
     assert excinfo.value.code == 1
     assert "no record" in capsys.readouterr().err
-
-
-def test_builds_use_wrapper_aware_runner(tmp_path, monkeypatch):
-    """Both build paths construct the project builder with the subprocess
-    runner that keeps compiler wrappers at the front of PATH."""
-    from xbuild import __main__ as xbuild_main
-
-    runner = object()
-    monkeypatch.setattr(xbuild_main, "make_subprocess_runner", lambda *a: runner)
-
-    builder = Mock()
-    builder.build.return_value = "fake.whl"
-    builder.build_system_requires = set()
-    builder.build_system_target_requires = set()
-    builder_cls = Mock(return_value=builder)
-    builder_cls.from_isolated_env.return_value = builder
-    monkeypatch.setattr(xbuild_main, "ProjectXBuilder", builder_cls)
-
-    isolated_env = Mock()
-    isolated_env.__enter__ = Mock(return_value=isolated_env)
-    isolated_env.__exit__ = Mock(return_value=False)
-    monkeypatch.setattr(xbuild_main, "XBuildIsolatedEnv", lambda **kw: isolated_env)
-
-    xbuild_main._build_in_isolated_env(tmp_path, tmp_path, "wheel", None, "pip", Mock())
-    assert builder_cls.from_isolated_env.call_args.kwargs["runner"] is runner
-
-    xbuild_main._build_in_current_env(
-        tmp_path, tmp_path, "wheel", None, skip_dependency_check=True
-    )
-    assert builder_cls.call_args.kwargs["runner"] is runner

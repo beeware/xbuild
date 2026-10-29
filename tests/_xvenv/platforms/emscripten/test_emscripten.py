@@ -26,7 +26,7 @@ from xvenv.platforms.emscripten import (
     ensure_emscripten,
     extend_context,
     install_emsdk,
-    install_xpython_symlink,
+    install_node_python_symlink,
     installed_emscripten_version,
     make_command_wrapper_symlinks,
     packages_path,
@@ -39,7 +39,7 @@ from xvenv.platforms.emscripten import (
     setup_testbed,
 )
 
-from ...utils import VersionInfo
+from ....utils import VersionInfo
 
 PREFIX = "/build/python-3.14.2"
 EMSDK = "/opt/emsdk/emsdk-5.0.3/upstream/emscripten"
@@ -830,36 +830,36 @@ def _fake_venv(venv_path, pips=("pip", "pip3", "pip3.14")):
         (venv_path / "bin" / pip).write_text("#!/python\nstock pip\n")
 
 
-def test_install_xpython_symlink(tmp_path):
-    """Inside an xbuildenv, the Pyodide interpreter is linked as xpython; the
+def test_install_node_python_symlink(tmp_path):
+    """Inside an xvenv, the Pyodide interpreter is linked as node-python; the
     link is replaced if it already exists."""
     prefix = _xbuildenv(tmp_path)
     venv_path = tmp_path / "venv"
     _fake_venv(venv_path)
-    (venv_path / "bin/xpython").symlink_to("/stale")
+    (venv_path / "bin/node-python").symlink_to("/stale")
 
-    install_xpython_symlink(venv_path, _emscripten_config(prefix))
+    install_node_python_symlink(venv_path, _emscripten_config(prefix))
 
-    assert os.readlink(venv_path / "bin/xpython") == str(
+    assert os.readlink(venv_path / "bin/node-python") == str(
         pyodide_root(prefix) / "dist/python"
     )
 
 
-def test_install_xpython_symlink_standalone(tmp_path):
+def test_install_node_python_symlink_standalone(tmp_path):
     """Outside an xbuildenv, there's no interpreter to link."""
     venv_path = tmp_path / "venv"
     _fake_venv(venv_path)
 
-    install_xpython_symlink(venv_path, _emscripten_config(tmp_path / "standalone"))
+    install_node_python_symlink(venv_path, _emscripten_config(tmp_path / "standalone"))
 
-    assert not os.path.lexists(venv_path / "bin/xpython")
+    assert not os.path.lexists(venv_path / "bin/node-python")
 
 
 @pytest.mark.parametrize("layout", ["xbuildenv", "standalone"])
 def test_convert(tmp_path, layout):
     """Converting a venv for Emscripten records the Emscripten version in the
     sysconfigdata, installs the pip wrapper, and (from an xbuildenv) links
-    xpython."""
+    node-python."""
     if layout == "xbuildenv":
         prefix = _xbuildenv(tmp_path)
         sysconfigdata_path = _emscripten_sysconfigdata(prefix, layout="sysconfigdata")
@@ -882,7 +882,7 @@ def test_convert(tmp_path, layout):
 
     localized = (site_packages / sysconfigdata_path.name).read_text()
     assert "'EMSCRIPTEN_VERSION': '5.0.3'" in localized
-    assert (venv_path / "bin/xpython").is_symlink() == (layout == "xbuildenv")
+    assert (venv_path / "bin/node-python").is_symlink() == (layout == "xbuildenv")
     cross_target = (
         site_packages / "_cross_emscripten_wasm32_emscripten.py"
     ).read_text()
@@ -933,10 +933,10 @@ def test_setup_testbed_requirements(tmp_path, which):
     ],
 )
 def test_run_testbed(tmp_path, fake_subprocess, args, expected):
-    """The xpython symlink in the venv is run against the staged sources."""
+    """The node-python symlink in the venv is run against the staged sources."""
     assert run_testbed(tmp_path, args, verbose=0) == 0
 
     ((command, kwargs),) = fake_subprocess.calls
-    assert command == [str(tmp_path / "venv/bin/xpython"), *expected]
+    assert command == [str(tmp_path / "venv/bin/node-python"), *expected]
     assert kwargs["cwd"] == tmp_path / "src"
     assert kwargs["env"]["XBUILD_ENV"] == "off"

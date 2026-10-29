@@ -29,9 +29,7 @@ class AlwaysWasm32:
 
 DEFAULT_ARCH = AlwaysWasm32()
 
-# The Pyodide release whose cross-build environment (xbuildenv) is used for
-# each supported Python series. Adding a series here is all that's needed to
-# support it (plus expected values in the live test suite).
+# The Pyodide release that is used for each supported Python.
 PYODIDE_VERSIONS = {
     "3.12": "0.27.8",
     "3.13": "0.29.5",
@@ -41,8 +39,7 @@ PYODIDE_VERSIONS = {
 XBUILD_ENV_SCRIPTS_DIR_VAR = "XBUILD_ENV_SCRIPTS_DIR"
 
 # Environment variables that build tools use to find compilers, and the
-# pywasmcross symlink that each should point at. Mirrors pyodide-build's
-# `SYMLINK_ENV_VARS`.
+# pywasmcross symlink that each should point at.
 SYMLINK_ENV_VARS = {
     "cc": "CC",
     "c++": "CXX",
@@ -86,8 +83,7 @@ cpu = 'wasm'
 endian = 'little'
 """
 
-# The environment variables that `emsdk_env.sh` sets. Mirrors pyodide-build's
-# `EMSDK_ENV_VARS`.
+# The environment variables that `emsdk_env.sh` sets.
 EMSDK_ENV_VARS = {"PATH", "EMSDK", "EMSDK_NODE", "EMSDK_PYTHON", "SSL_CERT_FILE"}
 EMSDK_REPO = "https://github.com/emscripten-core/emsdk"
 
@@ -680,10 +676,10 @@ def prepare_env(config) -> dict[str, str]:
 ###########################################################################
 
 
-def install_xpython_symlink(venv_path: Path, config) -> None:
-    """Expose the Pyodide (node-hosted) interpreter as `bin/xpython` in a
-    cross venv created from an xbuildenv, so that code can be run against the
-    venv's site-packages on the target.
+def install_node_python_symlink(venv_path: Path, config) -> None:
+    """Expose the Pyodide (node-hosted) interpreter as `bin/node-python` in a
+    cross venv, so that code can be run against the venv's site-packages on the
+    target.
 
     :param venv_path: The root of the cross venv.
     :param config: The resolved `xvenv.convert.CrossVenvConfig`.
@@ -692,9 +688,9 @@ def install_xpython_symlink(venv_path: Path, config) -> None:
     if root is None or not (python := root / "dist/python").is_file():
         return
 
-    xpython = venv_path / "bin/xpython"
-    xpython.unlink(missing_ok=True)
-    xpython.symlink_to(python)
+    node_python = venv_path / "bin/node-python"
+    node_python.unlink(missing_ok=True)
+    node_python.symlink_to(python)
 
 
 def post_convert(venv_path: Path, config) -> None:
@@ -704,7 +700,7 @@ def post_convert(venv_path: Path, config) -> None:
     :param venv_path: The root of the cross venv.
     :param config: The resolved `xvenv.convert.CrossVenvConfig`.
     """
-    install_xpython_symlink(venv_path, config)
+    install_node_python_symlink(venv_path, config)
 
 
 ###########################################################################
@@ -770,7 +766,7 @@ def run_testbed(
     :returns: The exit code of the subprocess.
     """
     command = [
-        str(work_path / "venv/bin/xpython"),
+        str(work_path / "venv/bin/node-python"),
         *(args or ["-m", "test"]),
     ]
 

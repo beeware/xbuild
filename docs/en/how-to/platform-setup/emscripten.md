@@ -15,7 +15,7 @@ The compiler flags used for extension modules are derived from the configure-tim
 
 `meson`-based builds (e.g., `meson-python`) are given a [cross file](https://mesonbuild.com/Cross-compilation.html) describing the Emscripten target, which is written alongside the wrappers. Set `MESON_CROSS_FILE` to use your own cross file instead.
 
-### Known limitations
+## Known limitations
 
 - Rust extensions (`maturin`, `setuptools-rust`) are not supported: `cargo` is not wrapped, and the Rust tool chain for the `wasm32-unknown-emscripten` target is not configured.
 - Fortran code is not supported.
