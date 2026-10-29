@@ -276,10 +276,9 @@ def extend_context(context, build_details):
     # Patch invocations of `pip`
     ###########################################################################
     if (
-        len(sys.orig_argv) > 3 and (
-            sys.orig_argv[1:3] == ["-m", "pip"]
-            or sys.orig_argv[1:3] == ["-m", "pip3"]
-        )
+        # `python -m pip install ...`
+        (len(sys.orig_argv) > 3 and sys.orig_argv[1:3] == ["-m", "pip"])
+        # `pip install ...`
         or (len(sys.orig_argv) > 2 and sys.orig_argv[1] == f"{sys.prefix}/bin/pip")
     ):
         # Ensure that the vendored urllib3 is imported before sys.platform

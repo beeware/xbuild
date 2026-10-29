@@ -100,7 +100,7 @@ def download(url: str, cache_path: Path) -> Path:
 
     :param url: The URL to download.
     :param cache_path: The (already-resolved, already-existing) cache
-        directory to use — see :func:`resolve_cache_path`.
+        directory to use.
     :returns: The path of the downloaded file in the cache.
     :raises ValueError: if the download fails.
     """
@@ -126,7 +126,7 @@ def download_archive(url: str, cache_path: Path) -> Path:
 
     :param url: The URL of the archive to download.
     :param cache_path: The (already-resolved, already-existing) cache
-        directory to use — see :func:`resolve_cache_path`.
+        directory to use.
     :returns: The path of the extracted archive in the cache.
     :raises ValueError: if the download fails.
     """
@@ -161,7 +161,7 @@ def fetch_python(
     :param platform_name: One of `"ios"`, `"android"`, `"emscripten"`.
     :param multiarch: The target multi-architecture.
     :param cache_path: The (already-resolved, already-existing) cache
-        directory to use — see :func:`resolve_cache_path`.
+        directory to use.
     :returns: A tuple of `(config_path, is_build_details)`, where
         `is_build_details` is `True` if `config_path` is a
         `build-details.json` file, `False` if it's a legacy
