@@ -57,6 +57,15 @@ def archive_path(path: Path) -> Path:
     return path.parents[4]
 
 
+def prefix_path(config_data_path: Path) -> Path:
+    return config_data_path.parents[2]
+
+
+def patch_sysconfig(sysconfigvars: dict, prefix: Path) -> dict:
+    """No local modifications for sysconfigvars."""
+    return sysconfigvars
+
+
 def config_path(extracted_dir: Path, version_info: tuple, multiarch: str) -> Path:
     """Locate the sysconfig/build-details file inside an extracted iOS
     XCframework archive.
@@ -118,6 +127,7 @@ def extend_context(context, build_details):
         "root:xnu-11417.101.15~117/RELEASE_ARM64_T6000"
     )
 
+    context["pre_patch_extra"] = ""
     context["sys_extra"] = ""
     context["os_extra"] = ""
     context["platform_extra"] = f"""
@@ -171,6 +181,10 @@ def prepare_env(config) -> dict[str, str]:
             ]
         ),
     }
+
+
+def post_convert(venv_path: Path, config) -> None:
+    """No post-conversion modifications required."""
 
 
 def testbed_path(work_path):

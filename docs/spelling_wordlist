@@ -1,7 +1,9 @@
+ABI
 backend
 BeeWare
 Bugfixes
 Emscripten
+Fortran
 frontend
 Gradle
 Homebrew
@@ -12,8 +14,11 @@ monkeypatch
 monkeypatching
 natively
 NDK
+OpenMP
 pre
 prepended
+pyodide
+Pyodide
 PyPI
 README
 SDK

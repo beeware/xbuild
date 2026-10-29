@@ -205,7 +205,7 @@ def test_no_config_in_cross_env(
     main([str(venv_path)])
 
     mock_CrossVenvConfig.assert_not_called()
-    mock_CrossVenvConfig.from_current_env.assert_called_once_with()
+    mock_CrossVenvConfig.from_current_env.assert_called_once_with(cache_path=None)
     mock_config.create.assert_called_once_with(venv_path, with_pip=True)
 
 

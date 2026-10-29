@@ -2,7 +2,7 @@
 
 ## `XBUILD_CACHE`
 
-The directory used to cache downloaded target-platform Python builds when using `--platform`. Overridden by the `--cache` command-line option, which takes precedence. If neither is set, defaults to a platform-appropriate user cache directory (via [`platformdirs.user_cache_dir("xbuild")`](https://pypi.org/project/platformdirs/)).
+The directory used to cache downloaded target-platform Python builds when using `--platform`, and (for Emscripten) automatically installed copies of the Emscripten SDK. Overridden by the `--cache` command-line option, which takes precedence. If neither is set, defaults to a platform-appropriate user cache directory (via [`platformdirs.user_cache_dir("xbuild")`](https://pypi.org/project/platformdirs/)).
 
 ## `XBUILD_ENV`
 
