@@ -12,7 +12,11 @@ description = "A PEP517 build frontend for cross-compiling wheels."
 readme = "README.md"
 requires-python = ">= 3.11"
 license = "BSD-3-Clause"
-license-files = ["LICENSE", "LICENSE.pyodide"]
+license-files = [
+    "LICENSE",
+    "LICENSE.pyodide",
+    "LICENSE.python"
+]
 authors = [
     {name="Russell Keith-Magee", email="russell@keith-magee.com"},
 ]
@@ -117,6 +121,10 @@ toplevel = [
     "xpython",
 ]
 
+[tool.ruff]
+# Files vendored from CPython are kept identical to their source.
+extend-exclude = ["src/xpython/resources"]
+
 [tool.ruff.lint]
 # In addition to the default rules, these additional rules will be used:
 extend-select = [
@@ -148,7 +156,12 @@ known-third-party = [
 [tool.rumdl]
 flavor = "mkdocs"
 include = ["**/*.md"]
-exclude = ["docs/en/SUMMARY.md", "CODE_OF_CONDUCT.md", "changes/template.md"]
+exclude = [
+    "docs/en/SUMMARY.md",
+    "CODE_OF_CONDUCT.md",
+    "changes/template.md",
+    "src/xpython/resources/**",
+]
 respect-gitignore = true
 
 # Disable rules:

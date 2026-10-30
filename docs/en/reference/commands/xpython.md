@@ -1,6 +1,6 @@
 # `xpython`
 
-`xpython` runs a Python module inside an iOS Simulator or Android emulator/device, using the same "testbed" project that Python uses to run its own test suite. This testbed is included as part of the official Python releases.
+`xpython` runs a Python module inside an iOS Simulator or Android emulator/device, using the same "testbed" project that Python uses to run its own test suite. On iOS, this testbed is included as part of the Python build for the target platform. On Android, `xpython` includes its own copy of CPython's testbed, which is used for every supported Python version.
 
 ## Usage
 

@@ -33,10 +33,6 @@ IOS_SKIPS = [
     pytest.mark.iOS,
 ]
 ANDROID_SKIPS = [
-    pytest.mark.skipif(
-        sys.version_info < (3, 13),
-        reason="Android tests require Python 3.13+",
-    ),
     pytest.mark.android,
 ]
 
@@ -141,10 +137,6 @@ def _verify_patched(
     )
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 13),
-    reason="Android tests require Python 3.13+",
-)
 @pytest.mark.live
 def test_convert_existing_venv(tmp_path):
     """xvenv converts an already-existing native venv in place."""
@@ -170,10 +162,6 @@ def test_convert_existing_venv(tmp_path):
     _verify_patched(venv_path, expected_path, platform_name="android", arch="aarch64")
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 13),
-    reason="Android tests require Python 3.13+",
-)
 @pytest.mark.live
 def test_convert_existing_virtualenv(tmp_path):
     """xvenv converts an already-existing venv created by the third-party
@@ -200,10 +188,6 @@ def test_convert_existing_virtualenv(tmp_path):
     _verify_patched(venv_path, expected_path, platform_name="android", arch="aarch64")
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 13),
-    reason="Android tests require Python 3.13+",
-)
 @pytest.mark.live
 def test_convert_existing_uv_venv(tmp_path):
     """xvenv converts an already-existing venv created by uv, rather than the
@@ -275,10 +259,6 @@ def test_create_xvenv(tmp_path, platform_name, arch):
     )
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 13),
-    reason="Android tests require Python 3.13+",
-)
 @pytest.mark.live
 def test_create_xvenv_from_current_env(tmp_path):
     """Inside a cross-venv, xvenv with no configuration arguments creates a

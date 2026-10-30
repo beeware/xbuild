@@ -14,6 +14,7 @@ from pathlib import Path
 from filelock import FileLock
 
 from xvenv import versions
+from xvenv.fetch import download_archive
 from xvenv.platforms import build_platform_env
 from xvenv.platforms.emscripten import pywasmcross
 
@@ -121,6 +122,18 @@ def download_url(version_info: tuple, multiarch: str) -> str:
         "https://github.com/pyodide/pyodide/releases/download/"
         f"{pyodide_version}/xbuildenv-{pyodide_version}.tar.gz"
     )
+
+
+def fetch_archive(version_info: tuple, multiarch: str, cache_path: Path) -> Path:
+    """Download (if not already cached) and extract the iOS Python build.
+
+    :param version_info: The `sys.version_info` tuple for the version being
+        requested.
+    :param multiarch: The multi-architecture being requested.
+    :param cache_path: The cache directory to use.
+    :returns: The path of the extracted archive.
+    """
+    return download_archive(download_url(version_info, multiarch), cache_path)
 
 
 def config_path(extracted_path: Path, version_info, multiarch: str) -> Path:
@@ -263,9 +276,10 @@ def extend_context(context, build_details):
     # Patch invocations of `pip`
     ###########################################################################
     if (
-        sys.orig_argv[1:3] == ["-m", "pip"]
-        or sys.orig_argv[1:3] == ["-m", "pip3"]
-        or sys.orig_argv[1] == f"{sys.prefix}/bin/pip"
+        # `python -m pip install ...`
+        (len(sys.orig_argv) > 3 and sys.orig_argv[1:3] == ["-m", "pip"])
+        # `pip install ...`
+        or (len(sys.orig_argv) > 2 and sys.orig_argv[1] == f"{sys.prefix}/bin/pip")
     ):
         # Ensure that the vendored urllib3 is imported before sys.platform
         # is patched.
@@ -771,7 +785,11 @@ def run_testbed(
         *(args or ["-m", "test"]),
     ]
 
-    result = subprocess.run(
-        command, check=False, cwd=work_path / "src", env=build_platform_env()
-    )
+    env = build_platform_env()
+
+    # On Python 3.12, Pyodide needs an explicit export of the work
+    # dir to be guaranteed to be able to see it.
+    if sys.version_info < (3, 13):
+        env["_PYODIDE_EXTRA_MOUNTS"] = str(work_path)
+    result = subprocess.run(command, check=False, cwd=work_path / "src", env=env)
     return result.returncode
