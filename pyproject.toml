@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools==84.1.0",
+    "setuptools==84.2.1",
     "setuptools_scm==10.3.4",
 ]
 build-backend = "setuptools.build_meta"
@@ -77,17 +77,17 @@ Source = "https://github.com/beeware/xbuild"
 # Extras used by developers *of* briefcase are pinned to specific versions to
 # ensure environment consistency.
 pre-commit = [
-    "pre-commit == 4.6.2",
+    "pre-commit == 4.7.0",
 ]
 towncrier = [
     "towncrier==26.9.0",
 ]
 tox = [
-    "tox-uv == 1.36.0",
+    "tox-uv == 1.37.0",
 ]
 test = [
     "pytest == 9.1.1",
-    "uv == 0.13.4",
+    "uv == 0.13.5",
     "virtualenv == 21.14.13",
 ]
 dev = [
