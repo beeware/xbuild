@@ -2,6 +2,23 @@
 
 <!-- towncrier release notes start -->
 
+## 0.5.0 (2026-11-03)
+
+### Features
+
+* `xpython --work-dir` can now reuse a work directory created by a previous `xpython` invocation, skipping testbed setup and dependency installation. ([#103](https://github.com/beeware/xbuild/issues/103))
+* Android is now supported on Python 3.11 and 3.12, using the Python builds published by Chaquopy. `xpython` now uses its own copy of CPython's Android testbed, rather than the copy included in the Android Python build. ([#108](https://github.com/beeware/xbuild/issues/108))
+* `xbuild` now supports Emscripten (Pyodide) on Python 3.12-3.14. ([#110](https://github.com/beeware/xbuild/issues/110))
+
+### Bugfixes
+
+* `xvenv` can now convert virtual environments that were created with `virtualenv` or `uv`, in addition to those created by the standard library `venv` module. ([#104](https://github.com/beeware/xbuild/issues/104))
+* `xvenv` now uses a symbolic link to the host interpreter in a new virtual environment (except on Windows), matching the behavior of `python -m venv`. Previously the interpreter was copied, which broke environment creation with Python builds that locate `libpython` relative to the executable, such as the python-build-standalone builds managed by `uv`. ([#109](https://github.com/beeware/xbuild/issues/109))
+
+### Misc
+
+* [#106](https://github.com/beeware/xbuild/issues/106), [#110](https://github.com/beeware/xbuild/issues/110), [#112](https://github.com/beeware/xbuild/issues/112), [#113](https://github.com/beeware/xbuild/issues/113)
+
 ## 0.4.1 (2026-10-07)
 
 ### Features
