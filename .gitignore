@@ -31,6 +31,7 @@ Dockerfile
 
 # Documentation
 _build/
+docs/_build.*.toml
 comment.md
 
 # In-repo spaces for local testing
