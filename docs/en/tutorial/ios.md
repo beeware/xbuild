@@ -38,7 +38,7 @@ ios
 
 ### Enforcing a minimum iOS version
 
-When a cross-platform environment is created, the minimum iOS version supported by that environment is the same as the version supported by the version of Python being used.
+When a cross-platform environment is created, the minimum iOS version supported by that environment defaults to the minimum iOS version supported by the version of Python being used.
 
 If you want to enforce a different minimum iOS version, set the `IPHONEOS_DEPLOYMENT_TARGET` environment variable to your preferred minimum version prior to creating your cross platform environment. This will encode your preferred iOS version as the platform version reported by the environment. For example, to create an iOS 17 environment:
 

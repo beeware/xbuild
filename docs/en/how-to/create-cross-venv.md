@@ -24,7 +24,7 @@ If the `x-venv` directory doesn't already exist, `xvenv` creates it first (equiv
 
 ### Setting the minimum OS version
 
-When a cross-platform environment is created, the minimum OS version supported by that environment is the same as the version supported by the version of Python being used.
+When a cross-platform environment is created, the minimum OS version supported by that environment defaults to the minimum OS version supported by the version of Python being used.
 
 If you want to enforce a different minimum OS version, you can set environment variables to enforce a minimum version:
 

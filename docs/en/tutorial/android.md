@@ -68,9 +68,9 @@ android
 
 ### Enforcing a minimum Android version
 
-When a cross-platform environment is created, the minimum OS version supported by that environment is the same as the version supported by the version of Python being used.
+When a cross-platform environment is created, the minimum OS version supported by that environment defaults to the minimum OS version supported by the version of Python being used.
 
-If you want to enforce a different minimum OS version, you can set, set the `ANDROID_API_LEVEL` environment variable to your preferred minimum version prior to creating your cross platform environment. This will encode your preferred API level as the platform version reported by the environment. For example, to create an Android 11 (API level 30) environment:
+If you want to enforce a different minimum OS version, you can set the `ANDROID_API_LEVEL` environment variable to your preferred minimum version prior to creating your cross platform environment. This will encode your preferred API level as the platform version reported by the environment. For example, to create an Android 11 (API level 30) environment:
 
 /// tab | macOS/Linux
 
