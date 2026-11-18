@@ -32,7 +32,7 @@ Dockerfile
 # Documentation
 comment.md
 
-# In-repo spaces for local testingbu
+# In-repo spaces for local testing
 .envrc
 local/
 temp/
