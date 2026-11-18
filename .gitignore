@@ -37,8 +37,6 @@ comment.md
 local/
 temp/
 
-# Docs
-
 # Agent tooling
 .kilo
 .opencode

@@ -52,18 +52,21 @@ def install_requirements(
     requirements: list[str],
     packages_path: Path,
     find_links: list[str],
+    allow_prerelease: bool = False,
 ) -> None:
     """Install `requirements` into `packages_path`, using `venv_python`'s
     own `pip`.
 
     No-op if `requirements` is empty.
 
-    :param venv_python: Path to the Python executable of the (cross-)venv
-        whose pip should be used to resolve/install the requirements.
+    :param venv_python: Path to the Python executable of the (cross-)venv whose
+        pip should be used to resolve/install the requirements.
     :param requirements: PEP 508 requirement strings to install.
     :param packages_path: The `--target` directory to install into.
-    :param find_links: Directories to pass as `--find-links` (searched for
-        local wheels before/alongside PyPI).
+    :param find_links: Directories to pass as `--find-links` (searched for local
+        wheels before/alongside PyPI).
+    :param allow_prerelease: Include pre-release and development versions of
+        dependencies.
     :raises subprocess.CalledProcessError: if pip fails.
     """
     if not requirements:
@@ -72,6 +75,8 @@ def install_requirements(
     command = [venv_python, "-m", "pip", "install", "--target", packages_path]
     for directory in find_links:
         command.extend(["--find-links", str(directory)])
+    if allow_prerelease:
+        command.append("--pre")
     command.extend(requirements)
 
     subprocess.run(command, check=True)
