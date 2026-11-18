@@ -327,6 +327,7 @@ def test_environment_min_os_version(tmp_path, platform_name, arch):
         ],
         check=True,
         env={
+            **os.environ,
             "IPHONEOS_DEPLOYMENT_TARGET": "24.0",
             "ANDROID_API_LEVEL": "35.7",
         },
