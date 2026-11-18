@@ -45,6 +45,15 @@ def main_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--pre",
+        dest="allow_prerelease",
+        action="store_true",
+        help=(
+            "Include pre-release and development versions of dependencies. "
+            "By default, pip only finds stable versions."
+        ),
+    )
+    parser.add_argument(
         "--group",
         dest="groups",
         action="append",
@@ -308,7 +317,13 @@ def _run(args: argparse.Namespace) -> int:
     packages_path.mkdir(parents=True, exist_ok=True)
     if requirements:
         venv_python = venv_path / "bin" / "python3"
-        install_requirements(venv_python, requirements, packages_path, args.find_links)
+        install_requirements(
+            venv_python,
+            requirements,
+            packages_path,
+            find_links=args.find_links,
+            allow_prerelease=args.allow_prerelease,
+        )
 
     _cprint("{bold}Running testbed...{reset}")
     return cross_venv.run_testbed(
