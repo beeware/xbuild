@@ -126,3 +126,35 @@ def test_install_requirements_noop_when_empty(tmp_path, monkeypatch):
     install_requirements(venv_python, [], packages_dir, [])
 
     mock_run.assert_not_called()
+
+
+def test_install_requirements_allow_prerelease(tmp_path, monkeypatch):
+    """Prereleases can be explicitly allowed."""
+    mock_run = Mock()
+    monkeypatch.setattr("xpython.deps.subprocess.run", mock_run)
+    venv_python = tmp_path / "venv" / "bin" / "python"
+    packages_dir = tmp_path / "packages"
+
+    install_requirements(
+        venv_python,
+        ["requests", "attrs>=23"],
+        packages_dir,
+        find_links=["/tmp/wheels"],
+        allow_prerelease=True,
+    )
+
+    mock_run.assert_called_once()
+    assert mock_run.call_args.args[0] == [
+        venv_python,
+        "-m",
+        "pip",
+        "install",
+        "--target",
+        packages_dir,
+        "--find-links",
+        "/tmp/wheels",
+        "--pre",
+        "requests",
+        "attrs>=23",
+    ]
+    assert mock_run.call_args.kwargs["check"] is True
