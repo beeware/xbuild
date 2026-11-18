@@ -66,6 +66,38 @@ android
 
 ///
 
+### Enforcing a minimum Android version
+
+When a cross-platform environment is created, the minimum OS version supported by that environment is the same as the version supported by the version of Python being used.
+
+If you want to enforce a different minimum OS version, you can set, set the `ANDROID_API_LEVEL` environment variable to your preferred minimum version prior to creating your cross platform environment. This will encode your preferred API level as the platform version reported by the environment. For example, to create an Android 11 (API level 30) environment:
+
+/// tab | macOS/Linux
+
+```console
+(venv) $ export ANDROID_API_LEVEL=30
+(venv) $ xvenv --platform android --arch aarch64 x-venv
+(venv) $ deactivate
+$ source x-venv/bin/activate
+(x-venv) $ python -c "import platform; print(platform.android_ver())"
+AndroidVer(release='11', api_level=30, manufacturer='Google', model='sdk_gphone64', device='emu64', is_emulator=True)
+```
+
+///
+
+/// tab | Windows
+
+```doscon
+(venv) $ set ANDROID_API_LEVEL=30
+(venv) $ xvenv --platform android --arch aarch64 x-venv
+(venv) C:\...> deactivate
+C:\...> x-venv\Scripts\activate
+(x-venv) C:\...> python -c "import platform; print(platform.android_ver())"
+AndroidVer(release='11', api_level=30, manufacturer='Google', model='sdk_gphone64', device='emu64', is_emulator=True)
+```
+
+///
+
 ## Build a wheel
 
 If you have a project that contains a PEP 517 build configuration and has binary modules, you can build a binary wheel for Android using:

@@ -22,6 +22,17 @@ Then run `xvenv`, specifying the platform and architecture you want to target, a
 
 If the `x-venv` directory doesn't already exist, `xvenv` creates it first (equivalent to running `python -m venv x-venv`), then converts it into a cross environment. If `x-venv` already exists, it is converted in place.
 
+### Setting the minimum OS version
+
+When a cross-platform environment is created, the minimum OS version supported by that environment is the same as the version supported by the version of Python being used.
+
+If you want to enforce a different minimum OS version, you can set environment variables to enforce a minimum version:
+
+* **Android** - `ANDROID_API_LEVEL`
+* **iOS** - `IPHONEOS_DEPLOYMENT_TARGET`
+
+The cross-platform environment will return those version numbers as the "current" OS version when asked (e.g., with `platform.android_ver()` or `platform.ios_ver()`).
+
 ## Activating the cross-environment
 
 Deactivate the build-platform virtual environment you used to create the cross-environment, then activate the cross-environment itself:

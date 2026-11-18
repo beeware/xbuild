@@ -294,31 +294,37 @@ def build_details_from_sysconfigdata(sysconfigdata):
 
 
 def extend_context(context, build_details):
-    # Convert the API level into a release number
-    api_level = int(build_details["platform"].split("-")[1])
-    if api_level >= 33:
-        release = f"{api_level - 20}"
-    elif api_level == 32:
+    # Convert the API level into a release number. Only convert the major
+    # version number; see python/cpython#162196
+    api_level = os.getenv(
+        "ANDROID_API_LEVEL",
+        build_details["platform"].split("-")[1],
+    )
+    api_level_major = int(api_level.split(".")[0])
+
+    if api_level_major >= 33:
+        release = f"{api_level_major - 20}"
+    elif api_level_major == 32:
         release = "12L"
-    elif api_level == 31:
+    elif api_level_major == 31:
         release = "12"
-    elif api_level > 28:
-        release = f"{api_level - 19}"
-    elif api_level == 27:
+    elif api_level_major > 28:
+        release = f"{api_level_major - 19}"
+    elif api_level_major == 27:
         release = "8.1"
-    elif api_level == 26:
+    elif api_level_major == 26:
         release = "8.0"
-    elif api_level == 25:
+    elif api_level_major == 25:
         release = "7.1"
-    elif api_level == 24:
+    elif api_level_major == 24:
         release = "7.0"
-    elif api_level == 23:
+    elif api_level_major == 23:
         release = "6.0"
-    elif api_level == 22:
+    elif api_level_major == 22:
         release = "5.1"
-    elif api_level == 21:
+    elif api_level_major == 21:
         release = "5.0"
-    elif api_level == 20:
+    elif api_level_major == 20:
         release = "4.4W"
     else:
         raise ValueError("xbuild doesn't support API levels lower than 20")
@@ -347,7 +353,7 @@ def extend_context(context, build_details):
 
     @monkeypatch(sys)
     def getandroidapilevel() -> int:
-        return {api_level}
+        return {api_level_major}
 """
     context["os_extra"] = ""
     context["platform_extra"] = f"""
@@ -364,7 +370,7 @@ def extend_context(context, build_details):
         if release == "":
             release = "{release}"
         if api_level == 0:
-            api_level = {api_level}
+            api_level = {api_level_major}
         if manufacturer == "":
             manufacturer = "Google"
         if model == "":

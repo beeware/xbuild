@@ -120,7 +120,10 @@ def build_details_from_sysconfigdata(sysconfigdata):
 
 
 def extend_context(context, build_details):
-    release = build_details["platform"].split("-")[1]
+    release = os.getenv(
+        "IPHONEOS_DEPLOYMENT_TARGET",
+        build_details["platform"].split("-")[1],
+    )
     is_simulator = context["sdk"] == "iphonesimulator"
 
     ######################################################################

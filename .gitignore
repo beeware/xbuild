@@ -30,7 +30,6 @@ tests/integration/
 Dockerfile
 
 # Documentation
-_build/
 comment.md
 
 # In-repo spaces for local testing
