@@ -36,24 +36,36 @@ ios
 (x-venv) $ deactivate
 ```
 
-### Enforcing a minimum Android version
+### Enforcing a minimum iOS version
 
 When a cross-platform environment is created, the minimum iOS version supported by that environment is the same as the version supported by the version of Python being used.
 
 If you want to enforce a different minimum iOS version, set the `IPHONEOS_DEPLOYMENT_TARGET` environment variable to your preferred minimum version prior to creating your cross platform environment. This will encode your preferred iOS version as the platform version reported by the environment. For example, to create an iOS 17 environment:
 
-/// tab | macOS/Linux
-
 ```console
 (venv) $ export IPHONEOS_DEPLOYMENT_TARGET=30
 (venv) $ xvenv --platform ios --arch arm64_iphonesimulator x-venv
-(venv) $ deactivate
+```
+
+Then, when the environment is activated:
+
+```console
 $ source x-venv/bin/activate
 (x-venv) $ python -c "import platform; print(platform.ios_ver())"
 IOSVersionInfo(system='iOS', release='17.0', model='iphonesimulator', is_simulator=True)
 ```
 
-///
+You can also define `IPHONEOS_DEPLOYMENT_TARGET` before running individual commands. The value in the current shell environment will always take priority:
+
+```console
+(venv) $ xvenv --platform ios --arch arm64_iphonesimulator x-venv
+(venv) $ deactivate
+$ source x-venv/bin/activate
+(x-venv) $ python -c "import platform; print(platform.ios_ver())"
+IOSVersionInfo(system='iOS', release='13.0', model='iphonesimulator', is_simulator=True)
+(x-venv) $ IPHONEOS_DEPLOYMENT_TARGET=17.0 python -c "import platform; print(platform.ios_ver())"
+IOSVersionInfo(system='iOS', release='17.0', model='iphonesimulator', is_simulator=True)
+```
 
 ## Build a wheel
 

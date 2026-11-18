@@ -261,6 +261,56 @@ def test_create_xvenv(tmp_path, platform_name, arch):
 
     _verify_patched(venv_path, expected_path, platform_name=platform_name, arch=arch)
 
+    # Install-time min OS version override check: reuses this same cross-venv
+    # rather than creating a third one, since behavior doesn't depend on how the
+    # venv was originally created.
+
+    overrides_path = tmp_path / "overrides.toml"
+    if platform_name == "ios":
+        overrides_path.write_text(
+            textwrap.dedent("""
+                [ios."arm64-iphonesimulator"]
+                sysconfig_platform = "ios-24.0-arm64-iphonesimulator"
+                ios_release = "24.0"
+
+                [ios."x86_64-iphonesimulator"]
+                sysconfig_platform = "ios-24.0-x86_64-iphonesimulator"
+                ios_release = "24.0"
+
+                [ios."arm64-iphoneos"]
+                sysconfig_platform = "ios-24.0-arm64-iphoneos"
+                ios_release = "24.0"
+            """)
+        )
+    elif platform_name == "android":
+        overrides_path.write_text(
+            textwrap.dedent("""
+                [android.aarch64]
+                sysconfig_platform = "android-35.7-arm64_v8a"
+                android_release = "15"
+                android_api_level = 35
+
+                [android.x86_64]
+                sysconfig_platform = "android-35.7-x86_64"
+                android_release = "15"
+                android_api_level = 35
+            """)
+        )
+    else:
+        overrides_path = expected_path
+
+    _verify_patched(
+        venv_path,
+        expected_path,
+        platform_name=platform_name,
+        arch=arch,
+        extra_env={
+            "_XBUILD_EXPECTED_VALUES_PATH": str(overrides_path),
+            "IPHONEOS_DEPLOYMENT_TARGET": "24.0",
+            "ANDROID_API_LEVEL": "35.7",
+        },
+    )
+
     # Disabled-mode check: reuses this same cross-venv rather than creating
     # a third one, since disabled-mode behavior doesn't depend on how the
     # venv was originally created.

@@ -77,7 +77,9 @@ If you want to enforce a different minimum OS version, you can set, set the `AND
 ```console
 (venv) $ export ANDROID_API_LEVEL=30
 (venv) $ xvenv --platform android --arch aarch64 x-venv
-(venv) $ deactivate
+```
+Then, when the environment is activated:
+```console
 $ source x-venv/bin/activate
 (x-venv) $ python -c "import platform; print(platform.android_ver())"
 AndroidVer(release='11', api_level=30, manufacturer='Google', model='sdk_gphone64', device='emu64', is_emulator=True)
@@ -90,8 +92,43 @@ AndroidVer(release='11', api_level=30, manufacturer='Google', model='sdk_gphone6
 ```doscon
 (venv) $ set ANDROID_API_LEVEL=30
 (venv) $ xvenv --platform android --arch aarch64 x-venv
+```
+
+Then, when the environment is activated:
+
+```doscon
+C:\...> x-venv\Scripts\activate
+(x-venv) C:\...> python -c "import platform; print(platform.android_ver())"
+AndroidVer(release='11', api_level=30, manufacturer='Google', model='sdk_gphone64', device='emu64', is_emulator=True)
+```
+
+///
+
+You can also define `ANDROID_API_LEVEL` before running individual commands. The value in the current shell environment will always take priority:
+
+/// tab | macOS/Linux
+
+```console
+(venv) $ xvenv --platform android --arch aarch64 x-venv
+(venv) $ deactivate
+$ source x-venv/bin/activate
+(x-venv) $ python -c "import platform; print(platform.android_ver())"
+AndroidVer(release='7.0', api_level=24, manufacturer='Google', model='sdk_gphone64', device='emu64', is_emulator=True)
+(x-venv) $ ANDROID_API_LEVEL=30 python -c "import platform; print(platform.android_ver())"
+AndroidVer(release='11', api_level=30, manufacturer='Google', model='sdk_gphone64', device='emu64', is_emulator=True)
+```
+
+///
+
+/// tab | Windows
+
+```doscon
+(venv) $ xvenv --platform android --arch aarch64 x-venv
 (venv) C:\...> deactivate
 C:\...> x-venv\Scripts\activate
+(x-venv) C:\...> python -c "import platform; print(platform.android_ver())"
+AndroidVer(release='7.0', api_level=24, manufacturer='Google', model='sdk_gphone64', device='emu64', is_emulator=True)
+(x-venv) C:\...> set ANDROID_API_LEVEL=30
 (x-venv) C:\...> python -c "import platform; print(platform.android_ver())"
 AndroidVer(release='11', api_level=30, manufacturer='Google', model='sdk_gphone64', device='emu64', is_emulator=True)
 ```
