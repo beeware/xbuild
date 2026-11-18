@@ -12,7 +12,7 @@ venv*/
 .venv
 
 # Distribution / packaging
-build/lib/
+build/
 dist/
 *.egg-info/
 .eggs
@@ -32,13 +32,12 @@ Dockerfile
 # Documentation
 comment.md
 
-# In-repo spaces for local testing
+# In-repo spaces for local testingbu
 .envrc
 local/
 temp/
 
 # Docs
-_build
 
 # Agent tooling
 .kilo
