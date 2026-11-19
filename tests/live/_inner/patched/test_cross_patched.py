@@ -19,9 +19,7 @@ CROSS_PLATFORM = os.environ["_XBUILD_PLATFORM"]
 CROSS_ARCH = os.environ["_XBUILD_ARCH"]
 
 TOML_PATH = Path(os.environ["_XBUILD_EXPECTED_VALUES_PATH"])
-COMMON_TOML_PATH = (
-    Path(os.environ["_XBUILD_EXPECTED_VALUES_PATH"]).parent / "common.toml"
-)
+COMMON_TOML_PATH = Path(os.environ["_XBUILD_COMMON_VALUES_PATH"]).parent / "common.toml"
 
 ALL_COMMON_EXPECTED = tomllib.loads(COMMON_TOML_PATH.read_text())
 ALL_EXPECTED = tomllib.loads(TOML_PATH.read_text())

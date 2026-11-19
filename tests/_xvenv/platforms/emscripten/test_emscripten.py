@@ -323,7 +323,6 @@ def test_extend_context():
     extend_context(context, {"platform": "emscripten-5.0.3-wasm32"})
 
     assert context["os"] == "Emscripten"
-    assert context["release"] == "5.0.3"
     assert context["platform_version"] == "5.0.3"
     assert context["machine"] == "wasm32"
     assert context["os_sysname"] == "Emscripten"
@@ -886,7 +885,7 @@ def test_convert(tmp_path, layout):
     cross_target = (
         site_packages / "_cross_emscripten_wasm32_emscripten.py"
     ).read_text()
-    assert 'release="5.0.3"' in cross_target
+    assert '_platform_version = "5.0.3"' in cross_target
 
 
 ###########################################################################

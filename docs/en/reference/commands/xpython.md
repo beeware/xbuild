@@ -38,13 +38,17 @@ See the [Common options](./index.md#common-options) page for options shared with
 
 A PEP 508 dependency specifier to install into the testbed (e.g. `requests`, `attrs>=23`, `mypkg[extra]`). Can be repeated.
 
+### `--pre`
+
+Include pre-releases and development versions when installing dependencies. By default, only stable and post-release versions will be considered for installation unless the pre-release version is explicitly selected as a version.
+
 ### `--group NAME`
 
 The name of a [PEP 735](https://peps.python.org/pep-0735/) dependency group, resolved against `[dependency-groups]` in `./pyproject.toml`. Can be repeated.
 
 ### `-f DIR` / `--find-links DIR`
 
-A directory of local wheels to search during dependency resolution. Forwarded to pip's `--find-links`. PyPI is still available for anything not found locally. Can be repeated.
+A directory of local wheels to search during dependency resolution. Forwarded to `pip`'s `--find-links`. PyPI is still available for anything not found locally. Can be repeated.
 
 ### `--src PATH`
 

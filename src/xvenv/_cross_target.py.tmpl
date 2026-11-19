@@ -55,7 +55,7 @@ def patch_cross_env():
         return platform.uname_result(
             system="{os}",
             node="{os_nodename}",
-            release="{release}",
+            release=_platform_version,
             version="{os_version}",
             machine="{arch}",
         )
@@ -89,7 +89,7 @@ def patch_cross_env():
 
     @monkeypatch(sysconfig)
     def get_platform():
-        return "{platform}-{platform_version}-{machine}"
+        return "{platform}-" + _platform_version + "-{machine}"
 
     @monkeypatch(sysconfig)
     def _get_sysconfigdata_name():

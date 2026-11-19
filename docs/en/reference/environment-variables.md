@@ -31,3 +31,11 @@ This variable is honored on all platforms, but it is most useful when building f
 Directories in `XBUILD_PATH` take precedence over the tools `xbuild` provides for the target platform. Point `XBUILD_PATH` at directories that contain only the specific tools you need, rather than at a general directory like `/opt/homebrew/bin`, which could shadow the target-platform compiler or Python interpreter.
 
 `XBUILD_PATH` only applies to builds performed by `xbuild`. It has no effect on a cross-platform environment that is activated and used directly.
+
+## `ANDROID_API_LEVEL`
+
+Sets the minimum API level supported by the cross-platform environment. If undefined, the minimum API level supported by the environment will be the same as the version supported by the version of Python being used.
+
+## `IPHONEOS_DEPLOYMENT_TARGET`
+
+Sets the minimum iOS version supported by the cross-platform environment. If undefined, the minimum iOS version supported by the environment will be the same as the version supported by the version of Python being used.

@@ -12,7 +12,7 @@ venv*/
 .venv
 
 # Distribution / packaging
-build/lib/
+build/
 dist/
 *.egg-info/
 .eggs
@@ -38,9 +38,6 @@ comment.md
 .envrc
 local/
 temp/
-
-# Docs
-_build
 
 # Agent tooling
 .kilo

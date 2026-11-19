@@ -120,13 +120,14 @@ def build_details_from_sysconfigdata(sysconfigdata):
 
 
 def extend_context(context, build_details):
-    release = build_details["platform"].split("-")[1]
+    platform_version = os.getenv(
+        "IPHONEOS_DEPLOYMENT_TARGET",
+        build_details["platform"].split("-")[1],
+    )
     is_simulator = context["sdk"] == "iphonesimulator"
 
     ######################################################################
     context["os"] = "iOS"
-    context["release"] = release
-    context["platform_version"] = release
     context["machine"] = context["multiarch"]
 
     # The Darwin kernel version and release are unlikely to be
@@ -141,7 +142,9 @@ def extend_context(context, build_details):
     )
 
     context["pre_patch_extra"] = ""
-    context["sys_extra"] = ""
+    context["sys_extra"] = f"""
+    _platform_version = os.getenv("IPHONEOS_DEPLOYMENT_TARGET", "{platform_version}")
+"""
     context["os_extra"] = ""
     context["platform_extra"] = f"""
     @monkeypatch(platform)
@@ -149,7 +152,7 @@ def extend_context(context, build_details):
         if system == "":
             system = "iOS"
         if release == "":
-            release = "{release}"
+            release = _platform_version
         if model == "":
             model = "{context["sdk"]}"
 
