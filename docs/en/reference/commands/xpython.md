@@ -48,7 +48,7 @@ The name of a [PEP 735](https://peps.python.org/pep-0735/) dependency group, res
 
 ### `-f DIR` / `--find-links DIR`
 
-A directory of local wheels to search during dependency resolution. Forwarded to pip's `--find-links`. PyPI is still available for anything not found locally. Can be repeated.
+A directory of local wheels to search during dependency resolution. Forwarded to `pip`'s `--find-links`. PyPI is still available for anything not found locally. Can be repeated.
 
 ### `--src PATH`
 

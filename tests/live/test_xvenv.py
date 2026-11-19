@@ -14,6 +14,7 @@ existing XBUILD_CACHE/platformdirs resolution in xvenv.fetch.resolve_cache_path(
 import os
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -48,16 +49,22 @@ EMSCRIPTEN_SKIPS = [
     pytest.mark.emscripten,
 ]
 
-CASES = [
+IOS_CASES = [
     pytest.param("ios", "arm64-iphonesimulator", id="ios-arm64-sim", marks=IOS_SKIPS),
     pytest.param("ios", "x86_64-iphonesimulator", id="ios-x86_64-sim", marks=IOS_SKIPS),
     pytest.param("ios", "arm64-iphoneos", id="ios-arm64-device", marks=IOS_SKIPS),
+]
+ANDROID_CASES = [
     pytest.param("android", "aarch64", id="android-aarch64", marks=ANDROID_SKIPS),
     pytest.param("android", "x86_64", id="android-x86_64", marks=ANDROID_SKIPS),
+]
+EMSCRIPTEN_CASES = [
     pytest.param(
         "emscripten", "wasm32", id="emscripten-wasm32", marks=EMSCRIPTEN_SKIPS
     ),
 ]
+
+CASES = IOS_CASES + ANDROID_CASES + EMSCRIPTEN_CASES
 
 
 def _expected_values_path() -> Path:
@@ -123,7 +130,10 @@ def _verify_patched(
     expected_path: Path,
     platform_name: str,
     arch: str,
+    extra_env: dict[str, str] | None = None,
 ) -> None:
+    if extra_env is None:
+        extra_env = {}
     venv_python = venv_python_exe(venv_path)
     _install_pytest(venv_python)
     _run_inner_suite(
@@ -131,8 +141,10 @@ def _verify_patched(
         INNER_PATCHED_DIR,
         {
             "_XBUILD_EXPECTED_VALUES_PATH": str(expected_path),
+            "_XBUILD_COMMON_VALUES_PATH": str(expected_path),
             "_XBUILD_PLATFORM": platform_name,
             "_XBUILD_ARCH": arch,
+            **extra_env,
         },
     )
 
@@ -249,6 +261,56 @@ def test_create_xvenv(tmp_path, platform_name, arch):
 
     _verify_patched(venv_path, expected_path, platform_name=platform_name, arch=arch)
 
+    # Install-time min OS version override check: reuses this same cross-venv
+    # rather than creating a third one, since behavior doesn't depend on how the
+    # venv was originally created.
+
+    overrides_path = tmp_path / "overrides.toml"
+    if platform_name == "ios":
+        overrides_path.write_text(
+            textwrap.dedent("""
+                [ios."arm64-iphonesimulator"]
+                sysconfig_platform = "ios-24.0-arm64-iphonesimulator"
+                ios_release = "24.0"
+
+                [ios."x86_64-iphonesimulator"]
+                sysconfig_platform = "ios-24.0-x86_64-iphonesimulator"
+                ios_release = "24.0"
+
+                [ios."arm64-iphoneos"]
+                sysconfig_platform = "ios-24.0-arm64-iphoneos"
+                ios_release = "24.0"
+            """)
+        )
+    elif platform_name == "android":
+        overrides_path.write_text(
+            textwrap.dedent("""
+                [android.aarch64]
+                sysconfig_platform = "android-35.7-arm64_v8a"
+                android_release = "15"
+                android_api_level = 35
+
+                [android.x86_64]
+                sysconfig_platform = "android-35.7-x86_64"
+                android_release = "15"
+                android_api_level = 35
+            """)
+        )
+    else:
+        overrides_path = expected_path
+
+    _verify_patched(
+        venv_path,
+        expected_path,
+        platform_name=platform_name,
+        arch=arch,
+        extra_env={
+            "_XBUILD_EXPECTED_VALUES_PATH": str(overrides_path),
+            "IPHONEOS_DEPLOYMENT_TARGET": "24.0",
+            "ANDROID_API_LEVEL": "35.7",
+        },
+    )
+
     # Disabled-mode check: reuses this same cross-venv rather than creating
     # a third one, since disabled-mode behavior doesn't depend on how the
     # venv was originally created.
@@ -289,3 +351,70 @@ def test_create_xvenv_from_current_env(tmp_path):
     )
 
     _verify_patched(inner_path, expected_path, platform_name="android", arch="aarch64")
+
+
+@pytest.mark.parametrize(("platform_name", "arch"), IOS_CASES + ANDROID_CASES)
+@pytest.mark.live
+def test_environment_min_os_version(tmp_path, platform_name, arch):
+    """The minimum OS deployment target defined where the environment was created
+    persists into the created environment."""
+    expected_path = _expected_values_path()
+
+    venv_path = tmp_path / "x-venv"
+    # Create the venv in an environment with a minimum OS version defined.
+    # Use OS versions that definitely don't exist, to make 100% certain
+    # we're seeing an override.
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "xvenv",
+            "--platform",
+            platform_name,
+            "--arch",
+            arch,
+            str(venv_path),
+        ],
+        check=True,
+        env={
+            **os.environ,
+            "IPHONEOS_DEPLOYMENT_TARGET": "24.0",
+            "ANDROID_API_LEVEL": "35.7",
+        },
+    )
+
+    overrides_path = tmp_path / "overrides.toml"
+    overrides_path.write_text(
+        textwrap.dedent("""
+            [android.aarch64]
+            sysconfig_platform = "android-35.7-arm64_v8a"
+            android_release = "15"
+            android_api_level = 35
+
+            [android.x86_64]
+            sysconfig_platform = "android-35.7-x86_64"
+            android_release = "15"
+            android_api_level = 35
+
+            [ios."arm64-iphonesimulator"]
+            sysconfig_platform = "ios-24.0-arm64-iphonesimulator"
+            ios_release = "24.0"
+
+            [ios."x86_64-iphonesimulator"]
+            sysconfig_platform = "ios-24.0-x86_64-iphonesimulator"
+            ios_release = "24.0"
+
+            [ios."arm64-iphoneos"]
+            sysconfig_platform = "ios-24.0-arm64-iphoneos"
+            ios_release = "24.0"
+        """)
+    )
+    _verify_patched(
+        venv_path,
+        expected_path,
+        platform_name=platform_name,
+        arch=arch,
+        extra_env={
+            "_XBUILD_EXPECTED_VALUES_PATH": str(overrides_path),
+        },
+    )

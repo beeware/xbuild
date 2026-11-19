@@ -2,7 +2,9 @@ ABI
 backend
 BeeWare
 Bugfixes
+build's
 Chaquopy
+CI
 CPython's
 Emscripten
 Fortran
@@ -24,6 +26,7 @@ Pyodide
 PyPI
 README
 SDK
+slice's
 testbed
 testbed's
 toga

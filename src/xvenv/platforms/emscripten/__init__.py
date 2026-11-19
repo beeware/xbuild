@@ -262,7 +262,6 @@ def extend_context(context, build_details):
     # `packaging.tags.platform_tags()` (and hence pip) dispatches on
     # `platform.system() == "Emscripten"`.
     context["os"] = "Emscripten"
-    context["release"] = emscripten_version
     context["platform_version"] = emscripten_version
     context["machine"] = context["arch"]
 
@@ -306,7 +305,9 @@ def extend_context(context, build_details):
             yield from tags._generic_platforms()
 
 """
-    context["sys_extra"] = ""
+    context["sys_extra"] = f"""
+    _platform_version = "{emscripten_version}"
+"""
     # The stdlib's `_pyrepl.trace` (imported by `pdb`, and hence by pytest)
     # does `from posix import _emscripten_log` when sys.platform is
     # emscripten. Provide a stand-in so that such imports don't fail on the

@@ -294,38 +294,15 @@ def build_details_from_sysconfigdata(sysconfigdata):
 
 
 def extend_context(context, build_details):
-    # Convert the API level into a release number
-    api_level = int(build_details["platform"].split("-")[1])
-    if api_level >= 33:
-        release = f"{api_level - 20}"
-    elif api_level == 32:
-        release = "12L"
-    elif api_level == 31:
-        release = "12"
-    elif api_level > 28:
-        release = f"{api_level - 19}"
-    elif api_level == 27:
-        release = "8.1"
-    elif api_level == 26:
-        release = "8.0"
-    elif api_level == 25:
-        release = "7.1"
-    elif api_level == 24:
-        release = "7.0"
-    elif api_level == 23:
-        release = "6.0"
-    elif api_level == 22:
-        release = "5.1"
-    elif api_level == 21:
-        release = "5.0"
-    elif api_level == 20:
-        release = "4.4W"
-    else:
-        raise ValueError("xbuild doesn't support API levels lower than 20")
+    # Convert the API level into a release number. Only convert the major
+    # version number; see python/cpython#162196
+    api_level = os.getenv(
+        "ANDROID_API_LEVEL",
+        build_details["platform"].split("-")[1],
+    )
 
     ######################################################################
     context["os"] = "Android"
-    context["release"] = release
     context["platform_version"] = api_level
     context["machine"] = {
         "x86_64": "x86_64",
@@ -345,12 +322,42 @@ def extend_context(context, build_details):
     context["pre_patch_extra"] = ""
     context["sys_extra"] = f"""
 
+    _platform_version = os.getenv("ANDROID_API_LEVEL", "{api_level}")
+    _api_level_major = int(_platform_version.split(".")[0])
+    if _api_level_major >= 33:
+        _release = f"{{_api_level_major - 20}}"
+    elif _api_level_major == 32:
+        _release = "12L"
+    elif _api_level_major == 31:
+        _release = "12"
+    elif _api_level_major > 28:
+        _release = f"{{_api_level_major - 19}}"
+    elif _api_level_major == 27:
+        _release = "8.1"
+    elif _api_level_major == 26:
+        _release = "8.0"
+    elif _api_level_major == 25:
+        _release = "7.1"
+    elif _api_level_major == 24:
+        _release = "7.0"
+    elif _api_level_major == 23:
+        _release = "6.0"
+    elif _api_level_major == 22:
+        _release = "5.1"
+    elif _api_level_major == 21:
+        _release = "5.0"
+    elif _api_level_major == 20:
+        _release = "4.4W"
+    else:
+        raise ValueError("xbuild doesn't support API levels lower than 20")
+
     @monkeypatch(sys)
     def getandroidapilevel() -> int:
-        return {api_level}
+        return _api_level_major
+
 """
     context["os_extra"] = ""
-    context["platform_extra"] = f"""
+    context["platform_extra"] = """
 
     @monkeypatch(platform)
     def android_ver(
@@ -362,9 +369,9 @@ def extend_context(context, build_details):
         is_emulator=False
     ):
         if release == "":
-            release = "{release}"
+            release = _release
         if api_level == 0:
-            api_level = {api_level}
+            api_level = _api_level_major
         if manufacturer == "":
             manufacturer = "Google"
         if model == "":
